@@ -1,0 +1,17 @@
+# PostgreSQL cho môi trường dev. Spring Boot (spring-boot-docker-compose) tự bật file này
+# khi chạy ./mvnw spring-boot:run và tự cấu hình datasource, nên không cần khai báo URL.
+# Thông tin đăng nhập dưới đây chỉ dùng cho máy local, không dùng cho production.
+services:
+  postgres:
+    image: 'postgres:17-alpine'
+    environment:
+      - 'POSTGRES_DB=minishop'
+      - 'POSTGRES_USER=minishop'
+      - 'POSTGRES_PASSWORD=minishop'
+    ports:
+      - '5432'
+    volumes:
+      - 'postgres-data:/var/lib/postgresql/data'
+
+volumes:
+  postgres-data:

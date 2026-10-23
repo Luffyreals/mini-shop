@@ -7,6 +7,7 @@
   - `phase-<N>/<mo-ta-ngan>`, ví dụ `phase-1/project-setup`
   - `fix/<mo-ta>`, `docs/<mo-ta>`, `chore/<mo-ta>` cho việc ngoài giai đoạn
 - Mở Pull Request vào `main`, điền đủ template, tự review diff, rồi chọn **Squash and merge**.
+- Nhánh `main` **không bật bảo vệ** (branch protection / ruleset) vì repo private và chỉ có một người phát triển; các quy tắc trên được giữ bằng kỷ luật. Xem xét bật lại khi chuyển repo sang public hoặc có thêm người.
 
 ## Commit message
 

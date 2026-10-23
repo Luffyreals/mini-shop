@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: mini-shop
+  jpa:
+    # Buộc service phải load đủ dữ liệu trong transaction, lộ sớm lỗi N+1 / lazy loading
+    open-in-view: false
+    hibernate:
+      # Flyway quản lý schema; Hibernate chỉ kiểm tra entity khớp với bảng (ADR-0004)
+      ddl-auto: validate
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 10MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+app:
+  seed:
+    # Mật khẩu demo chỉ dùng cho dev (BR-001-2); môi trường thật phải đặt biến môi trường
+    admin-password: ${SEED_ADMIN_PASSWORD:Admin@123}
+    user-password: ${SEED_USER_PASSWORD:User@123}

@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Token mặc định chỉ được đọc repo
+permissions:
+  contents: read
+
+# Trên PR chỉ lần push mới nhất quan trọng; trên main mọi commit phải có kết quả đầy đủ
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # Runner có sẵn Docker nên test Testcontainers luôn chạy ở đây (spec 001, AC-001-1, AC-001-7)
+      - name: Build and test
+        run: ./mvnw -B -ntp verify
+
+      # Test bị bỏ qua (ví dụ không có Docker) không được tính là xanh (AC-001-14).
+      # Cũng ghi bảng tổng chạy/fail/skipped vào job summary (AC-001-17).
+      - name: Fail if any test was skipped
+        run: bash .github/scripts/check-no-skipped-tests.sh
+
+      - name: Upload JaCoCo report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports/
+            target/failsafe-reports/
+          retention-days: 7
