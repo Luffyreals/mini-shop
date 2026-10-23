@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Không tìm thấy sản phẩm | Mini Shop')}"></head>
+<body class="site-body">
+<header th:replace="~{fragments/layout :: header}"></header>
+
+<main class="ms-container site-main">
+  <div class="row g-4 g-lg-5 align-items-center">
+    <div class="col-12 col-md-7">
+      <h1 class="page-title">Không tìm thấy sản phẩm</h1>
+      <p class="lead-text">Sản phẩm không tồn tại hoặc đã ngừng bán.</p>
+      <a class="btn btn-primary" th:href="@{/products}">Về danh sách sản phẩm</a>
+    </div>
+    <div class="col-12 col-md-5 col-lg-4 offset-lg-1">
+      <div class="product-tile tile-field-2">
+        <img class="product-tile__img" width="800" height="1000" alt="" th:src="@{/images/placeholder-product.svg}">
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

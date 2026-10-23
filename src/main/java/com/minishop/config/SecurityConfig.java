@@ -4,20 +4,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Cấu hình bảo mật nền: chặn mặc định, chỉ mở các đường dẫn công khai (spec 001, AC-001-6).
+ * Cấu hình bảo mật nền: chặn mặc định, chỉ mở các đường dẫn công khai (trang chủ, /products/**, tài nguyên tĩnh) (spec 001, AC-001-6).
  * <p>Phân quyền USER/ADMIN và trang đăng nhập riêng được thêm ở GĐ3.
  */
 @Configuration
 public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
-            "/", "/error", "/favicon.ico",
-            "/css/**", "/js/**", "/images/**", "/webjars/**",
+            "/", "/products", "/products/**", "/error", "/favicon.ico",
+            "/css/**", "/js/**", "/images/**", "/fonts/**", "/webjars/**", "/credits.html",
             "/actuator/health"
     };
 
@@ -31,7 +32,7 @@ public class SecurityConfig {
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY)))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(PUBLIC_PATHS).permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_PATHS).permitAll()
                         .anyRequest().authenticated())
                 .formLogin(Customizer.withDefaults())
                 .logout(Customizer.withDefaults());

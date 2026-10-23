@@ -11,7 +11,7 @@ Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-re
 - the `DataInitializer` seed;
 - architecture, data, and security tests.
 
-No user-facing features exist yet. Next is GĐ2 (product listing and detail), which starts with `/write-spec`. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
+GĐ2 ([spec 002](docs/specs/002-product-catalog.md), [plan](docs/plans/phase-2.md)) is **done and released as `v0.2.0`**: the storefront product listing and detail pages. Next is GĐ3 (registration, login, roles), which starts with `/write-spec`. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
 
 ## How to work with the user
 
@@ -95,6 +95,20 @@ Modular monolith, **package-by-feature** under `com.minishop`: `catalog`, `cart`
 - **The seed must be gated before any deployment (GĐ8):** with the dev defaults, an empty production DB would get `admin@minishop.local` with a known password. Add `app.seed.enabled` or remove the defaults before deploying.
 - **Visibility today:** `user.User`, `user.Role`, `user.UserRepository`, `catalog.Category`, `catalog.Product` and the catalog repositories are public; everything in `cart` and `order` is package-private.
 - **Entity conventions:** a protected no-arg constructor plus a constructor taking the required fields; setters only where used. `created_at` and `updated_at` are set by `@PrePersist`/`@PreUpdate`. Money is `numeric(12,0)` with whole VND, so keep amounts integral in services.
+
+### Storefront patterns (GĐ2), reuse these in later phases
+
+- **Query parameters arrive as strings.** `ProductController` takes `q`, `category`, `sort` and `page` as raw `String`s in a `ProductSearchParams` record, and `ProductFilter.from()` normalises them: trim, cap `q` at 100 chars, 1-based page, unknown values fall back to the defaults. Never bind `sort`/`page` straight into `Pageable`; a bad value would become a 500.
+- **Product queries** use Spring Data `Specification` (`ProductSpecifications`) plus `@EntityGraph("category")` on the repository's `findAll(spec, pageable)`. Never call `root.fetch()` inside a Specification, because it breaks the count query. Sorts always add `id` as a tie-breaker so pages are stable. LIKE input is escaped (`%`, `_`, `\`).
+- **Views receive records**, never entities: `ProductCardView`, `ProductDetailView`, `ProductListView`, `CategoryOption`. Categories are sorted in Java with a Vietnamese `Collator`, not by the DB.
+- **Prices:** always `${#vnd.format(price)}`, the `ViewHelpersDialect` expression object (`common.VndFormatter`). Never format money inline in a template.
+- **Pagination:** `common.PageNav.of(current, totalPages, urlForPage)` builds the links; templates render `fragments/pagination :: pagination(nav)` and never build URLs themselves.
+- **404:** throw `common.NotFoundException`. `catalog.ProductNotFoundAdvice` maps it, plus `MethodArgumentTypeMismatchException` (e.g. `/products/abc`), to status 404 and view `product/not-found`. The general error pages come in GĐ7.
+- **Templates:**
+  - Shared pieces live in `templates/fragments/`: `layout` (head/header/footer), `product` (tile/stock/card) and `pagination`. Page templates live in `templates/<feature>/`.
+  - `TemplateCspComplianceTest` scans every template and static HTML file for CSP violations.
+- **Design direction:** "The specimen catalogue" (tokens in the opening comment of `static/css/app.css`; working files in `.taste-skill/`, gitignored). Reuse it; never redraw for the storefront.
+- **Assets:** fonts are served from `/fonts/**` (public path). Every new image needs a licence entry in `static/credits.html` (CC BY/BY-SA require attribution in the app), which the footer links as "Nguồn ảnh". Product image paths are `/images/products/<slug>.jpg`.
 
 ### Domain invariants to preserve
 

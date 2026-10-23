@@ -5,6 +5,7 @@ import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.Entity;
 import org.springframework.data.repository.Repository;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RestController;
@@ -51,6 +52,13 @@ class ArchitectureTest {
             .that().areAnnotatedWith(Controller.class)
             .or().areAnnotatedWith(RestController.class)
             .should().dependOnClassesThat().areAssignableTo(Repository.class);
+
+    /** Spec 002 §8: view chỉ nhận DTO, controller không đụng tới entity. */
+    @ArchTest
+    static final ArchRule controllers_doNotDependOnEntities = noClasses()
+            .that().areAnnotatedWith(Controller.class)
+            .or().areAnnotatedWith(RestController.class)
+            .should().dependOnClassesThat().areAnnotatedWith(Entity.class);
 
     @ArchTest
     static final ArchRule noFieldInjection = fields()

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  nav là PageNav. Link do controller dựng (giữ q, category, sort); template không tự ghép URL.
+  Trang hiện tại và "trước/sau" không có đích thì là span, không có href.
+-->
+<nav th:fragment="pagination(nav)" aria-label="Phân trang" th:if="${nav.totalPages > 1}">
+  <ul class="pagination flex-wrap mb-0">
+    <li class="page-item" th:classappend="${nav.previousUrl == null} ? 'disabled'">
+      <a class="page-link" rel="prev" th:if="${nav.previousUrl != null}" th:href="@{${nav.previousUrl}}">Trang trước</a>
+      <span class="page-link" th:if="${nav.previousUrl == null}">Trang trước</span>
+    </li>
+    <li class="page-item" th:each="link : ${nav.links}" th:classappend="${link.current} ? 'active'">
+      <span class="page-link" th:if="${link.current}" aria-current="page" th:text="${link.number}">1</span>
+      <a class="page-link" th:unless="${link.current}" th:href="@{${link.url}}" th:text="${link.number}">2</a>
+    </li>
+    <li class="page-item" th:classappend="${nav.nextUrl == null} ? 'disabled'">
+      <a class="page-link" rel="next" th:if="${nav.nextUrl != null}" th:href="@{${nav.nextUrl}}">Trang sau</a>
+      <span class="page-link" th:if="${nav.nextUrl == null}">Trang sau</span>
+    </li>
+  </ul>
+</nav>
+</body>
+</html>

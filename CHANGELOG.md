@@ -5,6 +5,22 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-23
+
+GĐ2: danh sách và chi tiết sản phẩm ([spec 002](docs/specs/002-product-catalog.md)).
+
+### Thêm
+- Trang danh sách sản phẩm (`/`, `/products`): tìm theo tên (không phân biệt hoa thường), lọc theo danh mục, sắp xếp mới nhất / giá tăng / giá giảm, phân trang 12 sản phẩm; tham số sai tự quay về mặc định.
+- Trang chi tiết sản phẩm (`/products/{id}`) và trang 404 "Không tìm thấy sản phẩm" (kể cả sản phẩm bị ẩn và id không hợp lệ).
+- Truy vấn bằng Spring Data `Specification` + `@EntityGraph` (không có N+1), `ProductService` chỉ đọc, DTO cho view.
+- Helper Thymeleaf `#vnd` định dạng giá `1.250.000 ₫`; `PageNav` dựng link phân trang giữ nguyên bộ lọc.
+- Giao diện storefront theo hướng thiết kế "The specimen catalogue" (skill `design-taste-frontend`): layout và fragment dùng chung, font Bricolage Grotesque tự host, ảnh thay thế khi sản phẩm không có ảnh.
+- 19 ảnh sản phẩm mẫu có giấy phép mở và trang ghi nguồn `/credits.html`.
+- Test: truy vấn trên PostgreSQL (tìm có dấu, lọc, sắp xếp ổn định, N+1), service, controller, định dạng giá, phân trang, quét template tuân thủ CSP.
+
+### Thay đổi
+- Trang chủ `/` giờ là danh sách sản phẩm (tiêu đề tab `Sản phẩm | Mini Shop`), thay cho trang tạm của GĐ1.
+
 ## [0.1.0] - 2026-10-23
 
 GĐ1: nền móng dự án ([spec 001](docs/specs/001-project-foundation.md)).

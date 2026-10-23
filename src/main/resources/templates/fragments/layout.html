@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<!--
+  Layout dùng chung cho khu khách hàng (fragment thuần, không dùng Layout Dialect).
+  Mỗi trang gọi: head(title), header, footer. Không có script hay style nội tuyến (CSP).
+-->
+<head th:fragment="head(title)">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title th:text="${title}">Mini Shop</title>
+  <link rel="preload" as="font" type="font/woff2" crossorigin th:href="@{/fonts/BricolageGrotesque-latin-vi.woff2}">
+  <link rel="stylesheet" th:href="@{/webjars/bootstrap/dist/css/bootstrap.min.css}">
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<header class="site-header" th:fragment="header">
+  <div class="ms-container site-header__bar">
+    <a class="site-wordmark" th:href="@{/}">Mini Shop</a>
+    <nav aria-label="Menu chính">
+      <a class="site-nav-link" th:href="@{/products}">Sản phẩm</a>
+    </nav>
+  </div>
+</header>
+<footer class="site-footer" th:fragment="footer">
+  <div class="ms-container">
+    <p class="site-footer__name">Mini Shop</p>
+    <div class="site-footer__row">
+      <p class="mb-0">Dự án học tập, không bán hàng thật.</p>
+      <a class="site-footer__link" th:href="@{/credits.html}">Nguồn ảnh</a>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

@@ -112,3 +112,4 @@ Migration `V1__init_schema.sql`. Tên bảng ở dạng số nhiều để trán
 | 2026-10-23 | Người dùng duyệt theo khuyến nghị. Từ kết quả review khung dự án: siết AC-001-4 và AC-001-5, thêm AC-001-13 (health công khai, kiểm không cần Docker) và AC-001-14 (CI không được xanh khi có test bị bỏ qua). |
 | 2026-10-23 | Duyệt kế hoạch `docs/plans/phase-1.md` kèm nhóm "Nâng chất lượng": thêm AC-001-15 (ArchUnit), AC-001-16 (CSP), AC-001-17 (JaCoCo). Mật khẩu demo dùng mặc định. Chuyển sang Đang làm. |
 | 2026-10-23 | Nghiệm thu. `phase-verifier` PASS; CI của PR #2 xanh (45 test, 0 bị bỏ qua, có artifact JaCoCo). Thêm `Product.stock` `updatable = false` và chặn số lượng không dương trong `decrementStock` sau review. Chuyển sang Hoàn thành, phát hành `v0.1.0`. |
+| 2026-10-23 | (Sau khi hoàn thành) AC-001-5 được thay bằng AC-002-2 của spec 002: từ GĐ2, `/` là trang danh sách sản phẩm với tiêu đề tab `Sản phẩm \| Mini Shop`, không còn trang tạm "Mini Shop". |

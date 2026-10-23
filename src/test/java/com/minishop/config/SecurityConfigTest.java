@@ -12,12 +12,18 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest
+/**
+ * Chỉ kiểm chuỗi filter bảo mật (QĐ13): {@code useDefaultFilters = false} nên không nạp controller nào,
+ * test không phụ thuộc vào handler của tính năng cụ thể.
+ */
+@WebMvcTest(useDefaultFilters = false)
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
 
@@ -54,7 +60,10 @@ class SecurityConfigTest {
         assertThat(result.getResponse().getRedirectedUrl()).isNull();
     }
 
-    /** AC-001-16: trang công khai có CSP chặt, chỉ cho phép tài nguyên cùng origin. */
+    /**
+     * AC-001-16: trang công khai có CSP chặt, chỉ cho phép tài nguyên cùng origin.
+     * Chỉ assert header: không có controller nên "/" có thể trả 404, nhưng header vẫn được thêm.
+     */
     @Test
     void homePage_carriesContentSecurityPolicy() throws Exception {
         mockMvc.perform(get("/"))
@@ -69,6 +78,14 @@ class SecurityConfigTest {
         mockMvc.perform(get("/orders"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Content-Security-Policy", containsString("default-src 'self'")));
+    }
+
+    /** Đường dẫn công khai chỉ áp dụng cho GET: POST vào /products/** (ví dụ thêm giỏ ở GĐ4) vẫn phải đăng nhập. */
+    @Test
+    void publicPaths_areGetOnly_postToProductsRequiresLogin() throws Exception {
+        mockMvc.perform(post("/products/1").with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
     }
 
     @Test

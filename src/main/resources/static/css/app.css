@@ -1,1 +1,442 @@
-/* Style riêng của dự án (design token, override Bootstrap). Hướng thiết kế được chọn ở GĐ2. */
+/*
+ * Mini Shop: style riêng của dự án (design token, override Bootstrap 5.3).
+ *
+ * HƯỚNG THIẾT KẾ KHU KHÁCH HÀNG (storefront), vẽ một lần ở GĐ2 bằng skill design-taste-frontend
+ *   Hướng        : The specimen catalogue (id specimen-catalogue), seed 1671369641, ngày vẽ 2026-10-23
+ *   Ý tưởng      : mỗi món hàng đứng một mình trên một ô màu phẳng, cùng cỡ, cùng góc nhìn, tên gọi
+ *                  rõ ràng, giống bảng chim trong sách hướng dẫn; ô sản phẩm là "mẫu vật" của cửa hàng.
+ *   Bố cục       : hero "Statement beside specimen mosaic" (KHÔNG dùng ở GĐ2 vì không có hero tự nghĩ chữ),
+ *                  danh mục là lưới ô, tên + giá nằm dưới ô, canh trái theo mép ô; cứ 6-7 ô có một ô gấp đôi.
+ *   Palette      : "Poster chapters": nền xương #e6e0d2, mực #1a1a1a, nhấn xanh lá #18bc42 (chỉ cho nút chính),
+ *                  các ô màu: đỏ san hô #ed4b44, vàng #f2c21a, xanh lá #18bc42, mực #1a1a1a.
+ *   Chữ          : Bricolage Grotesque (một họ chữ, font biến thiên, tự host, SIL OFL), trục opsz 12-96 và wght 400-700.
+ *                  Display: 600, tracking -0.04em, leading 0.92. Text: 400, đậm vừa 500.
+ *   Redraw       : 1 lần, slot "type". Bộ chữ đầu tiên (Young Serif + Source Serif 4) bị loại vì Young Serif
+ *                  thiếu glyph tiếng Việt (ệ ữ ở ặ ẫ và ký hiệu ₫). Các slot khác giữ nguyên.
+ *   Chuyển động  : "Shutter image" của skill KHÔNG làm (là tính năng chưa được duyệt). Chỉ có phản hồi
+ *                  hover/focus/press, tắt khi prefers-reduced-motion.
+ *   Quy tắc nhà  : không viền mảnh trang trí, không gradient, không đổ bóng khi nghỉ, không icon trong hình vuông
+ *                  màu, nhãn chữ thường. Ô nhập vẫn có viền nhìn thấy được (truy cập quan trọng hơn).
+ *   Dữ liệu hướng: .taste-skill/direction.json (thư mục bị gitignore, đọc lại bằng `node draw.mjs --show`).
+ *
+ * Thứ tự file: 1. font  2. token  3. ánh xạ sang --bs-*  4. nền chữ  5. nút, ô nhập, phân trang  6. tiện ích.
+ * Component riêng của trang (thẻ sản phẩm, lưới ô, header, footer) do F2 thêm ở cuối file.
+ * Không dùng style="" hay <style> trong template (CSP): mọi thứ nằm ở đây.
+ */
+
+/* 1. Font: tự host, đủ glyph tiếng Việt (Latin + Latin mở rộng A + Latin Extended Additional + ₫). */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("../fonts/BricolageGrotesque-latin-vi.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 2. Token */
+:root {
+  /* màu: nền, mực, nhấn */
+  --ms-bg: #e6e0d2;
+  --ms-surface: #dcd5c5;
+  --ms-surface-strong: #cdc4af;
+  --ms-ink: #1a1a1a;
+  --ms-muted: #5f5b52;
+  --ms-accent: #18bc42;
+  --ms-accent-ink: #1a1a1a;
+  --ms-accent-hover: #14a03a;
+  --ms-danger: #b3261e;
+
+  /* các ô màu của "bảng mẫu vật": xoay vòng theo thứ tự này */
+  --ms-field-1: #ed4b44;
+  --ms-field-1-ink: #0f0f0f;
+  --ms-field-2: #f2c21a;
+  --ms-field-2-ink: #1a1a1a;
+  --ms-field-3: #18bc42;
+  --ms-field-3-ink: #1a1a1a;
+  --ms-field-4: #1a1a1a;
+  --ms-field-4-ink: #e6e0d2;
+
+  /* chữ */
+  --ms-font: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ms-step-small: clamp(0.875rem, 0.85rem + 0.1vw, 0.9375rem);
+  --ms-step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  --ms-step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+  --ms-step-head: clamp(2rem, 1.3rem + 3.2vw, 4rem);
+  --ms-display-weight: 600;
+  --ms-display-tracking: -0.04em;
+  --ms-display-leading: 0.92;
+
+  /* khung: một cặp lề ngoài, một bán kính góc (góc vuông), khoảng cách giữa các khối */
+  --ms-margin: clamp(1rem, 0.5rem + 2vw, 2rem);
+  --ms-radius: 0;
+  --ms-gap: 0.75rem;
+  --ms-section-gap: clamp(4rem, 3rem + 5vw, 7.5rem);
+
+  /* chuyển động */
+  --ms-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ms-fast: 140ms;
+}
+
+/* 3. Ánh xạ sang biến của Bootstrap 5.3 */
+:root,
+[data-bs-theme="light"] {
+  --bs-body-bg: var(--ms-bg);
+  --bs-body-bg-rgb: 230, 224, 210;
+  --bs-body-color: var(--ms-ink);
+  --bs-body-color-rgb: 26, 26, 26;
+  --bs-secondary-color: var(--ms-muted);
+  --bs-secondary-bg: var(--ms-surface);
+  --bs-tertiary-bg: var(--ms-surface);
+  --bs-emphasis-color: var(--ms-ink);
+  --bs-body-font-family: var(--ms-font);
+  --bs-body-font-size: var(--ms-step-body);
+  --bs-body-font-weight: 400;
+  --bs-body-line-height: 1.5;
+  --bs-heading-color: var(--ms-ink);
+  --bs-link-color: var(--ms-ink);
+  --bs-link-color-rgb: 26, 26, 26;
+  --bs-link-hover-color: var(--ms-ink);
+  --bs-link-hover-color-rgb: 26, 26, 26;
+  --bs-primary: var(--ms-accent);
+  --bs-primary-rgb: 24, 188, 66;
+  --bs-danger: var(--ms-danger);
+  --bs-danger-rgb: 179, 38, 30;
+  --bs-border-color: var(--ms-muted);
+  --bs-border-radius: var(--ms-radius);
+  --bs-border-radius-sm: var(--ms-radius);
+  --bs-border-radius-lg: var(--ms-radius);
+  --bs-border-radius-xl: var(--ms-radius);
+  --bs-border-radius-pill: var(--ms-radius);
+  --bs-focus-ring-color: rgba(26, 26, 26, 0.35);
+}
+
+/* 4. Nền chữ */
+body {
+  font-family: var(--ms-font);
+  font-optical-sizing: auto;
+  background: var(--ms-bg);
+  color: var(--ms-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: var(--ms-font);
+  font-weight: var(--ms-display-weight);
+  letter-spacing: var(--ms-display-tracking);
+  line-height: var(--ms-display-leading);
+  text-wrap: balance;
+}
+
+h1, .h1 { font-size: var(--ms-step-head); }
+h2, .h2 { font-size: var(--ms-step-lead); line-height: 1.05; }
+h3, .h3 { font-size: var(--ms-step-body); line-height: 1.2; font-weight: 500; letter-spacing: -0.01em; }
+
+small, .small { font-size: var(--ms-step-small); }
+.text-secondary, .text-body-secondary { color: var(--ms-muted) !important; }
+
+a { text-underline-offset: 0.18em; }
+
+/* Giá luôn trên một dòng để "₫" không rớt xuống dòng (QĐ8 của plan); số đều cột */
+.price {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* Mô tả sản phẩm giữ xuống dòng do người bán nhập; vẫn render bằng th:text */
+.product-description { white-space: pre-line; }
+
+/* Lề ngoài chung của mọi trang khách: một cặp lề bằng nhau ở mọi bề rộng */
+.ms-container {
+  width: 100%;
+  max-width: 90rem;
+  margin-inline: auto;
+  padding-inline: var(--ms-margin);
+}
+
+/* 5. Nút, ô nhập, phân trang */
+
+/* Nút chính: nền xanh lá, chữ mực, vuông góc, một hình dạng duy nhất */
+.btn {
+  --bs-btn-border-radius: var(--ms-radius);
+  --bs-btn-font-weight: 500;
+  --bs-btn-padding-x: 1.25rem;
+  --bs-btn-padding-y: 0.55rem;
+  --bs-btn-font-size: var(--ms-step-body);
+  min-height: 2.75rem;
+  transition: background-color var(--ms-fast) var(--ms-ease), color var(--ms-fast) var(--ms-ease),
+              transform var(--ms-fast) var(--ms-ease);
+}
+
+.btn-primary {
+  --bs-btn-color: var(--ms-accent-ink);
+  --bs-btn-bg: var(--ms-accent);
+  --bs-btn-border-color: var(--ms-accent);
+  --bs-btn-hover-color: var(--ms-accent-ink);
+  --bs-btn-hover-bg: var(--ms-accent-hover);
+  --bs-btn-hover-border-color: var(--ms-accent-hover);
+  --bs-btn-active-color: var(--ms-accent-ink);
+  --bs-btn-active-bg: var(--ms-accent-hover);
+  --bs-btn-active-border-color: var(--ms-accent-hover);
+  --bs-btn-focus-shadow-rgb: 26, 26, 26;
+  --bs-btn-disabled-color: var(--ms-muted);
+  --bs-btn-disabled-bg: var(--ms-surface-strong);
+  --bs-btn-disabled-border-color: var(--ms-surface-strong);
+}
+
+.btn-outline-dark {
+  --bs-btn-color: var(--ms-ink);
+  --bs-btn-border-color: var(--ms-ink);
+  --bs-btn-hover-color: var(--ms-bg);
+  --bs-btn-hover-bg: var(--ms-ink);
+  --bs-btn-hover-border-color: var(--ms-ink);
+  --bs-btn-active-color: var(--ms-bg);
+  --bs-btn-active-bg: var(--ms-ink);
+}
+
+.btn:active { transform: translateY(1px); }
+
+/* Ô nhập: viền nhìn thấy được (độ tương phản ≥ 3:1 với nền), nền sáng hơn nền trang */
+.form-control,
+.form-select {
+  --bs-border-color: var(--ms-muted);
+  background-color: #f4f0e6;
+  color: var(--ms-ink);
+  border: 1px solid var(--ms-muted);
+  border-radius: var(--ms-radius);
+  min-height: 2.75rem;
+  font-size: var(--ms-step-body);
+}
+
+.form-control::placeholder { color: var(--ms-muted); opacity: 1; }
+
+.form-control:focus,
+.form-select:focus {
+  background-color: #fffdf7;
+  border-color: var(--ms-ink);
+  box-shadow: 0 0 0 0.2rem rgba(26, 26, 26, 0.25); /* taste-skill-ignore: vòng focus, không phải bóng khi nghỉ */
+}
+
+.form-label { font-weight: 500; margin-bottom: 0.25rem; }
+
+/* Phân trang: hình vuông phẳng, trang hiện tại đảo màu (chữ nền xương trên mực), không viền mảnh */
+.pagination {
+  --bs-pagination-color: var(--ms-ink);
+  --bs-pagination-bg: var(--ms-surface);
+  --bs-pagination-border-width: 0;
+  --bs-pagination-border-radius: var(--ms-radius);
+  --bs-pagination-hover-color: var(--ms-ink);
+  --bs-pagination-hover-bg: var(--ms-surface-strong);
+  --bs-pagination-focus-color: var(--ms-ink);
+  --bs-pagination-focus-bg: var(--ms-surface-strong);
+  --bs-pagination-focus-box-shadow: 0 0 0 0.2rem rgba(26, 26, 26, 0.25); /* taste-skill-ignore: vòng focus */
+  --bs-pagination-active-color: var(--ms-bg);
+  --bs-pagination-active-bg: var(--ms-ink);
+  --bs-pagination-active-border-color: var(--ms-ink);
+  --bs-pagination-disabled-color: var(--ms-muted);
+  --bs-pagination-disabled-bg: transparent;
+  --bs-pagination-padding-x: 0.9rem;
+  --bs-pagination-padding-y: 0.5rem;
+  --bs-pagination-font-size: var(--ms-step-body);
+  gap: 0.25rem;
+}
+
+/* Nhãn kho: nền đặc cộng chữ, không chỉ dựa vào màu. Dùng với .badge. */
+.stock-badge {
+  --bs-badge-border-radius: var(--ms-radius);
+  --bs-badge-padding-x: 0.6rem;
+  --bs-badge-padding-y: 0.3rem;
+  font-size: var(--ms-step-small);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.stock-badge--in { background: var(--ms-ink); color: var(--ms-bg); }
+.stock-badge--out { background: var(--ms-field-1); color: var(--ms-field-1-ink); }
+
+/* Focus nhìn thấy được cho mọi thứ bấm được */
+:focus-visible {
+  outline: 3px solid var(--ms-ink);
+  outline-offset: 2px;
+}
+
+::selection { background: var(--ms-field-2); color: var(--ms-field-2-ink); }
+
+/* 6. Tiện ích cho ô màu: F2 gán một trong bốn lớp này theo vị trí (chỉ số % 4). */
+.tile-field-1 { background: var(--ms-field-1); color: var(--ms-field-1-ink); }
+.tile-field-2 { background: var(--ms-field-2); color: var(--ms-field-2-ink); }
+.tile-field-3 { background: var(--ms-field-3); color: var(--ms-field-3-ink); }
+.tile-field-4 { background: var(--ms-field-4); color: var(--ms-field-4-ink); }
+
+/* Giảm chuyển động theo cài đặt hệ điều hành: giữ nội dung, bỏ dịch chuyển */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn:active { transform: none; }
+}
+
+/* 7. Component của khu khách hàng (F2): khung trang, header, footer, lưới ô, thẻ sản phẩm */
+
+.site-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.site-main {
+  flex: 1 0 auto;
+  padding-top: clamp(1.5rem, 1rem + 2vw, 3rem);
+  padding-bottom: var(--ms-section-gap);
+}
+
+/* Header: thanh phẳng, tên shop bên trái, một link bên phải */
+.site-header__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4rem;
+}
+.site-wordmark {
+  font-size: var(--ms-step-lead);
+  font-weight: var(--ms-display-weight);
+  letter-spacing: var(--ms-display-tracking);
+  color: var(--ms-ink);
+  text-decoration: none;
+}
+.site-nav-link {
+  display: inline-block;
+  padding: 0.6rem 0;
+  font-weight: 500;
+  color: var(--ms-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.3em;
+}
+.site-nav-link:hover { text-decoration-thickness: 4px; }
+
+/* Footer: một mảng màu mực, tên shop trở lại ở cỡ lớn */
+.site-footer {
+  background: var(--ms-ink);
+  color: var(--ms-bg);
+  padding-block: clamp(2rem, 1.5rem + 2vw, 3.5rem);
+}
+.site-footer__name {
+  margin: 0 0 1.5rem;
+  font-size: clamp(3.5rem, 2rem + 12vw, 12rem);
+  font-weight: var(--ms-display-weight);
+  letter-spacing: var(--ms-display-tracking);
+  line-height: 0.85;
+  white-space: nowrap;
+}
+.site-footer__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+}
+.site-footer__link { color: var(--ms-bg); text-underline-offset: 0.25em; }
+.site-footer__link:hover { color: var(--ms-field-2); }
+.site-footer :focus-visible { outline-color: var(--ms-bg); }
+
+/* Tiêu đề trang: tối đa hai dòng ở mọi bề rộng */
+.page-title {
+  margin: 0 0 clamp(1.25rem, 1rem + 1vw, 2rem);
+  max-width: 18ch;
+}
+.page-title--masthead {
+  font-size: clamp(3rem, 1.5rem + 6.5vw, 8rem);
+  max-width: none;
+}
+.lead-text { font-size: var(--ms-step-lead); margin-bottom: 1.5rem; }
+
+/* Bộ lọc: một mảng tông đậm hơn nền, không viền */
+.filter-panel {
+  background: var(--ms-surface);
+  padding: clamp(1rem, 0.75rem + 1vw, 1.5rem);
+}
+.result-count {
+  margin: 1.25rem 0 1.5rem;
+  color: var(--ms-ink);
+  font-weight: 500;
+}
+
+/* Lưới ô: cùng tỉ lệ, khoảng cách đều */
+.product-grid { --bs-gutter-x: var(--ms-gap); --bs-gutter-y: 2rem; }
+
+.product-tile {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+}
+.product-tile__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Ảnh thật là ảnh cảnh, không phải ảnh tách nền, nên không trộn màu (multiply làm ngả màu ảnh).
+   Ô màu hiện ra ở nơi chưa có ảnh: ảnh thay thế có nền trong suốt. */
+
+/* Thẻ hiện lên nhẹ khi tải trang (chỉ transform và opacity; tắt khi prefers-reduced-motion) */
+@keyframes ms-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+.product-card {
+  animation: ms-rise 520ms var(--ms-ease) both;
+}
+.product-grid > .col:nth-child(4n + 1) .product-card { animation-delay: 120ms; }
+.product-grid > .col:nth-child(4n + 2) .product-card { animation-delay: 180ms; }
+.product-grid > .col:nth-child(4n + 3) .product-card { animation-delay: 240ms; }
+.product-grid > .col:nth-child(4n + 4) .product-card { animation-delay: 300ms; }
+
+.product-card { position: relative; }
+.product-card__name {
+  margin: 0.75rem 0 0.15rem;
+  font-size: var(--ms-step-body);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-wrap: pretty;
+}
+.product-card__name a { color: var(--ms-ink); text-decoration: none; }
+.product-card:hover .product-card__name a { text-decoration: underline; text-underline-offset: 0.2em; }
+.product-card__meta { margin: 0 0 0.35rem; font-size: var(--ms-step-small); color: var(--ms-muted); }
+.product-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.6rem;
+  margin: 0;
+}
+.product-card.is-out-of-stock .product-tile__img { filter: grayscale(1); }
+.product-card:focus-within .product-tile { outline: 3px solid var(--ms-ink); outline-offset: 2px; }
+.product-card .stretched-link:focus-visible { outline: none; }
+
+/* Danh sách rỗng, phân trang */
+.empty-state { padding-block: clamp(2rem, 1rem + 4vw, 5rem); }
+.empty-state__text { font-size: var(--ms-step-lead); margin-bottom: 1.25rem; }
+.pagination-wrap { margin-top: clamp(2rem, 1.5rem + 2vw, 3.5rem); }
+.page-item.disabled .page-link { background: transparent; }
+.page-link { min-height: 2.75rem; display: inline-flex; align-items: center; }
+
+/* Chi tiết sản phẩm */
+.product-detail__category { margin: 0 0 1rem; color: var(--ms-muted); font-weight: 500; }
+.product-detail__title {
+  margin: 0 0 1rem;
+  font-size: clamp(2rem, 1.4rem + 2.4vw, 3.5rem);
+}
+.product-detail__price { margin: 0 0 1rem; font-size: var(--ms-step-lead); }
+.product-detail__price .price { font-weight: 600; }
+.product-detail .product-description { max-width: 60ch; }
+
+/* Trang tĩnh credits.html */
+.credits-table { min-width: 48rem; --bs-table-bg: transparent; --bs-table-color: var(--ms-ink); font-size: var(--ms-step-small); }
+.credits-table th { font-weight: 600; }
+.credits-table td:nth-child(4) { white-space: nowrap; }
+.credits-table a { color: var(--ms-ink); }
+.credits-table-wrap { background: var(--ms-surface); padding: 0.5rem clamp(0.5rem, 0.25rem + 1vw, 1.25rem); }
+.credits-text { max-width: 65ch; }
