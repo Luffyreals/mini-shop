@@ -17,7 +17,7 @@
 | Giao diện | Thymeleaf + Bootstrap 5 | **Giữ nguyên** | Xem mục 6.2. |
 | Kiến trúc | Phân lớp, chia package theo tính năng hoặc theo lớp | **Modular monolith**: chia package theo tính năng, mỗi tính năng có các lớp controller → service → repository | Xem mục 6.1. |
 | Test | Unit test cho service | Unit test (Mockito) **+ test tích hợp với PostgreSQL thật (Testcontainers)** | Câu SQL trừ kho phải được test trên đúng DB sẽ chạy thật. |
-| CI / Deploy | Không đề cập | **GitHub Actions + Docker image** (GĐ8, tùy chọn) | Repo có CI xanh và một link demo trực tuyến tăng giá trị portfolio rõ rệt. |
+| CI / Deploy | Không đề cập | **GitHub Actions CI từ GĐ1**; Docker image và deploy ở GĐ8 (tùy chọn) | CI chạy ngay từ commit code đầu tiên để `main` luôn xanh. Link demo trực tuyến tăng giá trị portfolio. |
 | Khách tự hủy đơn | Không có | **Có, chỉ khi đơn đang PENDING** | Tính năng tối thiểu của mọi trang bán hàng; dùng lại logic hoàn kho của admin nên tốn rất ít code. |
 
 ---
@@ -152,14 +152,14 @@ Nếu sau này cần thể hiện kỹ năng REST, có thể thêm `/api/product
 
 | GĐ | Nội dung | Ước tính* |
 |---|---|---|
-| 1 | Project (Boot 4.1, Java 25), `git init`, Docker Compose Postgres, Flyway schema, entity, repository, seed, test Testcontainers đầu tiên | 2 buổi |
+| 1 | Project (Boot 4.1, Java 25), GitHub Actions CI + Dependabot, Docker Compose Postgres, Flyway schema, entity, repository, seed, test Testcontainers đầu tiên | 2 buổi |
 | 2 | Danh sách và chi tiết sản phẩm (tìm, lọc, phân trang, sắp xếp), layout Bootstrap | 1–2 buổi |
 | 3 | Đăng ký, đăng nhập, Security, phân quyền, test bảo mật | 1–2 buổi |
 | 4 | Giỏ hàng (session + DB, gộp khi đăng nhập) | 2 buổi |
 | 5 | Checkout COD, lịch sử đơn, khách tự hủy đơn PENDING | 2 buổi |
 | 6 | Admin: dashboard, CRUD, upload ảnh, quản lý đơn, hoàn kho | 2–3 buổi |
 | 7 | Hoàn thiện validation, trang lỗi, giao diện, README | 1–2 buổi |
-| 8 | *(Tùy chọn)* GitHub Actions CI, Dockerfile, deploy online | 1 buổi |
+| 8 | *(Tùy chọn)* Dockerfile, deploy online, CD từ `main` | 1 buổi |
 | | **Tổng** | **khoảng 12–16 buổi (3 tuần làm bán thời gian)** |
 
 \* Một buổi khoảng 2–3 giờ, gồm cả thời gian bạn đọc hiểu và chạy thử.

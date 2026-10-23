@@ -1,0 +1,35 @@
+name: Báo lỗi
+description: Báo một lỗi khi chạy Mini Shop
+title: "fix: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Chuyện gì đã xảy ra?
+      description: Mô tả lỗi và kết quả bạn mong đợi.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Các bước tái hiện
+      placeholder: |
+        1. Đăng nhập bằng user@minishop.local
+        2. Vào trang ...
+        3. Bấm ...
+    validations:
+      required: true
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Profile đang chạy
+      options:
+        - mặc định (PostgreSQL qua Docker)
+        - h2
+        - khác
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log / stack trace
+      render: shell

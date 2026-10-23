@@ -1,16 +1,87 @@
 # Mini Shop
 
-Website bán hàng mini viết bằng Java / Spring Boot. Đây là dự án học tập và portfolio, không bán hàng thật.
+Website bán hàng mini viết bằng Java / Spring Boot, render phía server. Đây là dự án học tập và portfolio, **không bán hàng thật**.
 
-> 🚧 **Đang phát triển.** Hướng dẫn cài đặt, chạy và tài khoản demo sẽ được bổ sung khi hoàn thành các giai đoạn.
+> 🚧 **Đang phát triển.** Hướng dẫn chạy chi tiết và tài khoản demo sẽ có khi xong GĐ1. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
 
-## Công nghệ dự kiến
+## Tính năng (MVP)
 
-Java 25 · Spring Boot 4.1 (Web MVC, Data JPA, Security, Validation) · Thymeleaf + Bootstrap 5 · PostgreSQL + Flyway · JUnit 5 + Testcontainers
+**Khách hàng**
+- Xem sản phẩm: phân trang, tìm theo tên, lọc theo danh mục, sắp xếp theo giá; trang chi tiết sản phẩm
+- Giỏ hàng: lưu trong session khi chưa đăng nhập, gộp vào tài khoản khi đăng nhập
+- Đăng ký / đăng nhập
+- Đặt hàng thanh toán khi nhận hàng (COD), xem lịch sử đơn, tự hủy đơn đang chờ xử lý
 
-## Tài liệu
+**Quản trị (`/admin`)**
+- Dashboard: số đơn hôm nay, doanh thu, số đơn chờ xử lý
+- Quản lý danh mục và sản phẩm (có upload ảnh)
+- Quản lý đơn hàng: lọc theo trạng thái, đổi trạng thái; hủy đơn thì tự hoàn lại tồn kho
 
-- [Bản mô tả dự án, kiến trúc và kế hoạch](docs/project-brief.md)
+## Công nghệ
+
+| | |
+|---|---|
+| Ngôn ngữ | Java 25 |
+| Framework | Spring Boot 4.1: Web MVC, Data JPA, Security, Validation |
+| Giao diện | Thymeleaf, Bootstrap 5.3 |
+| Cơ sở dữ liệu | PostgreSQL, Flyway (H2 làm phương án dự phòng) |
+| Kiểm thử | JUnit 5, Mockito, AssertJ, MockMvc, Testcontainers |
+| Build | Maven Wrapper, Docker Compose |
+
+Lý do chọn từng công nghệ: xem [docs/adr](docs/adr/README.md).
+
+## Kiến trúc
+
+Modular monolith: chia package theo tính năng (`catalog`, `cart`, `order`, `user`, `admin`…). Trong mỗi tính năng phân lớp controller → service → repository. Một vài điểm thiết kế đáng chú ý:
+
+- Trừ tồn kho bằng câu `UPDATE` nguyên tử nên không bán vượt kho khi nhiều người đặt cùng lúc ([ADR-0005](docs/adr/0005-atomic-stock-decrement.md))
+- Đơn hàng lưu lại tên và giá sản phẩm tại thời điểm mua
+- Luồng trạng thái đơn được kiểm soát chặt: `PENDING → CONFIRMED → SHIPPING → DELIVERED`, hoặc `CANCELLED`
+
+Chi tiết: [docs/project-brief.md](docs/project-brief.md).
+
+## Bắt đầu nhanh
+
+*(Có sau GĐ1)*
+
+Yêu cầu: JDK 25 và Docker. Không cần cài Maven vì dự án dùng Maven Wrapper.
+
+```bash
+./mvnw spring-boot:run
+```
+
+Sau đó mở http://localhost:8080. Máy không có Docker thì thêm `-Dspring-boot.run.profiles=h2`.
+
+## Cấu trúc repo
+
+```
+mini-shop/
+├── src/                 Mã nguồn và test (có từ GĐ1)
+├── docs/
+│   ├── project-brief.md Phạm vi, kiến trúc, lộ trình
+│   ├── adr/             Các quyết định kiến trúc
+│   └── plans/           Kế hoạch chi tiết từng giai đoạn
+├── .github/             Template PR và issue (CI có từ GĐ1)
+├── .claude/agents/      Subagent hỗ trợ phát triển với Claude Code
+├── CLAUDE.md            Hướng dẫn cho Claude Code
+├── CONTRIBUTING.md      Quy trình nhánh, commit, phát hành
+└── CHANGELOG.md
+```
+
+## Lộ trình
+
+- [ ] GĐ1: Khởi tạo project, CI, entity, migration, dữ liệu mẫu
+- [ ] GĐ2: Danh sách và chi tiết sản phẩm
+- [ ] GĐ3: Đăng ký, đăng nhập, phân quyền
+- [ ] GĐ4: Giỏ hàng
+- [ ] GĐ5: Đặt hàng và lịch sử đơn
+- [ ] GĐ6: Trang quản trị
+- [ ] GĐ7: Hoàn thiện (validation, xử lý lỗi, giao diện, tài liệu)
+- [ ] GĐ8: Deploy online *(tùy chọn)*
+
+## Đóng góp
+
+Xem [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Giấy phép
 
