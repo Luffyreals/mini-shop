@@ -1,7 +1,7 @@
 # Spec 001: Nền móng dự án
 
 - **Giai đoạn:** GĐ1
-- **Trạng thái:** Đang làm (duyệt 2026-10-23)
+- **Trạng thái:** Hoàn thành (2026-10-23, phát hành `v0.1.0`)
 - **Liên quan:** brief §3, §6, §11; ADR-0001, 0002, 0004, 0005
 
 ## 1. Mục tiêu
@@ -111,3 +111,4 @@ Migration `V1__init_schema.sql`. Tên bảng ở dạng số nhiều để trán
 | 2026-10-23 | Tạo bản nháp. Khung dự án (AC-001-1 đến AC-001-7) được làm trước trên nhánh `phase-1/project-skeleton`. |
 | 2026-10-23 | Người dùng duyệt theo khuyến nghị. Từ kết quả review khung dự án: siết AC-001-4 và AC-001-5, thêm AC-001-13 (health công khai, kiểm không cần Docker) và AC-001-14 (CI không được xanh khi có test bị bỏ qua). |
 | 2026-10-23 | Duyệt kế hoạch `docs/plans/phase-1.md` kèm nhóm "Nâng chất lượng": thêm AC-001-15 (ArchUnit), AC-001-16 (CSP), AC-001-17 (JaCoCo). Mật khẩu demo dùng mặc định. Chuyển sang Đang làm. |
+| 2026-10-23 | Nghiệm thu. `phase-verifier` PASS; CI của PR #2 xanh (45 test, 0 bị bỏ qua, có artifact JaCoCo). Thêm `Product.stock` `updatable = false` và chặn số lượng không dương trong `decrementStock` sau review. Chuyển sang Hoàn thành, phát hành `v0.1.0`. |

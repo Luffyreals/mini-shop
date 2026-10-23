@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-rendered). GĐ1 ([spec 001](docs/specs/001-project-foundation.md), [plan](docs/plans/phase-1.md)) is wrapping up. It contains:
+Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-rendered). GĐ1 ([spec 001](docs/specs/001-project-foundation.md), [plan](docs/plans/phase-1.md)) is **done and released as `v0.1.0`**. It delivered:
 - the skeleton: Maven, profiles, security baseline with CSP, a placeholder home page, and CI;
 - the Flyway `V1` schema for 7 tables;
 - entities and aggregate-root repositories, including `ProductRepository.decrementStock`;
 - the `DataInitializer` seed;
 - architecture, data, and security tests.
 
-No user-facing features exist yet; GĐ2 starts the storefront. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
+No user-facing features exist yet. Next is GĐ2 (product listing and detail), which starts with `/write-spec`. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
 
 ## How to work with the user
 

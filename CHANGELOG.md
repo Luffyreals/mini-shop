@@ -5,6 +5,10 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-23
+
+GĐ1: nền móng dự án ([spec 001](docs/specs/001-project-foundation.md)).
+
 ### Thêm
 - Quy trình đặc tả: `docs/specs/` (template, spec 001) và skill `/write-spec`.
 - Khung dự án Spring Boot 4.1.1 / Java 25: Maven Wrapper, profile mặc định (PostgreSQL qua Docker Compose) và profile `h2`, các package theo tính năng, cấu hình bảo mật nền, trang chủ tạm, Bootstrap qua WebJars.
