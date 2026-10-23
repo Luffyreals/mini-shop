@@ -21,9 +21,15 @@ public class SecurityConfig {
             "/actuator/health"
     };
 
+    /** CSP bật thật (AC-001-16). {@code img-src data:} cần vì CSS Bootstrap nhúng icon SVG dạng data URI. */
+    private static final String CONTENT_SECURITY_POLICY = "default-src 'self'; img-src 'self' data:; "
+            + "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
     @Bean
     SecurityFilterChain appSecurityFilterChain(HttpSecurity http) throws Exception {
         http
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .anyRequest().authenticated())

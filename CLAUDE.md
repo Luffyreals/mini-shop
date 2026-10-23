@@ -4,7 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-rendered). GĐ1 is in progress: the project skeleton exists (Maven, profiles, security baseline, placeholder home page, CI). Entities, the Flyway schema, and the seed are next, per [spec 001](docs/specs/001-project-foundation.md). The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
+Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-rendered). GĐ1 ([spec 001](docs/specs/001-project-foundation.md), [plan](docs/plans/phase-1.md)) is wrapping up. It contains:
+- the skeleton: Maven, profiles, security baseline with CSP, a placeholder home page, and CI;
+- the Flyway `V1` schema for 7 tables;
+- entities and aggregate-root repositories, including `ProductRepository.decrementStock`;
+- the `DataInitializer` seed;
+- architecture, data, and security tests.
+
+No user-facing features exist yet; GĐ2 starts the storefront. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
 
 ## How to work with the user
 
@@ -32,7 +39,7 @@ Project subagents live in `.claude/agents/`. Subagents cannot launch other subag
 
 ## UI design skill
 
-All UI work uses the **`design-taste-frontend`** skill. The user-level copy in `~/.claude/skills/` is the one Claude Code loads. A project copy also sits in `.agents/skills/`, tracked by `skills-lock.json`. Its run depends on the area:
+All UI work uses the **`design-taste-frontend`** skill. It is installed only at user level, in `~/.claude/skills/design-taste-frontend`, **on this machine**. It is not part of the repo, so another machine has to install it separately. Its run depends on the area:
 - **Storefront pages** follow the skill's page run.
 - **`/admin/**`** follows its app-screen run (`references/app-screens.md`, `draw.mjs --app`, `inspect.mjs --app`).
 
@@ -41,6 +48,7 @@ The project's rules override the skill:
 - Build no extra features (the skill's "one live thing", scroll scenes, extra sections) without the user's approval.
 - Use no invented content.
 - Draw the direction once per area into `.taste-skill/`, then reuse it for every page.
+- **The CSP is enforced** (`default-src 'self'`, see `SecurityConfig`). Templates must have no inline `<script>`, no `style="…"` / `th:style`, no `onclick` or other inline handlers, and no external fonts or CDNs. All CSS and JS live in `static/`, and images are self-hosted or `data:`.
 
 The skill's scripts need Node 22+ and Chrome or Edge; both are installed.
 
@@ -58,6 +66,11 @@ On Windows use `mvnw.cmd`; in Git Bash use `./mvnw`. The first run downloads Mav
 - **Run without Docker:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=h2`. This uses in-memory H2 in PostgreSQL mode. The H2 console at `/h2-console` exists only in this profile.
 - **Full build and all tests:** `./mvnw verify`. Tests annotated `@Testcontainers(disabledWithoutDocker = true)` are *skipped* when Docker is not running. CI (`.github/workflows/ci.yml`) always runs them.
 - **Single test class / method:** `./mvnw test -Dtest=HomeControllerTest` or `./mvnw test -Dtest=HomeControllerTest#home_isPublicAndRendersShopName`
+- **Skipped-test guard:** after `verify`, run `bash .github/scripts/check-no-skipped-tests.sh`. It exits 1 if any test was skipped, and CI runs it. Never leave `@Disabled` tests on `main`.
+- **Coverage:** `./mvnw verify` writes `target/site/jacoco/index.html` (JaCoCo, no threshold yet), and CI uploads it as the `jacoco-report` artifact. If surefire `argLine` is ever set, use `@{argLine}` so the JaCoCo agent is kept.
+- **Architecture rules are tests:** `ArchitectureTest` (ArchUnit) fails the build on a forbidden feature dependency, a dependency cycle, a controller touching a repository, or field injection. Update it together with `package-info.java` when a dependency rule changes.
+- **Without Docker:** `H2ProfileSmokeTest` still proves that V1, Hibernate `validate`, and the seed work on H2.
+- **Demo accounts:** seeded from `app.seed.*` (`SEED_ADMIN_PASSWORD` / `SEED_USER_PASSWORD`, dev defaults in `application.yml`).
 
 Spring Boot 4 notes (APIs moved from 3.x):
 - Starters are modular: `spring-boot-starter-webmvc`, `spring-boot-starter-flyway`, and per-module `*-test` starters.
@@ -77,11 +90,16 @@ Modular monolith, **package-by-feature** under `com.minishop`: `catalog`, `cart`
 - **All business logic lives in `@Transactional` services.** Controllers only bind and validate forms and pick views. `spring.jpa.open-in-view=false`, so services must fully load what views need (use fetch joins or DTOs).
 - **Never bind entities from requests.** Forms are Java `record`s with Jakarta Validation; views receive DTOs.
 - **Flyway owns the schema.** Schema changes go in new migration files, never via `ddl-auto=update`. Migrations must also run on H2 (PostgreSQL mode) for the `h2` profile.
-- **Seed data** comes from a Java `DataInitializer` (passwords must be BCrypt-hashed at runtime). It only seeds an empty DB. Demo accounts: `admin@minishop.local`, `user@minishop.local`.
+- **Seed data** comes from `config.DataInitializer`, an `ApplicationRunner`. Passwords are hashed at runtime by the `DelegatingPasswordEncoder` from `config.PasswordEncoderConfig` (`{bcrypt}…`). Users and catalog have independent "table is empty" guards. Demo accounts: `admin@minishop.local`, `user@minishop.local`.
+- **Repositories exist only for aggregate roots** (`User`, `Category`, `Product`, `Cart`, `Order`). `CartItem` and `OrderItem` are saved only through their parent (`cascade = ALL`, `orphanRemoval`). Use `Cart.addItem`/`removeItem` and `Order.addItem`; `getItems()` is read-only.
+- **The seed must be gated before any deployment (GĐ8):** with the dev defaults, an empty production DB would get `admin@minishop.local` with a known password. Add `app.seed.enabled` or remove the defaults before deploying.
+- **Visibility today:** `user.User`, `user.Role`, `user.UserRepository`, `catalog.Category`, `catalog.Product` and the catalog repositories are public; everything in `cart` and `order` is package-private.
+- **Entity conventions:** a protected no-arg constructor plus a constructor taking the required fields; setters only where used. `created_at` and `updated_at` are set by `@PrePersist`/`@PreUpdate`. Money is `numeric(12,0)` with whole VND, so keep amounts integral in services.
 
 ### Domain invariants to preserve
 
-- **Stock:** decrement only via an atomic conditional update (`UPDATE ... SET stock = stock - :q WHERE id = :id AND stock >= :q`). If 0 rows are affected, the item is out of stock and the whole order rolls back. Never read stock, check it, and then write it.
+- **Stock:** decrement only via an atomic conditional update (`ProductRepository.decrementStock`: `... WHERE id = :id AND :q > 0 AND stock >= :q`). If 0 rows are affected, the item is out of stock and the whole order rolls back. Never read stock, check it, and then write it.
+- `Product.stock` is mapped `updatable = false`, so saving a loaded `Product` (admin edit) can never overwrite stock that was decremented in the meantime. Any later stock change (admin restock, restoring stock on cancel) must use its own `@Modifying` query.
 - **Order placement** (`OrderService.placeOrder`) is one transaction: create Order and OrderItems, decrement stock, clear the cart.
 - **OrderItem snapshots** `productName` and `unitPrice` at purchase time. It still keeps the `product` FK so stock can be restored on cancel.
 - **Order status transitions** are encoded in `OrderStatus.canTransitionTo()`: `PENDING → CONFIRMED → SHIPPING → DELIVERED`. Cancel is allowed from `PENDING`/`CONFIRMED` (admin) or `PENDING` only (customer). Cancelling restores stock in the same transaction.

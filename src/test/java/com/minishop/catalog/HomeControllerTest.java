@@ -26,6 +26,6 @@ class HomeControllerTest {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("index"))
-                .andExpect(content().string(containsString("Mini Shop")));
+                .andExpect(content().string(containsString("<title>Mini Shop</title>")));
     }
 }

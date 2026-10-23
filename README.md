@@ -2,7 +2,7 @@
 
 Website bán hàng mini viết bằng Java / Spring Boot, render phía server. Đây là dự án học tập và portfolio, **không bán hàng thật**.
 
-> 🚧 **Đang phát triển (GĐ1).** Khung dự án đã chạy được; tài khoản demo sẽ có khi xong GĐ1. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
+> 🚧 **Đang phát triển (GĐ1).** Nền móng đã xong: có schema, dữ liệu mẫu và tài khoản demo. Các trang mua hàng bắt đầu từ GĐ2. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
 
 ## Tính năng (MVP)
 
@@ -56,7 +56,23 @@ Mở http://localhost:8080. PostgreSQL được Spring Boot tự bật từ `com
 | Build và chạy toàn bộ test | `./mvnw verify` |
 | Chạy một lớp test | `./mvnw test -Dtest=HomeControllerTest` |
 
-Trên Windows PowerShell, thay `./mvnw` bằng `.\mvnw.cmd`. Máy không bật Docker thì các test dùng Testcontainers sẽ được bỏ qua; CI luôn chạy đủ.
+| Kiểm tra không có test nào bị bỏ qua (CI cũng chạy bước này) | `bash .github/scripts/check-no-skipped-tests.sh` |
+| Xem độ phủ test | mở `target/site/jacoco/index.html` sau khi chạy `./mvnw verify` |
+
+Trên Windows PowerShell, thay `./mvnw` bằng `.\mvnw.cmd`. Máy không bật Docker thì các test dùng Testcontainers sẽ được bỏ qua; CI luôn chạy đủ và báo lỗi nếu có test bị bỏ qua.
+
+### Tài khoản demo
+
+Được tạo tự động khi app khởi động với DB trống. **Chỉ dùng cho môi trường dev.**
+
+| Vai trò | Email | Mật khẩu |
+|---|---|---|
+| Quản trị (ADMIN) | `admin@minishop.local` | `Admin@123` |
+| Khách hàng (USER) | `user@minishop.local` | `User@123` |
+
+Đổi mật khẩu demo bằng biến môi trường `SEED_ADMIN_PASSWORD` và `SEED_USER_PASSWORD`. Trang đăng nhập riêng có từ GĐ3.
+
+Dữ liệu mẫu gồm 5 danh mục và 22 sản phẩm, trong đó có 1 sản phẩm hết hàng và 1 sản phẩm bị ẩn, để thử các trường hợp đặc biệt.
 
 ## Cấu trúc repo
 

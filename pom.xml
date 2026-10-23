@@ -24,6 +24,8 @@
         <java.version>25</java.version>
         <!-- Không được Spring Boot BOM quản lý nên phải ghim phiên bản -->
         <bootstrap.version>5.3.8</bootstrap.version>
+        <archunit.version>1.5.1</archunit.version>
+        <jacoco.version>0.8.15</jacoco.version>
     </properties>
 
     <dependencies>
@@ -88,6 +90,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-h2console</artifactId>
+            <scope>runtime</scope>
         </dependency>
 
         <!-- Vận hành -->
@@ -161,6 +164,13 @@
             <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- Kiểm tra kiến trúc (chiều phụ thuộc giữa các package). Không nằm trong Spring Boot BOM nên phải ghim phiên bản -->
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -168,6 +178,28 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <!-- Báo cáo coverage tại target/site/jacoco; chưa đặt ngưỡng tối thiểu.
+                     Nếu cấu hình argLine cho surefire sau này, dùng @{argLine} để không đè agent. -->
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

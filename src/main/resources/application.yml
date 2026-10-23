@@ -17,3 +17,9 @@ management:
     web:
       exposure:
         include: health
+
+app:
+  seed:
+    # Mật khẩu demo chỉ dùng cho dev (BR-001-2); môi trường thật phải đặt biến môi trường
+    admin-password: ${SEED_ADMIN_PASSWORD:Admin@123}
+    user-password: ${SEED_USER_PASSWORD:User@123}

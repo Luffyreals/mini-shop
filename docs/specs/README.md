@@ -27,4 +27,4 @@ brief (phạm vi) ─▶ spec (cái gì, điều kiện "xong") ─▶ plan (tas
 
 | Spec | Giai đoạn | Trạng thái |
 |---|---|---|
-| [001 Nền móng dự án](001-project-foundation.md) | GĐ1 | Nháp |
+| [001 Nền móng dự án](001-project-foundation.md) | GĐ1 | Đang làm |
