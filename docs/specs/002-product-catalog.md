@@ -1,7 +1,7 @@
 # Spec 002: Danh sách và chi tiết sản phẩm
 
 - **Giai đoạn:** GĐ2
-- **Trạng thái:** Đang làm (duyệt 2026-10-23)
+- **Trạng thái:** Hoàn thành (2026-10-23, phát hành `v0.2.0`)
 - **Liên quan:** brief §1 (MVP), §2 (luồng chính), §11; ADR-0002, 0003; spec 001 (schema, dữ liệu mẫu, CSP)
 
 ## 1. Mục tiêu
@@ -124,3 +124,4 @@ Form tìm/lọc dùng phương thức **GET**, nên URL chia sẻ hoặc bookmar
 |---|---|
 | 2026-10-23 | Tạo bản nháp |
 | 2026-10-23 | Người dùng duyệt theo tất cả khuyến nghị. |
+| 2026-10-23 | Nghiệm thu. `phase-verifier` PASS 20/20 tiêu chí; CI của PR #6 xanh (158 test, 0 bị bỏ qua). Sau review: kẹp `page` tối đa `MAX_PAGE`, bỏ ký tự điều khiển khỏi `q`, cắt `q` theo code point, đường dẫn công khai chỉ cho GET. Chuyển sang Hoàn thành, phát hành `v0.2.0`. |

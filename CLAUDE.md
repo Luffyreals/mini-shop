@@ -11,7 +11,7 @@ Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-re
 - the `DataInitializer` seed;
 - architecture, data, and security tests.
 
-GĐ2 ([spec 002](docs/specs/002-product-catalog.md), [plan](docs/plans/phase-2.md)) is in progress. It covers the storefront product listing and detail. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
+GĐ2 ([spec 002](docs/specs/002-product-catalog.md), [plan](docs/plans/phase-2.md)) is **done and released as `v0.2.0`**: the storefront product listing and detail pages. Next is GĐ3 (registration, login, roles), which starts with `/write-spec`. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
 
 ## How to work with the user
 
