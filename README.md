@@ -2,7 +2,7 @@
 
 Website bán hàng mini viết bằng Java / Spring Boot, render phía server. Đây là dự án học tập và portfolio, **không bán hàng thật**.
 
-> 🚧 **Đang phát triển.** GĐ1 (`v0.1.0`) đã xong: có schema, dữ liệu mẫu và tài khoản demo. Các trang mua hàng bắt đầu từ GĐ2. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
+> 🚧 **Đang phát triển.** GĐ1 (`v0.1.0`) đã xong. GĐ2 đang làm: trang danh sách sản phẩm (tìm, lọc, sắp xếp, phân trang) và trang chi tiết đã có ở http://localhost:8080. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
 
 ## Tính năng (MVP)
 
@@ -72,7 +72,19 @@ Trên Windows PowerShell, thay `./mvnw` bằng `.\mvnw.cmd`. Máy không bật D
 
 Đổi mật khẩu demo bằng biến môi trường `SEED_ADMIN_PASSWORD` và `SEED_USER_PASSWORD`. Trang đăng nhập riêng có từ GĐ3.
 
-Dữ liệu mẫu gồm 5 danh mục và 22 sản phẩm, trong đó có 1 sản phẩm hết hàng và 1 sản phẩm bị ẩn, để thử các trường hợp đặc biệt.
+Dữ liệu mẫu gồm 5 danh mục và 22 sản phẩm, trong đó có 1 sản phẩm hết hàng và 1 sản phẩm bị ẩn, để thử các trường hợp đặc biệt. 19 sản phẩm có ảnh; 3 sản phẩm cố ý không có ảnh để kiểm tra ảnh thay thế.
+
+> **Dữ liệu mẫu chỉ được tạo khi DB trống.** PostgreSQL dev lưu dữ liệu trong volume Docker `mini-shop_postgres-data`, nên sau khi dữ liệu mẫu thay đổi (ví dụ thêm ảnh ở GĐ2), hãy xóa volume để seed lại:
+>
+> ```bash
+> docker compose down -v
+> ```
+>
+> Profile `h2` luôn seed lại vì dùng DB trong bộ nhớ.
+
+### Ảnh và font: nguồn và giấy phép
+
+Ảnh sản phẩm là ảnh minh họa có giấy phép mở (CC0, public domain, CC BY, CC BY-SA), **không phải ảnh của sản phẩm thật**. Danh sách đầy đủ (tác giả, giấy phép, link gốc) nằm ở trang `/credits.html` của ứng dụng, có link "Nguồn ảnh" ở footer mọi trang. Font **Bricolage Grotesque** dùng giấy phép SIL OFL 1.1 (`static/fonts/OFL.txt`). Muốn thêm hoặc đổi ảnh, cập nhật cả `static/credits.html`.
 
 ## Cấu trúc repo
 
