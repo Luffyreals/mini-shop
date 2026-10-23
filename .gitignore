@@ -19,6 +19,9 @@ Thumbs.db
 *.log
 logs/
 
+# File làm việc của skill design-taste-frontend (ảnh chụp màn hình, bản nháp)
+.taste-skill/
+
 # Ảnh do admin upload khi chạy local
 uploads/
 
