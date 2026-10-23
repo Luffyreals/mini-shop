@@ -5,6 +5,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-24
+
 GĐ3: đăng ký, đăng nhập và phân quyền ([spec 003](docs/specs/003-authentication.md)).
 
 ### Thêm
