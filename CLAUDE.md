@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-rendered). **No application code exists yet**: the repo currently holds only planning docs. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
+Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-rendered). GĐ1 is in progress: the project skeleton exists (Maven, profiles, security baseline, placeholder home page, CI). Entities, the Flyway schema, and the seed are next, per [spec 001](docs/specs/001-project-foundation.md). The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
 
 ## How to work with the user
 
@@ -17,7 +17,8 @@ Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-re
 
 Project subagents live in `.claude/agents/`. Subagents cannot launch other subagents, so the main session orchestrates:
 
-1. **`tech-lead`** (opus) plans the phase into `docs/plans/phase-<N>.md`: tasks, owner agent, files, dependencies, "done" condition, and questions for the user. Show the user the plan and its questions, and get approval before implementing.
+0. **Spec first.** Use the `/write-spec` skill (`.claude/skills/write-spec/`) to write or update `docs/specs/NNN-*.md`: user stories, `AC-NNN-n` acceptance criteria (Given/When/Then), business rules, URLs, data, and open questions. The user approves the spec (status `Đã duyệt`) before planning. The process is described in `docs/specs/README.md`.
+1. **`tech-lead`** (opus) plans the phase from the approved spec into `docs/plans/phase-<N>.md`: tasks, owner agent, files, dependencies, "done" condition, and questions for the user. Show the user the plan and its questions, and get approval before implementing.
 2. Dispatch the implementation tasks to the owners. They split by file ownership, so writers never edit the same files in parallel:
    - **`backend-developer`**: `src/main/java`, migrations, `application*.yml` feature keys.
    - **`frontend-developer`**: `templates/`, `static/`.
@@ -49,18 +50,28 @@ Java 25, Spring Boot 4.1.x (Web MVC, Data JPA/Hibernate 7, Security 7, Validatio
 
 Deliberately **not** used: Lombok (use records and explicit code), MapStruct, Thymeleaf Layout Dialect (use plain fragments), JS frameworks/SPA, JWT, microservices.
 
-## Commands (available once GĐ1 creates the Maven project)
+## Commands
 
-On Windows use `mvnw.cmd`; in Git Bash use `./mvnw`.
+On Windows use `mvnw.cmd`; in Git Bash use `./mvnw`. The first run downloads Maven itself.
 
-- Run: `./mvnw spring-boot:run`. `spring-boot-docker-compose` starts PostgreSQL automatically, so Docker must be running. App URL: http://localhost:8080
-- Run without Docker: `./mvnw spring-boot:run -Dspring-boot.run.profiles=h2` (H2 fallback; H2 console is only enabled in this profile)
-- Full build + all tests: `./mvnw verify` (Testcontainers tests need Docker)
-- Single test class / method: `./mvnw test -Dtest=OrderServiceTest` or `./mvnw test -Dtest=OrderServiceTest#placeOrder_outOfStock_rollsBack`
+- **Run:** `./mvnw spring-boot:run`. `spring-boot-docker-compose` starts PostgreSQL from `compose.yaml` automatically, so Docker Desktop must be running. App URL: http://localhost:8080
+- **Run without Docker:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=h2`. This uses in-memory H2 in PostgreSQL mode. The H2 console at `/h2-console` exists only in this profile.
+- **Full build and all tests:** `./mvnw verify`. Tests annotated `@Testcontainers(disabledWithoutDocker = true)` are *skipped* when Docker is not running. CI (`.github/workflows/ci.yml`) always runs them.
+- **Single test class / method:** `./mvnw test -Dtest=HomeControllerTest` or `./mvnw test -Dtest=HomeControllerTest#home_isPublicAndRendersShopName`
+
+Spring Boot 4 notes (APIs moved from 3.x):
+- Starters are modular: `spring-boot-starter-webmvc`, `spring-boot-starter-flyway`, and per-module `*-test` starters.
+- Test slices live in new packages, e.g. `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest` / `AutoConfigureMockMvc`.
+- Testcontainers 2.x uses `org.testcontainers.postgresql.PostgreSQLContainer`.
+- Integration tests import `TestcontainersConfiguration` (pinned `postgres:17-alpine`, the same image as `compose.yaml`). `TestMiniShopApplication` runs the app against a throwaway container.
 
 ## Architecture (planned, see brief §6)
 
-Modular monolith, **package-by-feature** under `com.minishop`: `catalog`, `cart`, `order`, `user`, `admin`, `storage`, `common`, `config`. Each feature contains its own controller → service → repository layers.
+Modular monolith, **package-by-feature** under `com.minishop`: `catalog`, `cart`, `order`, `user`, `admin`, `storage`, `common`, `config`. Each package's `package-info.java` states its responsibility and which features it may depend on.
+
+- **Feature packages are flat.** Use `Product`, `ProductRepository`, `ProductService`, `ProductController` side by side, with no `web/` or `domain/` sub-packages.
+- **Default to package-private.** Make classes and methods public only when another feature must call them; that is how module boundaries are enforced.
+- **Bootstrap 5.3.8 is loaded via WebJars**, with version-less URLs thanks to `webjars-locator-lite`, e.g. `@{/webjars/bootstrap/dist/css/bootstrap.min.css}`. Project CSS lives in `static/css/app.css`.
 
 - **Dependency direction:** `order → cart → catalog`, never the reverse. `admin` holds only the web layer (controllers and forms) and calls other features' services; it never reimplements business logic.
 - **All business logic lives in `@Transactional` services.** Controllers only bind and validate forms and pick views. `spring.jpa.open-in-view=false`, so services must fully load what views need (use fetch joins or DTOs).

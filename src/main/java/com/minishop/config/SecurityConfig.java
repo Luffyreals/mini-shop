@@ -1,0 +1,50 @@
+package com.minishop.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+
+/**
+ * Cấu hình bảo mật nền: chặn mặc định, chỉ mở các đường dẫn công khai (spec 001, AC-001-6).
+ * <p>Phân quyền USER/ADMIN và trang đăng nhập riêng được thêm ở GĐ3.
+ */
+@Configuration
+public class SecurityConfig {
+
+    private static final String[] PUBLIC_PATHS = {
+            "/", "/error", "/favicon.ico",
+            "/css/**", "/js/**", "/images/**", "/webjars/**",
+            "/actuator/health"
+    };
+
+    @Bean
+    SecurityFilterChain appSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(PUBLIC_PATHS).permitAll()
+                        .anyRequest().authenticated())
+                .formLogin(Customizer.withDefaults())
+                .logout(Customizer.withDefaults());
+        return http.build();
+    }
+
+    /**
+     * H2 console chỉ tồn tại ở profile {@code h2}. Console dùng iframe và form không có CSRF token,
+     * nên cần chuỗi filter riêng, ưu tiên cao hơn và chỉ áp dụng cho {@code /h2-console/**}.
+     */
+    @Bean
+    @Order(1)
+    @Profile("h2")
+    SecurityFilterChain h2ConsoleSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/h2-console/**")
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
+        return http.build();
+    }
+}

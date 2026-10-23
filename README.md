@@ -2,7 +2,7 @@
 
 Website bán hàng mini viết bằng Java / Spring Boot, render phía server. Đây là dự án học tập và portfolio, **không bán hàng thật**.
 
-> 🚧 **Đang phát triển.** Hướng dẫn chạy chi tiết và tài khoản demo sẽ có khi xong GĐ1. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
+> 🚧 **Đang phát triển (GĐ1).** Khung dự án đã chạy được; tài khoản demo sẽ có khi xong GĐ1. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
 
 ## Tính năng (MVP)
 
@@ -42,27 +42,39 @@ Chi tiết: [docs/project-brief.md](docs/project-brief.md).
 
 ## Bắt đầu nhanh
 
-*(Có sau GĐ1)*
-
-Yêu cầu: JDK 25 và Docker. Không cần cài Maven vì dự án dùng Maven Wrapper.
+Yêu cầu: **JDK 25** và **Docker Desktop đang chạy**. Không cần cài Maven vì dự án dùng Maven Wrapper; lần chạy đầu sẽ tự tải Maven về.
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Sau đó mở http://localhost:8080. Máy không có Docker thì thêm `-Dspring-boot.run.profiles=h2`.
+Mở http://localhost:8080. PostgreSQL được Spring Boot tự bật từ `compose.yaml`.
+
+| Việc cần làm | Lệnh |
+|---|---|
+| Chạy khi **không có Docker** (H2 trong bộ nhớ, có `/h2-console`) | `./mvnw spring-boot:run -Dspring-boot.run.profiles=h2` |
+| Build và chạy toàn bộ test | `./mvnw verify` |
+| Chạy một lớp test | `./mvnw test -Dtest=HomeControllerTest` |
+
+Trên Windows PowerShell, thay `./mvnw` bằng `.\mvnw.cmd`. Máy không bật Docker thì các test dùng Testcontainers sẽ được bỏ qua; CI luôn chạy đủ.
 
 ## Cấu trúc repo
 
 ```
 mini-shop/
-├── src/                 Mã nguồn và test (có từ GĐ1)
+├── src/main/java/com/minishop/
+│   ├── catalog/ cart/ order/ user/   Các tính năng nghiệp vụ
+│   ├── admin/                        Tầng web của khu quản trị
+│   └── storage/ common/ config/      Lưu file, thành phần dùng chung, cấu hình
+├── src/main/resources/  application*.yml, db/migration (Flyway), templates, static
+├── compose.yaml         PostgreSQL cho dev
 ├── docs/
 │   ├── project-brief.md Phạm vi, kiến trúc, lộ trình
+│   ├── specs/           Đặc tả tính năng và tiêu chí chấp nhận
 │   ├── adr/             Các quyết định kiến trúc
 │   └── plans/           Kế hoạch chi tiết từng giai đoạn
-├── .github/             Template PR và issue (CI có từ GĐ1)
-├── .claude/agents/      Subagent hỗ trợ phát triển với Claude Code
+├── .github/             CI, Dependabot, template PR và issue
+├── .claude/             Subagent, skill /write-spec, cấu hình Claude Code
 ├── CLAUDE.md            Hướng dẫn cho Claude Code
 ├── CONTRIBUTING.md      Quy trình nhánh, commit, phát hành
 └── CHANGELOG.md

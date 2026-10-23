@@ -1,6 +1,6 @@
-# Maven
+# Maven (wrapper dạng only-script: không commit maven-wrapper.jar)
 target/
-!.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.jar
 
 # IDE
 .idea/
@@ -9,6 +9,9 @@ target/
 .settings/
 .project
 .classpath
+.factorypath
+.apt_generated
+.sts4-cache
 *.swp
 
 # OS
