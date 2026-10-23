@@ -440,3 +440,60 @@ a { text-underline-offset: 0.18em; }
 .credits-table a { color: var(--ms-ink); }
 .credits-table-wrap { background: var(--ms-surface); padding: 0.5rem clamp(0.5rem, 0.25rem + 1vw, 1.25rem); }
 .credits-text { max-width: 65ch; }
+
+/* GĐ3: tài khoản (form, header, thông báo) */
+
+/* Header: nhiều mục hơn thì xuống dòng, họ tên dài không làm tràn ngang */
+.site-header__bar { flex-wrap: wrap; padding-block: 0.25rem; }
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0 1.25rem;
+  min-width: 0;
+}
+.site-user {
+  min-width: 0;
+  max-width: 100%;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.site-logout { margin: 0; }
+.site-nav-button {
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Thông báo một lần: mảng màu phẳng, có chữ, không viền */
+.notice {
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  font-weight: 500;
+}
+.notice--success { background: var(--ms-field-3); color: var(--ms-field-3-ink); }
+.notice--info { background: var(--ms-surface-strong); color: var(--ms-ink); }
+.notice--error { background: var(--ms-danger); color: #fff; }
+
+/* Form tài khoản: một cột, rộng tối đa 28rem */
+.auth-panel { max-width: 28rem; }
+.auth-field { margin-bottom: 1.25rem; }
+.field-hint { margin: 0.35rem 0 0; font-size: var(--ms-step-small); color: var(--ms-muted); }
+.field-error { margin: 0.35rem 0 0; font-size: var(--ms-step-small); font-weight: 500; color: var(--ms-danger); }
+.form-control.is-invalid {
+  border-color: var(--ms-danger);
+  border-width: 2px;
+  background-image: none;
+  padding-right: 0.75rem;
+}
+.auth-switch { margin: 1.5rem 0 0; }
+.auth-switch a { color: var(--ms-ink); text-underline-offset: 0.25em; }
+
+/* Điện thoại: link ở một hàng, họ tên (có thể rất dài) xuống hàng riêng bên dưới */
+@media (max-width: 575.98px) {
+  .site-nav { flex-basis: 100%; justify-content: flex-start; }
+  .site-user { order: 1; flex-basis: 100%; padding-bottom: 0.5rem; }
+}

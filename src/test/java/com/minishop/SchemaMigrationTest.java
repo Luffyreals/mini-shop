@@ -76,6 +76,25 @@ class SchemaMigrationTest {
     }
 
     @Test
+    void migration_recordsV2() {
+        Integer v2 = jdbc.queryForObject(
+                "select count(*) from flyway_schema_history where version = '2' and success", Integer.class);
+        assertThat(v2).isEqualTo(1);
+    }
+
+    @Test
+    void users_uppercaseEmail_isRejected() {
+        assertViolation("insert into users (email, password_hash, full_name, role) values ('A@x.local', 'h', 'B', 'USER')",
+                "ck_users_email_lowercase");
+    }
+
+    @Test
+    void users_emailWithSurroundingSpaces_isRejected() {
+        assertViolation("insert into users (email, password_hash, full_name, role) values (' b@x.local ', 'h', 'B', 'USER')",
+                "ck_users_email_lowercase");
+    }
+
+    @Test
     void products_negativeStock_isRejected() {
         assertViolation("insert into products (category_id, name, price, stock) values (" + categoryId + ", 'n', 1, -1)");
     }
@@ -138,6 +157,12 @@ class SchemaMigrationTest {
     private String orderInsert(String status, String payment) {
         return "insert into orders (user_id, status, receiver_name, phone, shipping_address, payment_method, total_amount) "
                 + "values (" + userId + ", " + status + ", 'r', '1', 'addr', " + payment + ", 0)";
+    }
+
+    private void assertViolation(String sql, String constraintName) {
+        assertThatThrownBy(() -> jdbc.update(sql))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining(constraintName);
     }
 
     private void assertViolation(String sql) {

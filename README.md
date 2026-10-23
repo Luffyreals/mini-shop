@@ -2,7 +2,7 @@
 
 Website bán hàng mini viết bằng Java / Spring Boot, render phía server. Đây là dự án học tập và portfolio, **không bán hàng thật**.
 
-> 🚧 **Đang phát triển.** Đã xong GĐ1 (`v0.1.0`, nền móng) và GĐ2 (`v0.2.0`, danh sách và chi tiết sản phẩm tại http://localhost:8080). Tiếp theo: GĐ3 đăng ký, đăng nhập, phân quyền. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
+> 🚧 **Đang phát triển.** Đã xong GĐ1 (`v0.1.0`, nền móng), GĐ2 (`v0.2.0`, danh sách và chi tiết sản phẩm tại http://localhost:8080) và GĐ3 (`v0.3.0`, đăng ký, đăng nhập, phân quyền). Tiếp theo: GĐ4 giỏ hàng. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
 
 ## Tính năng (MVP)
 
@@ -70,7 +70,9 @@ Trên Windows PowerShell, thay `./mvnw` bằng `.\mvnw.cmd`. Máy không bật D
 | Quản trị (ADMIN) | `admin@minishop.local` | `Admin@123` |
 | Khách hàng (USER) | `user@minishop.local` | `User@123` |
 
-Đổi mật khẩu demo bằng biến môi trường `SEED_ADMIN_PASSWORD` và `SEED_USER_PASSWORD`. Trang đăng nhập riêng có từ GĐ3.
+Đổi mật khẩu demo bằng biến môi trường `SEED_ADMIN_PASSWORD` và `SEED_USER_PASSWORD`.
+
+Đăng nhập ở http://localhost:8080/login. Tạo tài khoản mới (luôn là `USER`) ở http://localhost:8080/register: mật khẩu 8–64 ký tự, có cả chữ và số. Chỉ tài khoản `ADMIN` vào được `/admin`.
 
 Dữ liệu mẫu gồm 5 danh mục và 22 sản phẩm, trong đó có 1 sản phẩm hết hàng và 1 sản phẩm bị ẩn, để thử các trường hợp đặc biệt. 19 sản phẩm có ảnh; 3 sản phẩm cố ý không có ảnh để kiểm tra ảnh thay thế.
 
@@ -112,7 +114,7 @@ mini-shop/
 
 - [x] GĐ1: Khởi tạo project, CI, entity, migration, dữ liệu mẫu (`v0.1.0`)
 - [x] GĐ2: Danh sách và chi tiết sản phẩm (`v0.2.0`)
-- [ ] GĐ3: Đăng ký, đăng nhập, phân quyền
+- [x] GĐ3: Đăng ký, đăng nhập, phân quyền (`v0.3.0`)
 - [ ] GĐ4: Giỏ hàng
 - [ ] GĐ5: Đặt hàng và lịch sử đơn
 - [ ] GĐ6: Trang quản trị

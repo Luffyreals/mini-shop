@@ -60,6 +60,11 @@ class ArchitectureTest {
             .or().areAnnotatedWith(RestController.class)
             .should().dependOnClassesThat().areAnnotatedWith(Entity.class);
 
+    /** CLAUDE.md: admin chỉ là tầng web, gọi service của tính năng khác, không đụng repository. */
+    @ArchTest
+    static final ArchRule admin_doesNotUseRepositories = noClasses().that().resideInAPackage("com.minishop.admin..")
+            .should().dependOnClassesThat().areAssignableTo(Repository.class);
+
     @ArchTest
     static final ArchRule noFieldInjection = fields()
             .should().notBeAnnotatedWith(Autowired.class);

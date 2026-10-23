@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Đăng nhập | Mini Shop')}"></head>
+<body class="site-body">
+<header th:replace="~{fragments/layout :: header}"></header>
+
+<main class="ms-container site-main">
+  <div class="auth-panel">
+    <h1 class="page-title">Đăng nhập</h1>
+
+    <th:block th:if="${registered != null}"><div th:replace="~{fragments/notice :: notice('success', 'Đăng ký thành công. Vui lòng đăng nhập.')}"></div></th:block>
+    <th:block th:if="${param.error != null}"><div th:replace="~{fragments/notice :: notice('error', 'Email hoặc mật khẩu không đúng.')}"></div></th:block>
+
+    <form method="post" th:action="@{/login}" novalidate>
+      <div class="auth-field">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-control" type="email" id="email" name="email" autocomplete="username" th:value="${email}">
+      </div>
+      <div class="auth-field">
+        <label class="form-label" for="password">Mật khẩu</label>
+        <input class="form-control" type="password" id="password" name="password" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary w-100" type="submit">Đăng nhập</button>
+    </form>
+
+    <p class="auth-switch"><a th:href="@{/register}">Chưa có tài khoản? Đăng ký</a></p>
+  </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

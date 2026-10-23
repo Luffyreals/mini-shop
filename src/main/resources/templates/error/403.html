@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Không có quyền truy cập | Mini Shop')}"></head>
+<body class="site-body">
+<header th:replace="~{fragments/layout :: header}"></header>
+
+<main class="ms-container site-main">
+  <h1 class="page-title">Bạn không có quyền truy cập trang này.</h1>
+  <a class="btn btn-primary" th:href="@{/}">Về trang chủ</a>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

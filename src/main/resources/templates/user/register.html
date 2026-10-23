@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Đăng ký | Mini Shop')}"></head>
+<body class="site-body">
+<header th:replace="~{fragments/layout :: header}"></header>
+
+<main class="ms-container site-main">
+  <div class="auth-panel">
+    <h1 class="page-title">Đăng ký</h1>
+
+    <!-- Hai ô mật khẩu cố ý không dùng th:field/th:value: không bao giờ điền lại mật khẩu (BR-003-4). -->
+    <form method="post" th:action="@{/register}" th:object="${form}" novalidate>
+      <div class="auth-field">
+        <label class="form-label" for="fullName">Họ và tên</label>
+        <input class="form-control" type="text" th:field="*{fullName}" autocomplete="name"
+               th:classappend="${#fields.hasErrors('fullName')} ? 'is-invalid'"
+               th:aria-invalid="${#fields.hasErrors('fullName')} ? 'true'"
+               th:aria-describedby="${#fields.hasErrors('fullName')} ? 'fullName-error'">
+        <p class="field-error" id="fullName-error" th:if="${#fields.hasErrors('fullName')}" th:errors="*{fullName}">Lỗi</p>
+      </div>
+
+      <div class="auth-field">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-control" type="email" th:field="*{email}" autocomplete="email"
+               th:classappend="${#fields.hasErrors('email')} ? 'is-invalid'"
+               th:aria-invalid="${#fields.hasErrors('email')} ? 'true'"
+               th:aria-describedby="${#fields.hasErrors('email')} ? 'email-error'">
+        <p class="field-error" id="email-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Lỗi</p>
+      </div>
+
+      <div class="auth-field">
+        <label class="form-label" for="password">Mật khẩu</label>
+        <input class="form-control" type="password" id="password" name="password" autocomplete="new-password"
+               th:classappend="${#fields.hasErrors('password')} ? 'is-invalid'"
+               th:aria-invalid="${#fields.hasErrors('password')} ? 'true'"
+               th:aria-describedby="${#fields.hasErrors('password')} ? 'password-hint password-error' : 'password-hint'">
+        <p class="field-hint" id="password-hint">Ít nhất 8 ký tự, gồm chữ và số.</p>
+        <p class="field-error" id="password-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Lỗi</p>
+      </div>
+
+      <div class="auth-field">
+        <label class="form-label" for="confirmPassword">Nhập lại mật khẩu</label>
+        <input class="form-control" type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password"
+               th:classappend="${#fields.hasErrors('confirmPassword')} ? 'is-invalid'"
+               th:aria-invalid="${#fields.hasErrors('confirmPassword')} ? 'true'"
+               th:aria-describedby="${#fields.hasErrors('confirmPassword')} ? 'confirmPassword-error'">
+        <p class="field-error" id="confirmPassword-error" th:if="${#fields.hasErrors('confirmPassword')}" th:errors="*{confirmPassword}">Lỗi</p>
+      </div>
+
+      <button class="btn btn-primary w-100" type="submit">Đăng ký</button>
+    </form>
+
+    <p class="auth-switch"><a th:href="@{/login}">Đã có tài khoản? Đăng nhập</a></p>
+  </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

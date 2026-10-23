@@ -29,3 +29,4 @@ brief (phạm vi) ─▶ spec (cái gì, điều kiện "xong") ─▶ plan (tas
 |---|---|---|
 | [001 Nền móng dự án](001-project-foundation.md) | GĐ1 | Hoàn thành |
 | [002 Danh sách và chi tiết sản phẩm](002-product-catalog.md) | GĐ2 | Hoàn thành |
+| [003 Đăng ký, đăng nhập và phân quyền](003-authentication.md) | GĐ3 | Hoàn thành |

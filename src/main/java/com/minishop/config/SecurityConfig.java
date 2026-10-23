@@ -5,19 +5,21 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.servlet.FlashMapManager;
 
 /**
  * Cấu hình bảo mật nền: chặn mặc định, chỉ mở các đường dẫn công khai (trang chủ, /products/**, tài nguyên tĩnh) (spec 001, AC-001-6).
- * <p>Phân quyền USER/ADMIN và trang đăng nhập riêng được thêm ở GĐ3.
+ * <p>GĐ3 thêm: trang đăng nhập riêng {@code /login}, phân quyền ({@code /admin/**} chỉ ADMIN, {@code /orders/**} và
+ * {@code /checkout/**} cần đăng nhập) và trang 403 {@code /access-denied}. Đường dẫn công khai vẫn chỉ cho GET;
+ * {@code /register} và {@code /access-denied} mở cho mọi method (CSRF vẫn áp dụng). Quy tắc theo vai trò đứng đầu.
  */
 @Configuration
 public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
-            "/", "/products", "/products/**", "/error", "/favicon.ico",
+            "/", "/products", "/products/**", "/favicon.ico",
             "/css/**", "/js/**", "/images/**", "/fonts/**", "/webjars/**", "/credits.html",
             "/actuator/health"
     };
@@ -27,15 +29,29 @@ public class SecurityConfig {
             + "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
     @Bean
-    SecurityFilterChain appSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain appSecurityFilterChain(HttpSecurity http, FlashMapManager flashMapManager) throws Exception {
         http
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY)))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/admin", "/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/orders", "/orders/**", "/checkout", "/checkout/**").authenticated()
                         .requestMatchers(HttpMethod.GET, PUBLIC_PATHS).permitAll()
+                        // formLogin().permitAll() so khớp cả query string, và vì dùng failureHandler riêng nên nó
+                        // không mở /login?error. Mở GET /login theo đường dẫn (bỏ qua query) để trang lỗi hiện được.
+                        .requestMatchers(HttpMethod.GET, "/login").permitAll()
+                        // Mọi method: forward (403) và error dispatch giữ nguyên method gốc, nên POST lỗi cũng phải
+                        // tới được /access-denied và /error thay vì bị chuyển sang /login. CSRF vẫn áp dụng.
+                        .requestMatchers("/register", "/access-denied", "/error").permitAll()
                         .anyRequest().authenticated())
-                .formLogin(Customizer.withDefaults())
-                .logout(Customizer.withDefaults());
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .usernameParameter("email")
+                        .defaultSuccessUrl("/")
+                        .failureHandler(new LoginFailureHandler(flashMapManager))
+                        .permitAll())
+                .logout(logout -> logout.logoutSuccessUrl("/?logout").permitAll())
+                .exceptionHandling(ex -> ex.accessDeniedPage("/access-denied"));
         return http.build();
     }
 
