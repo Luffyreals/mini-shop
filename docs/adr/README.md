@@ -18,3 +18,4 @@ Mỗi quyết định kiến trúc quan trọng được ghi thành một file n
 | [0004](0004-postgresql-flyway.md) | PostgreSQL ở mọi môi trường, Flyway quản lý schema | Chấp nhận |
 | [0005](0005-atomic-stock-decrement.md) | Trừ tồn kho bằng câu UPDATE có điều kiện | Chấp nhận |
 | [0006](0006-session-cart-merged-on-login.md) | Giỏ hàng: session cho khách, DB cho user, gộp khi đăng nhập | Chấp nhận |
+| [0007](0007-session-form-login-current-user.md) | Đăng nhập bằng form trên session, principal riêng, email luôn chữ thường | Chấp nhận |

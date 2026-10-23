@@ -6,11 +6,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -64,6 +66,22 @@ class H2ProfileSmokeTest {
         mockMvc.perform(get("/h2-console/"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus() / 100).isNotEqualTo(3))
                 .andExpect(result -> assertThat(result.getResponse().getRedirectedUrl()).isNull());
+    }
+
+    /** V2 có hiệu lực trên H2. Lệnh insert bị từ chối nên không để lại dòng nào (seed vẫn đúng 2 người dùng). */
+    @Test
+    void v2_uppercaseEmail_isRejectedOnH2() {
+        assertThat(jdbc.queryForObject(
+                "select count(*) from flyway_schema_history where \"version\" = '2' and \"success\"", Integer.class))
+                .isEqualTo(1);
+        assertThatThrownBy(() -> jdbc.update(
+                "insert into users (email, password_hash, full_name, role) values ('A@x.local', 'h', 'A', 'USER')"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void loginPage_isPublicOnH2() throws Exception {
+        mockMvc.perform(get("/login")).andExpect(status().isOk());
     }
 
     @Test

@@ -11,7 +11,7 @@ Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-re
 - the `DataInitializer` seed;
 - architecture, data, and security tests.
 
-GĐ2 ([spec 002](docs/specs/002-product-catalog.md), [plan](docs/plans/phase-2.md)) is **done and released as `v0.2.0`**: the storefront product listing and detail pages. Next is GĐ3 (registration, login, roles), which starts with `/write-spec`. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
+GĐ2 ([spec 002](docs/specs/002-product-catalog.md), [plan](docs/plans/phase-2.md)) is **done and released as `v0.2.0`**: the storefront product listing and detail pages. GĐ3 ([spec 003](docs/specs/003-authentication.md), [plan](docs/plans/phase-3.md)) is **done and verified, awaiting the user's acceptance** (PR from `phase-3/auth`, not merged): registration, login/logout, `USER`/`ADMIN` access rules, the `/admin` placeholder and the 403 page. After acceptance it is released as `v0.3.0`. Next is GĐ4 (cart), which starts with `/write-spec`. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
 
 ## How to work with the user
 
@@ -92,8 +92,8 @@ Modular monolith, **package-by-feature** under `com.minishop`: `catalog`, `cart`
 - **Flyway owns the schema.** Schema changes go in new migration files, never via `ddl-auto=update`. Migrations must also run on H2 (PostgreSQL mode) for the `h2` profile.
 - **Seed data** comes from `config.DataInitializer`, an `ApplicationRunner`. Passwords are hashed at runtime by the `DelegatingPasswordEncoder` from `config.PasswordEncoderConfig` (`{bcrypt}…`). Users and catalog have independent "table is empty" guards. Demo accounts: `admin@minishop.local`, `user@minishop.local`.
 - **Repositories exist only for aggregate roots** (`User`, `Category`, `Product`, `Cart`, `Order`). `CartItem` and `OrderItem` are saved only through their parent (`cascade = ALL`, `orphanRemoval`). Use `Cart.addItem`/`removeItem` and `Order.addItem`; `getItems()` is read-only.
-- **The seed must be gated before any deployment (GĐ8):** with the dev defaults, an empty production DB would get `admin@minishop.local` with a known password. Add `app.seed.enabled` or remove the defaults before deploying.
-- **Visibility today:** `user.User`, `user.Role`, `user.UserRepository`, `catalog.Category`, `catalog.Product` and the catalog repositories are public; everything in `cart` and `order` is package-private.
+- **The seed must be gated before any deployment (GĐ8):** with the dev defaults, an empty production DB would get `admin@minishop.local` with a known password. Add `app.seed.enabled` or remove the defaults before deploying. Also before deploying: there is no login rate limiting or account lockout yet (spec 003, open question 7), and the session cookie should get `same-site=lax` and `secure=true` behind HTTPS.
+- **Visibility today:** `user.User`, `user.Role`, `user.UserRepository`, `user.CurrentUser`, `catalog.Category`, `catalog.Product` and the catalog repositories are public; everything in `cart` and `order` is package-private.
 - **Entity conventions:** a protected no-arg constructor plus a constructor taking the required fields; setters only where used. `created_at` and `updated_at` are set by `@PrePersist`/`@PreUpdate`. Money is `numeric(12,0)` with whole VND, so keep amounts integral in services.
 
 ### Storefront patterns (GĐ2), reuse these in later phases
@@ -109,6 +109,21 @@ Modular monolith, **package-by-feature** under `com.minishop`: `catalog`, `cart`
   - `TemplateCspComplianceTest` scans every template and static HTML file for CSP violations.
 - **Design direction:** "The specimen catalogue" (tokens in the opening comment of `static/css/app.css`; working files in `.taste-skill/`, gitignored). Reuse it; never redraw for the storefront.
 - **Assets:** fonts are served from `/fonts/**` (public path). Every new image needs a licence entry in `static/credits.html` (CC BY/BY-SA require attribution in the app), which the footer links as "Nguồn ảnh". Product image paths are `/images/products/<slug>.jpg`.
+
+### Auth patterns (GĐ3), reuse these in later phases
+
+See [ADR-0007](docs/adr/0007-session-form-login-current-user.md) and [spec 003](docs/specs/003-authentication.md).
+
+- **The principal is `user.CurrentUser`** (id, email, fullName, role), never the `User` entity. Its password hash is erased after login. Later features get the current user with `@AuthenticationPrincipal CurrentUser` and use `getId()`; templates read `${#authentication.principal.fullName}`.
+- **Emails always go through `user.EmailNormalizer`** (strip + lower-case `Locale.ROOT`), for both registration and login. The DB enforces it with `ck_users_email_lowercase` (V2). Registration accepts ASCII emails only.
+- **Duplicate registration** is handled in `UserService.register`: pre-check plus `saveAndFlush` and a catch that maps only the `uq_users_email` violation (matched with `contains`, because H2 prefixes the schema) to `EmailAlreadyRegisteredException`.
+- **Security rules** live in `config.SecurityConfig`, most specific first: `/admin/**` → `ADMIN`; `/orders/**`, `/checkout/**` → authenticated; public paths are GET-only; `GET /login` is opened by path; `/register`, `/access-denied` and `/error` are open for all methods, because forwards and error dispatches keep the original method (a failed POST becomes `POST /error`). `formLogin().permitAll()` matches the URL *including the query string*, so with a custom failure handler it would not open `/login?error`. In MockMvc, test such URLs as `get("/login?error")`: `.param("error", "")` creates no query string and hides this kind of bug. Any new page that needs login is covered by `anyRequest().authenticated()`; any new public page must be added to `PUBLIC_PATHS` deliberately.
+- **One-time messages:** a controller redirect uses `RedirectAttributes.addFlashAttribute`. Redirects issued by Spring Security use a query parameter (`/login?error`, `/?logout`), because logout destroys the session before redirecting. `LoginFailureHandler` keeps the typed email through `FlashMapManager`.
+- **Forms:** every POST form uses `th:action` (that is what adds the `_csrf` field). Password inputs never use `th:field` or `th:value`, because `th:field` re-renders the rejected value. Form records mask passwords in `toString()`.
+- **403:** `accessDeniedPage("/access-denied")` forwards to `common.AccessDeniedController`, which renders `error/403.html` with status 403. GĐ7 adds the other error pages next to it.
+- **Logged-in users** opening `/login` or `/register` are redirected to `/` by `AuthController` (checks the `Principal` parameter).
+- **Tests:** web tests that render a page for a logged-in user need a real `CurrentUser` principal (the `TestUsers` fixture), because `@WithMockUser` has no `fullName`. Filter-only tests (`SecurityConfigTest`) can keep `@WithMockUser`.
+- **GĐ4 cart merge:** hook it on successful login (an `AuthenticationSuccessEvent` listener or a wrapping success handler) and keep the saved-request redirect behaviour.
 
 ### Domain invariants to preserve
 

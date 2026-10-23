@@ -5,6 +5,23 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+GĐ3: đăng ký, đăng nhập và phân quyền ([spec 003](docs/specs/003-authentication.md)).
+
+### Thêm
+- Trang đăng ký `/register`: họ tên, email, mật khẩu (8–64 ký tự, có chữ và số, tối đa 72 byte), nhập lại mật khẩu; tài khoản mới luôn là `USER`; báo lỗi theo từng ô, không điền lại mật khẩu.
+- Trang đăng nhập `/login` riêng, đăng nhập bằng email không phân biệt hoa thường; đăng xuất bằng POST; sau khi đăng nhập quay lại trang đã yêu cầu.
+- Phân quyền: `/admin/**` chỉ cho `ADMIN` (người dùng thường nhận trang 403), `/orders/**` và `/checkout/**` cần đăng nhập; trang `/admin` tạm.
+- Header hiển thị theo trạng thái đăng nhập: "Xin chào, {họ tên}", nút đăng xuất, link "Quản trị" cho admin.
+- Migration V2: ràng buộc `ck_users_email_lowercase` bảo đảm email luôn chữ thường.
+- ADR-0007: đăng nhập bằng form trên session, principal riêng `CurrentUser`, email luôn chữ thường.
+
+### Thay đổi
+- Spring Security dùng người dùng trong DB thay cho tài khoản tự sinh (không còn dòng "Using generated security password").
+
+### Bảo mật
+- Chống tự cấp quyền khi đăng ký (form không có trường vai trò), CSRF cho mọi form, đổi session ID sau khi đăng nhập, thông báo đăng nhập sai không tiết lộ email có tồn tại hay không, hash mật khẩu bị xóa khỏi phiên sau khi đăng nhập.
+- Hai yêu cầu đăng ký cùng email đồng thời chỉ tạo một tài khoản (unique constraint của DB), không gây lỗi 500.
+
 ## [0.2.0] - 2026-10-23
 
 GĐ2: danh sách và chi tiết sản phẩm ([spec 002](docs/specs/002-product-catalog.md)).

@@ -7,6 +7,8 @@
 <main class="ms-container site-main">
   <h1 class="page-title page-title--masthead">Sản phẩm</h1>
 
+  <th:block th:if="${param.logout != null}"><div th:replace="~{fragments/notice :: notice('info', 'Bạn đã đăng xuất.')}"></div></th:block>
+
   <!-- Form GET: không gửi page, nên đổi bộ lọc thì về trang 1; không cần CSRF -->
   <form class="filter-panel" method="get" th:action="@{/products}">
     <div class="row g-3 align-items-end">

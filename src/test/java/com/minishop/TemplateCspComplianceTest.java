@@ -48,7 +48,8 @@ class TemplateCspComplianceTest {
         // chống "xanh giả": phải thực sự quét được các file đã biết
         assertThat(files).extracting(Resource::getFilename)
                 .contains("list.html", "detail.html", "not-found.html", "layout.html", "pagination.html",
-                        "product.html", "credits.html");
+                        "product.html", "credits.html", "login.html", "register.html", "403.html", "index.html",
+                        "notice.html");
 
         List<String> violations = new ArrayList<>();
         for (Resource file : files) {
