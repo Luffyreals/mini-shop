@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-rendered). **No application code exists yet**: the repo currently holds only planning docs. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). Read it before starting any phase, and update this file once real commands and packages exist.
+Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-rendered). **No application code exists yet**: the repo currently holds only planning docs. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
 
 ## How to work with the user
 
@@ -81,6 +81,12 @@ Modular monolith, **package-by-feature** under `com.minishop`: `catalog`, `cart`
 - **Order access:** order ownership is checked in the service layer (IDOR protection). A user can only see their own orders.
 - **Images:** go through the `StorageService` interface. The local implementation writes UUID-named files to `uploads/` (gitignored) after validating extension, content type, and size (≤ 2 MB). Keeping it an interface lets a cloud implementation replace it for deployment.
 
-## Repository
+## Repository conventions
 
-GitHub: `Luffyreals/mini-shop` (private), default branch `main`. Tag each completed phase `v0.<phase>`.
+GitHub: `Luffyreals/mini-shop` (private), default branch `main`. The full rules are in [CONTRIBUTING.md](CONTRIBUTING.md). The essentials:
+
+- Never commit directly to `main`. Each phase works on `phase-<N>/<slug>`; other work uses `fix/…`, `docs/…`, `chore/…`. Open a PR using `.github/pull_request_template.md`, then squash-merge.
+- Commit messages follow Conventional Commits in English, with the feature name as scope: `feat(order): …`, `test(cart): …`.
+- When a phase is done, move `[Unreleased]` in `CHANGELOG.md` to a release and tag `v0.<N>.0`.
+- Any change to architecture, technology, or a domain invariant gets a new ADR in `docs/adr/`. Accepted ADRs are never edited; a new ADR supersedes the old one.
+- Line endings are normalized to LF by `.gitattributes` (CRLF only for `*.cmd`). Formatting rules are in `.editorconfig`.

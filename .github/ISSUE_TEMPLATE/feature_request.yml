@@ -1,0 +1,24 @@
+name: Đề xuất tính năng
+description: Đề xuất tính năng hoặc cải tiến
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Vấn đề cần giải quyết
+      description: Người dùng nào gặp vấn đề gì?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Giải pháp đề xuất
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Phạm vi
+      options:
+        - label: Tôi đã kiểm tra mục "Loại ra" trong docs/project-brief.md; tính năng này cần được duyệt trước khi làm
