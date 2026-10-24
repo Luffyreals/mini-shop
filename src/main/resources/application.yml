@@ -9,7 +9,8 @@ spring:
       ddl-auto: validate
   servlet:
     multipart:
-      max-file-size: 2MB
+      # Trần của Tomcat; giới hạn ảnh 2 MB kiểm trong ứng dụng (ImageUpload) để hiện lỗi trên form thay vì 403/ngắt kết nối, xem ADR-0010
+      max-file-size: 10MB
       max-request-size: 10MB
 
 management:
@@ -23,3 +24,7 @@ app:
     # Mật khẩu demo chỉ dùng cho dev (BR-001-2); môi trường thật phải đặt biến môi trường
     admin-password: ${SEED_ADMIN_PASSWORD:Admin@123}
     user-password: ${SEED_USER_PASSWORD:User@123}
+  storage:
+    local:
+      # Tương đối với thư mục chạy ứng dụng, đã nằm trong .gitignore
+      upload-dir: ${UPLOAD_DIR:uploads}

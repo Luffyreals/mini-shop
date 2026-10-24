@@ -3,6 +3,8 @@ package com.minishop.catalog;
 import com.minishop.common.NotFoundException;
 import com.minishop.cart.CartHeaderTestConfig;
 import com.minishop.config.SecurityConfig;
+import com.minishop.user.Role;
+import com.minishop.user.TestUsers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -25,6 +27,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -471,5 +475,36 @@ class ProductControllerTest {
         when(productService.search(any())).thenReturn(singleProductList());
 
         assertThat(body("/products")).contains("Mini Shop").contains("Dự án học tập, không bán hàng thật.");
+    }
+
+    // ---------- link "Quản trị" trên header (GĐ6; thay phần của AdminControllerTest cũ) ----------
+
+    private String headerFor(org.springframework.test.web.servlet.request.RequestPostProcessor who) throws Exception {
+        when(productService.search(any())).thenReturn(singleProductList());
+        String html = mockMvc.perform(get("/products").with(who)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        int start = html.indexOf("<header");
+        return html.substring(start, html.indexOf("</header>", start));
+    }
+
+    @Test
+    void header_forAdmin_hasLinkToAdminDashboard() throws Exception {
+        String header = headerFor(user(TestUsers.admin()));
+
+        assertThat(matches("<a[^>]*href=\"/admin\"[^>]*>\s*Quản trị\s*</a>", header)).isTrue();
+    }
+
+    @Test
+    void header_forUserAndGuest_hasNoAdminLink() throws Exception {
+        assertThat(headerFor(user(TestUsers.user()))).doesNotContain("Quản trị").doesNotContain("href=\"/admin\"");
+        assertThat(headerFor(anonymous())).doesNotContain("Quản trị").doesNotContain("href=\"/admin\"");
+    }
+
+    @Test
+    void header_adminFullNameWithScript_isEscaped() throws Exception {
+        String header = headerFor(user(TestUsers.withName("<script>alert(1)</script>", Role.ADMIN)));
+
+        assertThat(header).contains("Xin chào, &lt;script&gt;alert(1)&lt;/script&gt;")
+                .doesNotContain("<script>alert(1)</script>");
     }
 }

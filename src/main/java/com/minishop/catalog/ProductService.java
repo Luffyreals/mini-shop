@@ -7,11 +7,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.text.Collator;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 
 @Service
 @Transactional(readOnly = true)
@@ -21,10 +18,13 @@ class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ProductImages productImages;
 
-    ProductService(ProductRepository productRepository, CategoryRepository categoryRepository) {
+    ProductService(ProductRepository productRepository, CategoryRepository categoryRepository,
+                   ProductImages productImages) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.productImages = productImages;
     }
 
     ProductListView search(ProductSearchParams params) {
@@ -51,20 +51,15 @@ class ProductService {
         Product p = productRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new NotFoundException("Product not found: " + id));
         return new ProductDetailView(p.getId(), p.getName(), p.getCategory().getName(), p.getPrice(),
-                p.getDescription(), p.getStock() > 0, ProductImages.toUrl(p.getImagePath()));
+                p.getDescription(), p.getStock() > 0, productImages.toUrl(p.getImagePath()));
     }
 
-    /** Sắp bằng Collator tiếng Việt trong Java: collation của DB khác nhau giữa PostgreSQL (Alpine) và H2. */
     private List<CategoryOption> categoryOptions() {
-        Collator collator = Collator.getInstance(Locale.forLanguageTag("vi")); // Collator không thread-safe
-        return categoryRepository.findAll().stream()
-                .sorted(Comparator.comparing(Category::getName, collator))
-                .map(c -> new CategoryOption(c.getId(), c.getName()))
-                .toList();
+        return CategoryOptions.sortedByName(categoryRepository.findAll());
     }
 
     private ProductCardView toCard(Product p) {
         return new ProductCardView(p.getId(), p.getName(), p.getCategory().getName(), p.getPrice(),
-                p.getStock() > 0, ProductImages.toUrl(p.getImagePath()));
+                p.getStock() > 0, productImages.toUrl(p.getImagePath()));
     }
 }

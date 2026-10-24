@@ -15,6 +15,7 @@ import org.springframework.web.servlet.FlashMapManager;
  * {@code /checkout/**} cần đăng nhập) và trang 403 {@code /access-denied}. Đường dẫn công khai vẫn chỉ cho GET;
  * {@code /register} và {@code /access-denied} mở cho mọi method (CSRF vẫn áp dụng). Quy tắc theo vai trò đứng đầu.
  * <p>GĐ4 mở {@code /cart} và {@code /cart/**} cho mọi người và mọi method (khách cũng có giỏ), có CSRF.
+ * <p>GĐ6 mở {@code GET /uploads/**} (ảnh sản phẩm do admin tải lên), đường dẫn công khai duy nhất của GĐ6 (BR-006-1).
  */
 @Configuration
 public class SecurityConfig {
@@ -22,7 +23,7 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/", "/products", "/products/**", "/favicon.ico",
             "/css/**", "/js/**", "/images/**", "/fonts/**", "/webjars/**", "/credits.html",
-            "/actuator/health"
+            "/uploads/**", "/actuator/health"
     };
 
     /** CSP bật thật (AC-001-16). {@code img-src data:} cần vì CSS Bootstrap nhúng icon SVG dạng data URI. */

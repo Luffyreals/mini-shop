@@ -32,3 +32,4 @@ brief (phạm vi) ─▶ spec (cái gì, điều kiện "xong") ─▶ plan (tas
 | [003 Đăng ký, đăng nhập và phân quyền](003-authentication.md) | GĐ3 | Hoàn thành |
 | [004 Giỏ hàng](004-shopping-cart.md) | GĐ4 | Hoàn thành |
 | [005 Đặt hàng, lịch sử đơn và tự hủy đơn](005-checkout-and-orders.md) | GĐ5 | Hoàn thành |
+| [006 Trang quản trị](006-admin.md) | GĐ6 | Hoàn thành |

@@ -1,6 +1,7 @@
 package com.minishop.catalog;
 
 import com.minishop.common.NotFoundException;
+import com.minishop.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,9 +39,18 @@ class ProductServiceTest {
 
     ProductService service;
 
+    private static ProductImages productImages() {
+        StorageService storage = org.mockito.Mockito.mock(StorageService.class);
+        lenient().when(storage.toUrl(any())).thenAnswer(inv -> {
+            String path = inv.getArgument(0);
+            return path == null || path.isBlank() ? null : path;
+        });
+        return new ProductImages(storage);
+    }
+
     @BeforeEach
     void setUp() {
-        service = new ProductService(productRepository, categoryRepository);
+        service = new ProductService(productRepository, categoryRepository, productImages());
     }
 
     private static ProductSearchParams params(String q, String category, String sort, String page) {

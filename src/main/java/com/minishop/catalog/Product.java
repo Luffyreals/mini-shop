@@ -18,6 +18,9 @@ import java.time.Instant;
 /** Sản phẩm. Xóa mềm bằng {@code active=false} vì OrderItem cũ vẫn tham chiếu tới. */
 @Entity
 @Table(name = "products")
+// Write only changed columns: a full-column UPDATE would overwrite a hide/show (or other change) committed by
+// another transaction between this one's load and flush with this transaction's stale copy.
+@org.hibernate.annotations.DynamicUpdate
 public class Product {
 
     @Id
@@ -117,6 +120,17 @@ public class Product {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    /**
+     * Sửa thông tin hiển thị (admin). Cố ý không có tham số {@code stock}, {@code active}, {@code imagePath}:
+     * tồn kho chỉ đổi bằng truy vấn riêng (ADR-0005, ADR-0010), ảnh và trạng thái có setter riêng.
+     */
+    void updateDetails(Category category, String name, String description, BigDecimal price) {
+        this.category = category;
+        this.name = name;
+        this.description = description;
+        this.price = price;
     }
 
     public Instant getCreatedAt() {

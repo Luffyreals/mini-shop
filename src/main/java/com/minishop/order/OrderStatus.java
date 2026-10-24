@@ -30,6 +30,21 @@ enum OrderStatus {
         };
     }
 
+    /**
+     * Chữ trên nút đi tới trạng thái này (admin). {@code PENDING} không bao giờ là đích của một bước chuyển.
+     *
+     * @throws IllegalStateException với {@code PENDING}
+     */
+    String actionLabel() {
+        return switch (this) {
+            case PENDING -> throw new IllegalStateException("PENDING is never a transition target");
+            case CONFIRMED -> "Xác nhận đơn";
+            case SHIPPING -> "Bắt đầu giao hàng";
+            case DELIVERED -> "Xác nhận đã giao";
+            case CANCELLED -> "Hủy đơn";
+        };
+    }
+
     /** Nhãn hiển thị tiếng Việt (BR-005-9). */
     String label() {
         return switch (this) {

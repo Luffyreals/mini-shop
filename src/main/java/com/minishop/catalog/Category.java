@@ -40,4 +40,10 @@ public class Category {
     public String getDescription() {
         return description;
     }
+
+    /** Sửa tên và mô tả (admin). Việc kiểm trùng tên nằm ở service. */
+    void update(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
 }

@@ -1,0 +1,8 @@
+# Test-only overrides. Spring Boot reads classpath:/config/application.yml AFTER classpath:/application.yml, so this
+# key wins in every test context without being a @DynamicPropertySource (which would change the Spring context
+# cache key and make each test class start its own context and PostgreSQL container).
+# Uploads written by tests land under target/ and are removed by "mvn clean" (QĐ14, phase 6 plan).
+app:
+  storage:
+    local:
+      upload-dir: target/test-uploads

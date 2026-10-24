@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<!--
+  Danh sách sản phẩm (cả sản phẩm đã ẩn).
+  Model: products (AdminProductPage: products[id, name, categoryName, price, stock, active, imageUrl], q, page, totalPages, totalElements, empty),
+         pageNav (common.PageNav, link do controller dựng, giữ q); flash tùy chọn: notice, noticeKind.
+  GET tìm kiếm: field q. POST /admin/products/{id}/hide | /show: field from=list, q, page (để quay về đúng trang).
+-->
+<head th:replace="~{fragments/admin :: head('Sản phẩm | Quản trị Mini Shop')}"></head>
+<body class="admin-body">
+<div class="admin-shell">
+  <aside th:replace="~{fragments/admin :: sidebar('products')}"></aside>
+
+  <main class="admin-main">
+    <div class="admin-pagehead">
+      <h1 class="admin-title">Sản phẩm</h1>
+      <a class="btn btn-primary" th:href="@{/admin/products/new}">Thêm sản phẩm</a>
+    </div>
+
+    <th:block th:if="${notice != null}">
+      <div th:replace="~{fragments/notice :: notice(${noticeKind}, ${notice})}"></div>
+    </th:block>
+
+    <form class="admin-toolbar admin-search" method="get" th:action="@{/admin/products}" role="search">
+      <div class="admin-search__field">
+        <label class="visually-hidden" for="q">Tìm theo tên sản phẩm</label>
+        <input class="form-control" type="search" id="q" name="q" maxlength="100"
+               placeholder="Tìm theo tên sản phẩm…" th:value="${products.q}">
+      </div>
+      <button class="btn btn-primary" type="submit">Tìm</button>
+    </form>
+
+    <section class="admin-card" aria-labelledby="products-title">
+      <h2 class="visually-hidden" id="products-title">Danh sách sản phẩm</h2>
+
+      <p class="admin-empty" th:if="${products.empty and #strings.isEmpty(products.q)}">Chưa có sản phẩm nào.</p>
+      <p class="admin-empty" th:if="${products.empty and !#strings.isEmpty(products.q)}">Không tìm thấy sản phẩm phù hợp.</p>
+
+      <div class="admin-table-wrap" th:unless="${products.empty}"
+           role="region" aria-labelledby="products-title" tabindex="0">
+        <table class="admin-table admin-table--products" aria-labelledby="products-title">
+          <thead>
+            <tr>
+              <th scope="col">Ảnh</th>
+              <th scope="col">Tên</th>
+              <th scope="col">Danh mục</th>
+              <th scope="col" class="admin-num">Giá</th>
+              <th scope="col" class="admin-num">Tồn kho</th>
+              <th scope="col">Trạng thái</th>
+              <th scope="col"><span class="visually-hidden">Thao tác</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="p : ${products.products}">
+              <td>
+                <img class="admin-thumb" th:if="${p.imageUrl != null}" th:src="@{${p.imageUrl}}" th:alt="${p.name}"
+                     alt="Ảnh sản phẩm" width="48" height="60" loading="lazy">
+                <span class="admin-thumb admin-thumb--empty" th:unless="${p.imageUrl != null}">
+                  <span class="visually-hidden">Chưa có ảnh</span>
+                </span>
+              </td>
+              <td class="admin-strong admin-name" th:text="${p.name}">Tên sản phẩm</td>
+              <td th:text="${p.categoryName}">Danh mục</td>
+              <td class="admin-num admin-nowrap"><span class="price" th:text="${#vnd.format(p.price)}">1.250.000 ₫</span></td>
+              <td class="admin-num" th:classappend="${p.stock == 0} ? 'admin-stock--out'" th:text="${p.stock}">10</td>
+              <td>
+                <span class="admin-flag" th:classappend="${p.active} ? 'admin-flag--on' : 'admin-flag--off'"
+                      th:text="${p.active} ? 'Đang bán' : 'Đã ẩn'">Đang bán</span>
+              </td>
+              <td>
+                <div class="admin-actions admin-actions--row">
+                  <a class="btn btn-outline-dark btn-sm" th:href="@{/admin/products/{id}/edit(id=${p.id})}">Sửa</a>
+                  <form method="post" th:if="${p.active}" th:action="@{/admin/products/{id}/hide(id=${p.id})}">
+                    <input type="hidden" name="from" value="list">
+                    <input type="hidden" name="q" th:value="${products.q}">
+                    <input type="hidden" name="page" th:value="${products.page}">
+                    <button class="btn btn-outline-dark btn-sm" type="submit">Ẩn</button>
+                  </form>
+                  <form method="post" th:unless="${p.active}" th:action="@{/admin/products/{id}/show(id=${p.id})}">
+                    <input type="hidden" name="from" value="list">
+                    <input type="hidden" name="q" th:value="${products.q}">
+                    <input type="hidden" name="page" th:value="${products.page}">
+                    <button class="btn btn-outline-dark btn-sm" type="submit">Hiện lại</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="admin-pager" th:unless="${products.empty}">
+      <div th:replace="~{fragments/pagination :: pagination(${pageNav})}"></div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

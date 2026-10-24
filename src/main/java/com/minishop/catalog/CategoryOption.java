@@ -1,4 +1,5 @@
 package com.minishop.catalog;
 
-record CategoryOption(Long id, String name) {
+/** Một lựa chọn danh mục (bộ lọc storefront, ô chọn danh mục của admin). */
+public record CategoryOption(Long id, String name) {
 }

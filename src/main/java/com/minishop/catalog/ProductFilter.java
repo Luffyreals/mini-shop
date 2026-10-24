@@ -19,7 +19,7 @@ record ProductFilter(String q, Long categoryId, ProductSort sort, int page) {
                 parsePage(params.page()));
     }
 
-    private static String normalizeQuery(String raw) {
+    static String normalizeQuery(String raw) {
         if (raw == null) {
             return null;
         }

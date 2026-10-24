@@ -37,10 +37,12 @@ class CartService {
 
     private final CartRepository cartRepository;
     private final ProductRepository productRepository;
+    private final ProductImages productImages;
 
-    CartService(CartRepository cartRepository, ProductRepository productRepository) {
+    CartService(CartRepository cartRepository, ProductRepository productRepository, ProductImages productImages) {
         this.cartRepository = cartRepository;
         this.productRepository = productRepository;
+        this.productImages = productImages;
     }
 
     // ---------------------------------------------------------------- queries
@@ -269,12 +271,12 @@ class CartService {
         return result;
     }
 
-    private static CartLineView toLine(Product product, int quantity) {
+    private CartLineView toLine(Product product, int quantity) {
         CartLineStatus status = CartLineStatus.of(product.isActive(), product.getStock(), quantity);
         boolean purchasable = status == CartLineStatus.AVAILABLE || status == CartLineStatus.LOW_STOCK;
         BigDecimal lineTotal = purchasable ? product.getPrice().multiply(BigDecimal.valueOf(quantity)) : null;
         int availableStock = status == CartLineStatus.LOW_STOCK ? product.getStock() : 0;
-        return new CartLineView(product.getId(), product.getName(), ProductImages.toUrl(product.getImagePath()),
+        return new CartLineView(product.getId(), product.getName(), productImages.toUrl(product.getImagePath()),
                 product.getPrice(), quantity, lineTotal, status, availableStock);
     }
 }

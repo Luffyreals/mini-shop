@@ -3,8 +3,10 @@ package com.minishop.cart;
 import com.minishop.cart.CartChange.Outcome;
 import com.minishop.catalog.Category;
 import com.minishop.catalog.Product;
+import com.minishop.catalog.ProductImages;
 import com.minishop.catalog.ProductRepository;
 import com.minishop.common.NotFoundException;
+import com.minishop.storage.StorageService;
 import com.minishop.user.Role;
 import com.minishop.user.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,9 +65,18 @@ class CartServiceTest {
     private final User user = new User("buyer@cart.test", "hash", "Buyer", Role.USER);
     private long nextItemId = 1;
 
+    private static ProductImages productImages() {
+        StorageService storage = org.mockito.Mockito.mock(StorageService.class);
+        lenient().when(storage.toUrl(any())).thenAnswer(inv -> {
+            String path = inv.getArgument(0);
+            return path == null || path.isBlank() ? null : path;
+        });
+        return new ProductImages(storage);
+    }
+
     @BeforeEach
     void setUp() {
-        service = new CartService(cartRepository, productRepository);
+        service = new CartService(cartRepository, productRepository, productImages());
         ReflectionTestUtils.setField(user, "id", USER_ID);
         lenient().when(productRepository.findByIdAndActiveTrue(anyLong())).thenAnswer(inv -> {
             Product p = catalog.get(inv.<Long>getArgument(0));

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<!--
+  Form thêm / sửa danh mục (cùng một template).
+  Model: form (CategoryForm: name, description), mode ('new' | 'edit'), categoryId (chỉ khi sửa).
+  POST: new -> /admin/categories ; edit -> /admin/categories/{categoryId}. Field: name, description.
+-->
+<head th:replace="~{fragments/admin :: head(${(mode == 'edit' ? 'Sửa danh mục' : 'Thêm danh mục') + ' | Quản trị Mini Shop'})}"></head>
+<body class="admin-body">
+<div class="admin-shell">
+  <aside th:replace="~{fragments/admin :: sidebar('categories')}"></aside>
+
+  <main class="admin-main">
+    <div class="admin-pagehead">
+      <h1 class="admin-title" th:text="${mode == 'edit'} ? 'Sửa danh mục' : 'Thêm danh mục'">Thêm danh mục</h1>
+    </div>
+
+    <section class="admin-card admin-card--form">
+      <form class="admin-form" method="post" novalidate th:object="${form}"
+            th:action="${mode == 'edit'} ? @{/admin/categories/{id}(id=${categoryId})} : @{/admin/categories}">
+        <div class="admin-field">
+          <label class="form-label" for="name">Tên danh mục</label>
+          <input class="form-control" type="text" maxlength="100" th:field="*{name}"
+                 th:classappend="${#fields.hasErrors('name')} ? 'is-invalid'"
+                 th:aria-invalid="${#fields.hasErrors('name')} ? 'true'"
+                 th:aria-describedby="${#fields.hasErrors('name')} ? 'name-error'">
+          <p class="field-error" id="name-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Lỗi</p>
+        </div>
+
+        <div class="admin-field">
+          <label class="form-label" for="description">Mô tả (không bắt buộc)</label>
+          <textarea class="form-control" rows="4" maxlength="1000" th:field="*{description}"
+                    th:classappend="${#fields.hasErrors('description')} ? 'is-invalid'"
+                    th:aria-invalid="${#fields.hasErrors('description')} ? 'true'"
+                    th:aria-describedby="${#fields.hasErrors('description')} ? 'description-error'"></textarea>
+          <p class="field-error" id="description-error" th:if="${#fields.hasErrors('description')}" th:errors="*{description}">Lỗi</p>
+        </div>
+
+        <div class="admin-actions">
+          <button class="btn btn-primary" type="submit">Lưu</button>
+          <a class="btn btn-outline-dark" th:href="@{/admin/categories}">Hủy</a>
+        </div>
+      </form>
+    </section>
+  </main>
+</div>
+</body>
+</html>

@@ -177,32 +177,16 @@ class OrderService {
             return CancelResult.NOT_CANCELLABLE;
         }
 
-        // 3. Copy (productId, quantity) now: incrementStock clears the persistence context.
-        List<Restore> restores = order.getItems().stream()
-                .map(i -> new Restore(i.getProduct().getId(), i.getQuantity()))
-                .sorted(Comparator.comparingLong(Restore::productId))
-                .toList();
+        // 3-5. Transition and give the stock back (shared with the admin cancel, see OrderCancellation).
+        int lines = OrderCancellation.cancelAndRestoreStock(order, productRepository);
 
-        // 4. Domain guard; the new status is flushed before the first incrementStock.
-        order.transitionTo(OrderStatus.CANCELLED);
-
-        // 5. Give stock back in ascending product id. The context is cleared from the first call on.
-        for (Restore r : restores) {
-            if (productRepository.incrementStock(r.productId(), r.quantity()) != 1) {
-                throw new IllegalStateException("Stock restore failed for product " + r.productId());
-            }
-        }
-
-        log.info("Order cancelled: id={}, user={}, lines={}", orderId, userId, restores.size());
+        log.info("Order cancelled: id={}, user={}, lines={}", orderId, userId, lines);
         return CancelResult.CANCELLED;
     }
 
     /** The only place that decides whether a customer may cancel; used by the button flag and the action. */
     static boolean customerMayCancel(OrderStatus status) {
         return status == OrderStatus.PENDING;
-    }
-
-    private record Restore(long productId, int quantity) {
     }
 
     private static String statusKey(OrderStatus status) {
