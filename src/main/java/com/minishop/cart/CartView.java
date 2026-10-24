@@ -9,4 +9,9 @@ record CartView(List<CartLineView> lines, BigDecimal total) {
     public boolean isEmpty() {
         return lines.isEmpty();
     }
+
+    /** Nút "Đặt hàng" chỉ bật khi giỏ không trống và mọi dòng đặt được (AC-005-1). */
+    public boolean isOrderable() {
+        return !lines.isEmpty() && lines.stream().allMatch(l -> l.status() == CartLineStatus.AVAILABLE);
+    }
 }

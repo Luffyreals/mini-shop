@@ -270,16 +270,7 @@ class CartService {
     }
 
     private static CartLineView toLine(Product product, int quantity) {
-        CartLineStatus status;
-        if (!product.isActive()) {
-            status = CartLineStatus.DISCONTINUED;
-        } else if (product.getStock() == 0) {
-            status = CartLineStatus.OUT_OF_STOCK;
-        } else if (quantity > product.getStock()) {
-            status = CartLineStatus.LOW_STOCK;
-        } else {
-            status = CartLineStatus.AVAILABLE;
-        }
+        CartLineStatus status = CartLineStatus.of(product.isActive(), product.getStock(), quantity);
         boolean purchasable = status == CartLineStatus.AVAILABLE || status == CartLineStatus.LOW_STOCK;
         BigDecimal lineTotal = purchasable ? product.getPrice().multiply(BigDecimal.valueOf(quantity)) : null;
         int availableStock = status == CartLineStatus.LOW_STOCK ? product.getStock() : 0;

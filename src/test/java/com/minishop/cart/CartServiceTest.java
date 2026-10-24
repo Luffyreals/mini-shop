@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -870,5 +872,66 @@ class CartServiceTest {
 
         verify(productRepository, never()).decrementStock(anyLong(), anyInt());
         assertThat(p.getStock()).isEqualTo(10);
+    }
+
+    // ---------- checkout button flag (AC-005-1) ----------
+
+    private static CartLineView lineWithStatus(CartLineStatus status) {
+        return new CartLineView(1L, "P", null, BigDecimal.TEN, 1, BigDecimal.TEN, status, 0);
+    }
+
+    /** AC-005-1 */
+    @Test
+    void cartView_isOrderable_whenEveryLineIsAvailable() {
+        CartView view = new CartView(
+                List.of(lineWithStatus(CartLineStatus.AVAILABLE), lineWithStatus(CartLineStatus.AVAILABLE)),
+                BigDecimal.TEN);
+
+        assertThat(view.isOrderable()).isTrue();
+    }
+
+    /** AC-005-1 */
+    @ParameterizedTest
+    @EnumSource(value = CartLineStatus.class, names = {"LOW_STOCK", "OUT_OF_STOCK", "DISCONTINUED"})
+    void cartView_isNotOrderable_whenAnyLineIsNotAvailable(CartLineStatus bad) {
+        CartView view = new CartView(List.of(lineWithStatus(CartLineStatus.AVAILABLE), lineWithStatus(bad)),
+                BigDecimal.TEN);
+
+        assertThat(view.isOrderable()).isFalse();
+    }
+
+    /** AC-005-1 */
+    @Test
+    void cartView_isNotOrderable_whenEmpty() {
+        assertThat(new CartView(List.of(), BigDecimal.ZERO).isOrderable()).isFalse();
+    }
+
+    /** AC-005-1: the flag derived from a real view of the cart, for both kinds of owner. */
+    @ParameterizedTest(name = "customer={0}")
+    @ValueSource(booleans = {false, true})
+    void view_isOrderableOnlyWhenNoLineIsShortOrHidden(boolean customer) {
+        Fixture fx = new Fixture(customer);
+        product(1, "1000", 5);
+        fx.with(catalog.get(1L), 2);
+        assertThat(service.view(fx.owner).isOrderable()).isTrue();
+
+        product(2, "1000", 1);
+        fx.with(catalog.get(2L), 3);
+        assertThat(service.view(fx.owner).isOrderable()).isFalse();
+    }
+
+    /** AC-005-1 / BR-005-2: the order in which {@link CartLineStatus#of} looks at the product. */
+    @ParameterizedTest(name = "active={0} stock={1} quantity={2} -> {3}")
+    @CsvSource({
+            "true,  5, 5, AVAILABLE",
+            "true,  5, 1, AVAILABLE",
+            "true,  5, 6, LOW_STOCK",
+            "true,  0, 1, OUT_OF_STOCK",
+            "false, 5, 1, DISCONTINUED",
+            "false, 0, 1, DISCONTINUED",
+            "false, 1, 9, DISCONTINUED"})
+    void cartLineStatusOf_checksDiscontinuedThenOutOfStockThenLowStock(boolean active, int stock, int quantity,
+                                                                       CartLineStatus expected) {
+        assertThat(CartLineStatus.of(active, stock, quantity)).isEqualTo(expected);
     }
 }

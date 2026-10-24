@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
+import java.util.Map;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -169,6 +170,64 @@ class H2ProfileSmokeTest {
         } finally {
             jdbc.update("delete from cart_items where cart_id in (select id from carts where user_id = ?)", userId);
             jdbc.update("delete from carts where user_id = ?", userId);
+        }
+    }
+
+    /**
+     * GĐ5 trên H2 (AC-005-34): đặt rồi hủy một đơn bằng tài khoản seed chạy được {@code lockOwner},
+     * {@code decrementStock}, câu xóa giỏ, {@code findDetailByIdAndUserId} và {@code lockByIdAndUserId}
+     * ({@code for update}) cùng {@code incrementStock}. Khôi phục kho và xóa đơn, giỏ ở finally; không thêm người dùng.
+     */
+    @Test
+    void order_placeThenCancel_worksOnH2AndRestoresStock() throws Exception {
+        Map<String, Object> product = jdbc.queryForMap(
+                "select id, price, stock from products where active = true and stock > 1 order by id limit 1");
+        Long productId = ((Number) product.get("ID")).longValue();
+        int stockBefore = ((Number) product.get("STOCK")).intValue();
+        String price = ((java.math.BigDecimal) product.get("PRICE")).toPlainString();
+        Long userId = jdbc.queryForObject("select id from users where email = 'user@minishop.local'", Long.class);
+        try {
+            RequestBuilder login = formLogin("/login").userParameter("email")
+                    .user("user@minishop.local").password(userPassword);
+            MockHttpSession session = (MockHttpSession) mockMvc.perform(login)
+                    .andExpect(status().is3xxRedirection()).andReturn().getRequest().getSession(false);
+
+            mockMvc.perform(post("/cart/items").with(csrf()).session(session)
+                            .param("productId", String.valueOf(productId)).param("quantity", "1"))
+                    .andExpect(status().is3xxRedirection());
+            mockMvc.perform(get("/checkout").session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Xác nhận đặt hàng")));
+
+            String location = mockMvc.perform(post("/checkout").with(csrf()).session(session)
+                            .param("receiverName", "Khách hàng mẫu").param("phone", "0912 345 678")
+                            .param("shippingAddress", "12 Lê Lợi").param("expectedTotal", price))
+                    .andExpect(status().is3xxRedirection())
+                    .andReturn().getResponse().getRedirectedUrl();
+            assertThat(location).startsWith("/orders/");
+            long orderId = Long.parseLong(location.substring("/orders/".length()));
+            assertThat(jdbc.queryForObject("select stock from products where id = ?", Integer.class, productId))
+                    .isEqualTo(stockBefore - 1);
+            assertThat(jdbc.queryForObject("select count(*) from cart_items i join carts c on c.id = i.cart_id "
+                    + "where c.user_id = ?", Integer.class, userId)).isZero();
+            assertThat(jdbc.queryForObject("select phone from orders where id = ?", String.class, orderId))
+                    .isEqualTo("0912345678");
+            mockMvc.perform(get(location).session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Hủy đơn hàng")));
+
+            mockMvc.perform(post(location + "/cancel").with(csrf()).session(session))
+                    .andExpect(status().is3xxRedirection());
+            assertThat(jdbc.queryForObject("select status from orders where id = ?", String.class, orderId))
+                    .isEqualTo("CANCELLED");
+            assertThat(jdbc.queryForObject("select stock from products where id = ?", Integer.class, productId))
+                    .isEqualTo(stockBefore);
+        } finally {
+            jdbc.update("delete from order_items where order_id in (select id from orders where user_id = ?)", userId);
+            jdbc.update("delete from orders where user_id = ?", userId);
+            jdbc.update("delete from cart_items where cart_id in (select id from carts where user_id = ?)", userId);
+            jdbc.update("delete from carts where user_id = ?", userId);
+            jdbc.update("update products set stock = ? where id = ?", stockBefore, productId);
         }
     }
 }

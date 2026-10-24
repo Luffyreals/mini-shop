@@ -1,5 +1,12 @@
 package com.minishop.order;
 
 enum PaymentMethod {
-    COD
+    COD;
+
+    /** Nhãn hiển thị tiếng Việt. */
+    String label() {
+        return switch (this) {
+            case COD -> "Thanh toán khi nhận hàng (COD)";
+        };
+    }
 }

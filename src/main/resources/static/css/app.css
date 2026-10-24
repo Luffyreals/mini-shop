@@ -554,3 +554,82 @@ a { text-underline-offset: 0.18em; }
   .cart-table .cart-total { display: flex; justify-content: space-between; align-items: baseline; padding: 0.75rem; }
   .cart-total th, .cart-total td { padding: 0; }
 }
+
+/* GĐ5: thanh toán, danh sách và chi tiết đơn */
+
+/* Tiêu đề mục trong trang thanh toán và chi tiết đơn */
+.checkout-heading { margin: 0 0 0.75rem; }
+.checkout-payment { margin: 0 0 1.5rem; }
+.checkout-payment__method { margin: 0; font-weight: 500; }
+.checkout-back { margin: 1rem 0 0; }
+.checkout-back a { color: var(--ms-ink); text-underline-offset: 0.25em; }
+.order-summary .cart-table-wrap { margin-top: 0; }
+
+/* Bảng đơn: dùng lại .cart-table; tên sản phẩm và địa chỉ rất dài không làm tràn ngang */
+.order-line__name { font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
+.order-line__name a { color: var(--ms-ink); }
+.order-table .cart-total td { text-align: left; }
+.order-multiline { white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Nhãn trạng thái: chữ trên nền đặc, không chỉ dựa vào màu */
+.order-status {
+  display: inline-block;
+  padding: 0.35rem 0.7rem;
+  font-size: var(--ms-step-small);
+  font-weight: 600;
+  line-height: 1.2;
+  background: var(--ms-surface-strong);
+  color: var(--ms-ink);
+}
+.order-status--pending { background: var(--ms-field-2); color: var(--ms-field-2-ink); }
+.order-status--confirmed { background: var(--ms-surface-strong); color: var(--ms-ink); }
+.order-status--shipping { background: var(--ms-field-3); color: var(--ms-field-3-ink); }
+.order-status--delivered { background: var(--ms-ink); color: var(--ms-field-3); }
+.order-status--cancelled { background: var(--ms-field-1); color: var(--ms-field-1-ink); }
+
+/* Chi tiết đơn: mã, ngày, trạng thái thành một mảng tông; thông tin nhận hàng là danh sách dọc */
+.order-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 3rem;
+  margin: 0 0 clamp(2rem, 1.5rem + 2vw, 3rem);
+  padding: clamp(1rem, 0.75rem + 1vw, 1.5rem);
+  background: var(--ms-surface);
+}
+.order-facts__item { min-width: 0; }
+.order-facts dt,
+.order-info__list dt { font-weight: 600; }
+.order-facts dd,
+.order-info__list dd { margin: 0; }
+.order-info { margin-bottom: 2rem; }
+/* Tên người nhận dài không có dấu cách (tối đa 100 ký tự) vẫn xuống dòng, không làm tràn ngang ở 375px */
+.order-info__list dd { margin-bottom: 0.9rem; overflow-wrap: anywhere; min-width: 0; }
+.order-info__list dd:last-child { margin-bottom: 0; }
+
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 2rem;
+}
+.order-actions form { margin: 0; }
+
+/* Nút hủy: nền đặc màu cảnh báo của dự án, chữ trắng */
+.btn-danger {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--ms-danger);
+  --bs-btn-border-color: var(--ms-danger);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #8f1e18;
+  --bs-btn-hover-border-color: #8f1e18;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #8f1e18;
+  --bs-btn-active-border-color: #8f1e18;
+  --bs-btn-focus-shadow-rgb: 26, 26, 26;
+}
+
+/* Bảng đơn trong khối dọc (dưới lg): tên sản phẩm là dòng đầu của mỗi khối */
+@media (max-width: 991.98px) {
+  .order-table .order-line__name { padding-bottom: 0.25rem; font-size: var(--ms-step-lead); }
+}

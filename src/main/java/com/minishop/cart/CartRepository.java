@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -29,4 +30,12 @@ interface CartRepository extends JpaRepository<Cart, Long> {
 
     @Query("select coalesce(sum(i.quantity), 0) from CartItem i where i.cart.user.id = :userId")
     long sumQuantityByUserId(@Param("userId") Long userId);
+
+    /**
+     * Xóa mọi dòng của giỏ người đó, giữ dòng {@code carts}. Chỉ gọi sau {@code lockOwner} trong cùng
+     * transaction (ADR-0008). Là câu xóa hàng loạt nên không phụ thuộc entity đang được quản lý.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from CartItem i where i.cart.id in (select c.id from Cart c where c.user.id = :userId)")
+    int deleteItemsByUserId(@Param("userId") Long userId);
 }

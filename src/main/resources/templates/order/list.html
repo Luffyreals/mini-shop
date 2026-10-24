@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Đơn hàng của tôi | Mini Shop')}"></head>
+<body class="site-body">
+<header th:replace="~{fragments/layout :: header}"></header>
+
+<main class="ms-container site-main">
+  <h1 class="page-title">Đơn hàng của tôi</h1>
+
+  <th:block th:if="${notice != null}">
+    <div th:replace="~{fragments/notice :: notice(${noticeKind}, ${notice})}"></div>
+  </th:block>
+
+  <div class="empty-state" th:if="${orders.empty}">
+    <p class="empty-state__text">Bạn chưa có đơn hàng nào.</p>
+    <a class="btn btn-primary" th:href="@{/products}">Bắt đầu mua sắm</a>
+  </div>
+
+  <th:block th:unless="${orders.empty}">
+    <div class="cart-table-wrap">
+      <table class="cart-table order-table">
+        <caption class="visually-hidden">Đơn hàng của tôi</caption>
+        <thead>
+          <tr>
+            <th scope="col">Mã đơn</th>
+            <th scope="col">Ngày đặt</th>
+            <th scope="col">Tổng tiền</th>
+            <th scope="col">Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="o : ${orders.orders}">
+            <td class="order-line__name">
+              <a th:href="@{/orders/{id}(id=${o.id})}" th:text="|#${o.id}|">#1</a>
+            </td>
+            <td class="cart-line__cell" data-label="Ngày đặt" th:text="${#vnDateTime.format(o.createdAt)}">24/10/2026 09:30</td>
+            <td class="cart-line__cell" data-label="Tổng tiền">
+              <span class="price" th:text="${#vnd.format(o.totalAmount)}">1.250.000 ₫</span>
+            </td>
+            <td class="cart-line__cell" data-label="Trạng thái">
+              <span class="order-status" th:classappend="|order-status--${o.statusKey}|" th:text="${o.statusLabel}">Chờ xử lý</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination-wrap">
+      <nav th:replace="~{fragments/pagination :: pagination(${pageNav})}"></nav>
+    </div>
+  </th:block>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

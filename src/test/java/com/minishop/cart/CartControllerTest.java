@@ -5,6 +5,7 @@ import com.minishop.config.SecurityConfig;
 import com.minishop.user.TestUsers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -537,5 +538,59 @@ class CartControllerTest {
         getCart();
 
         verify(cartService, times(1)).totalQuantity(any());
+    }
+
+    // ---------- GĐ5: nút "Đặt hàng" và link header (AC-005-1, 32) ----------
+
+    private static final String BLOCKED_TEXT =
+            "Vui lòng xóa hoặc giảm số lượng các sản phẩm không đủ hàng trước khi đặt hàng.";
+
+    private static boolean hasCheckoutButton(String html) {
+        return matches("<a[^>]*href=\"/checkout\"[^>]*>\s*Đặt hàng\s*</a>", main(html));
+    }
+
+    @Test
+    void view_whenEveryLineAvailable_showsCheckoutLinkForGuestAndUser() throws Exception {
+        when(cartService.view(any())).thenReturn(cartOf("300000", available(1, "Áo thun", "100000", 3)));
+
+        for (RequestPostProcessor who : List.of(GUEST, user(TestUsers.user()))) {
+            String html = cartPageFor(who);
+            assertThat(hasCheckoutButton(html)).isTrue();
+            assertThat(main(html)).doesNotContain(BLOCKED_TEXT);
+        }
+    }
+
+    @ParameterizedTest(name = "a {0} line blocks checkout")
+    @EnumSource(value = CartLineStatus.class, names = {"LOW_STOCK", "OUT_OF_STOCK", "DISCONTINUED"})
+    void view_whenAnyLineNotAvailable_hidesCheckoutLinkAndShowsBlockedText(CartLineStatus status) throws Exception {
+        when(cartService.view(any())).thenReturn(cartOf("100000",
+                available(1, "Áo thun", "100000", 1), line(2, "Quần jean", "250000", 3, status, 1)));
+
+        for (RequestPostProcessor who : List.of(GUEST, user(TestUsers.user()))) {
+            String html = cartPageFor(who);
+            assertThat(html).doesNotContain("href=\"/checkout\"");
+            assertThat(main(html)).contains(BLOCKED_TEXT);
+        }
+    }
+
+    @Test
+    void view_whenEmpty_hasNeitherCheckoutLinkNorBlockedText() throws Exception {
+        when(cartService.view(any())).thenReturn(emptyCart());
+
+        String html = cartPageFor(user(TestUsers.user()));
+
+        assertThat(html).doesNotContain("href=\"/checkout\"");
+        assertThat(main(html)).doesNotContain(BLOCKED_TEXT);
+    }
+
+    @Test
+    void header_ordersLink_isShownOnlyToLoggedInUsers() throws Exception {
+        when(cartService.view(any())).thenReturn(emptyCart());
+
+        assertThat(cartPageFor(GUEST)).doesNotContain("Đơn hàng của tôi");
+        for (RequestPostProcessor who : List.of(user(TestUsers.user()), user(TestUsers.admin()))) {
+            String html = cartPageFor(who);
+            assertThat(matches("<a[^>]*href=\"/orders\"[^>]*>\s*Đơn hàng của tôi\s*</a>", html)).isTrue();
+        }
     }
 }

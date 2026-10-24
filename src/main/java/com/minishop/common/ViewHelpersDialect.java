@@ -8,13 +8,18 @@ import org.thymeleaf.expression.IExpressionObjectFactory;
 
 import java.util.Set;
 
-/** Đưa các helper hiển thị vào template: {@code ${#vnd.format(p.price)}}. */
+/**
+ * Đưa các helper hiển thị vào template: {@code ${#vnd.format(p.price)}} và
+ * {@code ${#vnDateTime.format(o.createdAt)}}.
+ */
 @Component
 public class ViewHelpersDialect extends AbstractDialect implements IExpressionObjectDialect {
 
     private static final String VND = "vnd";
+    private static final String VN_DATE_TIME = "vnDateTime";
 
     private final VndFormatter vndFormatter = new VndFormatter();
+    private final VnDateTimeFormatter vnDateTimeFormatter = new VnDateTimeFormatter();
 
     public ViewHelpersDialect() {
         super("View helpers");
@@ -25,12 +30,16 @@ public class ViewHelpersDialect extends AbstractDialect implements IExpressionOb
         return new IExpressionObjectFactory() {
             @Override
             public Set<String> getAllExpressionObjectNames() {
-                return Set.of(VND);
+                return Set.of(VND, VN_DATE_TIME);
             }
 
             @Override
             public Object buildObject(IExpressionContext context, String expressionObjectName) {
-                return VND.equals(expressionObjectName) ? vndFormatter : null;
+                return switch (expressionObjectName) {
+                    case VND -> vndFormatter;
+                    case VN_DATE_TIME -> vnDateTimeFormatter;
+                    default -> null;
+                };
             }
 
             @Override
