@@ -55,6 +55,13 @@ class TemplateCspComplianceTest {
         assertThat(files).extracting(f -> f.getDescription().replace("\\", "/"))
                 .anyMatch(d -> d.contains("templates/cart/view.html"));
 
+        // trang thanh toán và đơn hàng (GĐ5) phải nằm trong phạm vi quét
+        assertThat(files).extracting(f -> f.getDescription().replace("\\", "/"))
+                .anyMatch(d -> d.contains("templates/order/checkout.html"))
+                .anyMatch(d -> d.contains("templates/order/list.html"))
+                .anyMatch(d -> d.contains("templates/order/detail.html"))
+                .anyMatch(d -> d.contains("templates/order/not-found.html"));
+
         List<String> violations = new ArrayList<>();
         for (Resource file : files) {
             violations.addAll(find(file.getDescription(), new String(file.getInputStream().readAllBytes(),

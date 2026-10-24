@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Thanh toán | Mini Shop')}"></head>
+<body class="site-body">
+<header th:replace="~{fragments/layout :: header}"></header>
+
+<main class="ms-container site-main">
+  <h1 class="page-title">Thanh toán</h1>
+
+  <th:block th:if="${notice != null}">
+    <div th:replace="~{fragments/notice :: notice(${noticeKind}, ${notice})}"></div>
+  </th:block>
+
+  <div class="row g-4 g-lg-5">
+    <div class="col-12 col-lg-5 order-2 order-lg-1">
+      <!-- expectedTotal chỉ để so sánh giá ở server, không bao giờ được lưu (BR-005-5). -->
+      <form class="checkout-form" method="post" th:action="@{/checkout}" th:object="${form}" novalidate>
+        <div class="auth-field">
+          <label class="form-label" for="receiverName">Họ tên người nhận</label>
+          <input class="form-control" type="text" th:field="*{receiverName}" autocomplete="name" maxlength="100"
+                 th:classappend="${#fields.hasErrors('receiverName')} ? 'is-invalid'"
+                 th:aria-invalid="${#fields.hasErrors('receiverName')} ? 'true'"
+                 th:aria-describedby="${#fields.hasErrors('receiverName')} ? 'receiverName-error'">
+          <p class="field-error" id="receiverName-error" th:if="${#fields.hasErrors('receiverName')}" th:errors="*{receiverName}">Lỗi</p>
+        </div>
+
+        <div class="auth-field">
+          <label class="form-label" for="phone">Số điện thoại</label>
+          <input class="form-control" type="tel" th:field="*{phone}" autocomplete="tel" inputmode="tel"
+                 th:classappend="${#fields.hasErrors('phone')} ? 'is-invalid'"
+                 th:aria-invalid="${#fields.hasErrors('phone')} ? 'true'"
+                 th:aria-describedby="${#fields.hasErrors('phone')} ? 'phone-error'">
+          <p class="field-error" id="phone-error" th:if="${#fields.hasErrors('phone')}" th:errors="*{phone}">Lỗi</p>
+        </div>
+
+        <div class="auth-field">
+          <label class="form-label" for="shippingAddress">Địa chỉ giao hàng</label>
+          <textarea class="form-control" rows="3" th:field="*{shippingAddress}" autocomplete="street-address" maxlength="500"
+                    th:classappend="${#fields.hasErrors('shippingAddress')} ? 'is-invalid'"
+                    th:aria-invalid="${#fields.hasErrors('shippingAddress')} ? 'true'"
+                    th:aria-describedby="${#fields.hasErrors('shippingAddress')} ? 'shippingAddress-error'"></textarea>
+          <p class="field-error" id="shippingAddress-error" th:if="${#fields.hasErrors('shippingAddress')}" th:errors="*{shippingAddress}">Lỗi</p>
+        </div>
+
+        <div class="auth-field">
+          <label class="form-label" for="note">Ghi chú (không bắt buộc)</label>
+          <textarea class="form-control" rows="3" th:field="*{note}" maxlength="500"
+                    th:classappend="${#fields.hasErrors('note')} ? 'is-invalid'"
+                    th:aria-invalid="${#fields.hasErrors('note')} ? 'true'"
+                    th:aria-describedby="${#fields.hasErrors('note')} ? 'note-error'"></textarea>
+          <p class="field-error" id="note-error" th:if="${#fields.hasErrors('note')}" th:errors="*{note}">Lỗi</p>
+        </div>
+
+        <section class="checkout-payment">
+          <h2 class="checkout-heading">Phương thức thanh toán</h2>
+          <p class="checkout-payment__method">Thanh toán khi nhận hàng (COD)</p>
+        </section>
+
+        <input type="hidden" name="expectedTotal" th:value="${checkout.total.toPlainString()}">
+        <button class="btn btn-primary w-100" type="submit">Xác nhận đặt hàng</button>
+      </form>
+      <p class="checkout-back"><a th:href="@{/cart}">Quay lại giỏ hàng</a></p>
+    </div>
+
+    <div class="col-12 col-lg-7 order-1 order-lg-2">
+      <section class="order-summary">
+        <h2 class="checkout-heading">Đơn hàng của bạn</h2>
+        <div class="cart-table-wrap">
+          <table class="cart-table order-table">
+            <caption class="visually-hidden">Đơn hàng của bạn</caption>
+            <thead>
+              <tr>
+                <th scope="col">Sản phẩm</th>
+                <th scope="col">Số lượng</th>
+                <th scope="col">Đơn giá</th>
+                <th scope="col">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr th:each="line : ${checkout.lines}">
+                <td class="order-line__name" th:text="${line.name}">Tên sản phẩm</td>
+                <td class="cart-line__cell" data-label="Số lượng" th:text="${line.quantity}">1</td>
+                <td class="cart-line__cell" data-label="Đơn giá">
+                  <span class="price" th:text="${#vnd.format(line.unitPrice)}">1.250.000 ₫</span>
+                </td>
+                <td class="cart-line__cell" data-label="Thành tiền">
+                  <span class="price" th:text="${#vnd.format(line.lineTotal)}">1.250.000 ₫</span>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="cart-total">
+                <th scope="row" colspan="3">Tổng cộng</th>
+                <td><span class="price" th:text="${#vnd.format(checkout.total)}">2.500.000 ₫</span></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

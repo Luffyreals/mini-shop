@@ -5,6 +5,20 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+GĐ5: đặt hàng (COD), lịch sử đơn và tự hủy đơn ([spec 005](docs/specs/005-checkout-and-orders.md)).
+
+### Thêm
+- Nút "Đặt hàng" ở trang giỏ (chỉ khi mọi dòng đều đặt được) và trang thanh toán `/checkout`: thông tin nhận hàng (điền sẵn họ tên, số điện thoại của tài khoản), tóm tắt đơn, thanh toán khi nhận hàng (COD). Khách chưa đăng nhập được đưa qua bước đăng nhập rồi quay lại thanh toán với giỏ đã gộp.
+- Đặt hàng trong một transaction: chụp tên và giá sản phẩm vào đơn, trừ tồn kho có điều kiện, xóa giỏ. Không đủ hàng thì không đặt gì và báo tên sản phẩm; giá vừa đổi thì hiện lại trang thanh toán với giá mới.
+- Trang "Đơn hàng của tôi" `/orders` (10 đơn mỗi trang, mới nhất trước, giờ Việt Nam) và chi tiết đơn `/orders/{id}`; link "Đơn hàng của tôi" trên header.
+- Khách tự hủy đơn đang "Chờ xử lý" (có hộp xác nhận); tồn kho được cộng lại trong cùng transaction.
+- Luồng trạng thái đơn `OrderStatus.canTransitionTo()` cho cả GĐ6.
+- ADR-0009: thứ tự khóa cố định khi đặt và hủy đơn; mọi chuyển trạng thái đơn khóa dòng `orders` trước.
+
+### Bảo mật
+- Chỉ xem và hủy được đơn của chính mình (đơn của người khác trả 404); mọi form đặt và hủy là POST có CSRF; tham số giả mạo (`userId`, `status`, giá, tổng) bị bỏ qua.
+- Đặt hàng đồng thời không bán vượt kho, không tạo hai đơn từ một giỏ, không deadlock; hủy hai lần chỉ hoàn kho một lần.
+
 ## [0.4.0] - 2026-10-24
 
 GĐ4: giỏ hàng ([spec 004](docs/specs/004-shopping-cart.md)).

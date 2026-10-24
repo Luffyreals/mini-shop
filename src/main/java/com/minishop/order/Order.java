@@ -142,6 +142,18 @@ class Order {
         return item;
     }
 
+    /**
+     * Đổi trạng thái theo {@link OrderStatus#canTransitionTo}; chốt chặn ở domain cho cả khách và admin.
+     *
+     * @throws IllegalStateException nếu bước chuyển không hợp lệ
+     */
+    void transitionTo(OrderStatus next) {
+        if (!status.canTransitionTo(next)) {
+            throw new IllegalStateException("Cannot change order status from " + status + " to " + next);
+        }
+        this.status = next;
+    }
+
     Instant getCreatedAt() {
         return createdAt;
     }

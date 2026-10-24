@@ -231,6 +231,53 @@ class SecurityConfigTest {
                 .andExpect(forwardedUrl("/access-denied"));
     }
 
+    /** AC-005-25, AC-005-6: đơn hàng và thanh toán cần đăng nhập, kể cả URL có query string thật (bài học GĐ3). */
+    @ParameterizedTest
+    @ValueSource(strings = {"/orders", "/orders?page=2", "/orders/abc", "/orders/1", "/checkout", "/checkout?continue"})
+    void orderAndCheckoutPages_redirectAnonymousToLogin(String path) throws Exception {
+        mockMvc.perform(get(path))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    /** AC-005-6: POST có CSRF nhưng chưa đăng nhập thì được chuyển sang /login, không chạm tới handler. */
+    @ParameterizedTest
+    @ValueSource(strings = {"/checkout", "/orders/1/cancel"})
+    void orderAndCheckoutPost_withCsrf_redirectsAnonymousToLogin(String path) throws Exception {
+        mockMvc.perform(post(path).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    /** AC-005-19: người đã đăng nhập gửi POST thiếu token CSRF bị chặn (403, trang access-denied). */
+    @ParameterizedTest
+    @ValueSource(strings = {"/checkout", "/orders/1/cancel"})
+    @WithMockUser
+    void orderAndCheckoutPost_withoutCsrf_asUser_isForbidden(String path) throws Exception {
+        mockMvc.perform(post(path))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"));
+    }
+
+    /** AC-005-19: người đã đăng nhập, có CSRF thì qua bộ lọc (slice không có controller nên là 404, không phải 403). */
+    @ParameterizedTest
+    @ValueSource(strings = {"/checkout", "/orders/1/cancel"})
+    @WithMockUser
+    void orderAndCheckoutPost_withCsrf_asUser_passesSecurityFilter(String path) throws Exception {
+        MvcResult result = mockMvc.perform(post(path).with(csrf())).andReturn();
+
+        assertThat(result.getResponse().getStatus()).isNotEqualTo(403);
+        assertThat(result.getResponse().getRedirectedUrl()).isNull();
+        assertThat(result.getResponse().getForwardedUrl()).isNull();
+    }
+
+    /** QĐ12: file JS xác nhận hủy là tài nguyên tĩnh công khai, khách không bị chuyển sang /login. */
+    @Test
+    void confirmScript_isPublicForAnonymous() throws Exception {
+        mockMvc.perform(get("/js/confirm.js"))
+                .andExpect(status().isOk());
+    }
+
     /** AC-004-23: /cart/** mở không làm lộ POST vào /products và /products/{id}. */
     @ParameterizedTest
     @ValueSource(strings = {"/products", "/products/1"})

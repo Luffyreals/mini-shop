@@ -78,6 +78,11 @@
       </tfoot>
     </table>
   </div>
+
+  <div class="order-actions" th:unless="${cart.empty}">
+    <a class="btn btn-primary" th:if="${cart.orderable}" th:href="@{/checkout}">Đặt hàng</a>
+    <p class="mb-0" th:unless="${cart.orderable}">Vui lòng xóa hoặc giảm số lượng các sản phẩm không đủ hàng trước khi đặt hàng.</p>
+  </div>
 </main>
 
 <footer th:replace="~{fragments/layout :: footer}"></footer>

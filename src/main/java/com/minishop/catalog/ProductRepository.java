@@ -35,4 +35,14 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Query("update Product p set p.stock = p.stock - :quantity "
             + "where p.id = :id and :quantity > 0 and p.stock >= :quantity")
     int decrementStock(@Param("id") Long id, @Param("quantity") int quantity);
+
+    /**
+     * Cộng lại kho khi hủy đơn (BR-005-10). Không lọc {@code active}: sản phẩm đã ẩn vẫn được hoàn kho.
+     * Là câu {@code @Modifying} riêng vì {@code Product.stock} là {@code updatable = false}.
+     *
+     * @return 1 nếu đã cộng, 0 nếu số lượng không dương hoặc không có sản phẩm
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Product p set p.stock = p.stock + :quantity where p.id = :id and :quantity > 0")
+    int incrementStock(@Param("id") Long id, @Param("quantity") int quantity);
 }

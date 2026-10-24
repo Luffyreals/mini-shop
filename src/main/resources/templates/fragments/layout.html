@@ -25,6 +25,7 @@
       <a class="site-nav-link" sec:authorize="!isAuthenticated()" th:href="@{/login}">Đăng nhập</a>
       <a class="site-nav-link" sec:authorize="!isAuthenticated()" th:href="@{/register}">Đăng ký</a>
       <a class="site-nav-link" sec:authorize="hasRole('ADMIN')" th:href="@{/admin}">Quản trị</a>
+      <a class="site-nav-link" sec:authorize="isAuthenticated()" th:href="@{/orders}">Đơn hàng của tôi</a>
       <span class="site-user" sec:authorize="isAuthenticated()"
             th:text="|Xin chào, ${#authentication.principal.fullName}|">Xin chào</span>
       <form class="site-logout" sec:authorize="isAuthenticated()" th:action="@{/logout}" method="post">

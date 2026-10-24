@@ -11,6 +11,9 @@ import org.springframework.data.repository.Repository;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RestController;
 
+import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleName;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
@@ -38,6 +41,25 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule cart_neverDecrementsStock = noClasses().that().resideInAPackage("com.minishop.cart..")
             .should().callMethod(ProductRepository.class, "decrementStock", Long.class, int.class);
+
+    /** GĐ5: order không phụ thuộc admin, config, storage. */
+    @ArchTest
+    static final ArchRule order_dependsOnlyOnAllowedPackages = noClasses().that().resideInAPackage("com.minishop.order..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.minishop.admin..", "com.minishop.config..", "com.minishop.storage..");
+
+    /** QĐ1: order chỉ thấy API công khai hẹp của cart, không thấy CartService, CartRepository hay entity của cart. */
+    @ArchTest
+    static final ArchRule order_usesOnlyCartCheckoutApi = noClasses().that().resideInAPackage("com.minishop.order..")
+            .should().dependOnClassesThat(resideInAPackage("com.minishop.cart..")
+                    .and(not(simpleName("CartCheckout"))).and(not(simpleName("CheckoutLine"))));
+
+    /** Spec 005 §8: chỉ đặt hàng và hủy đơn (order) được đổi tồn kho; catalog là nơi định nghĩa. */
+    @ArchTest
+    static final ArchRule onlyOrderChangesStock = noClasses()
+            .that().resideOutsideOfPackages("com.minishop.order..", "com.minishop.catalog..")
+            .should().callMethod(ProductRepository.class, "decrementStock", Long.class, int.class)
+            .orShould().callMethod(ProductRepository.class, "incrementStock", Long.class, int.class);
 
     @ArchTest
     static final ArchRule user_dependsOnNoOtherFeature = noClasses().that().resideInAPackage("com.minishop.user..")
