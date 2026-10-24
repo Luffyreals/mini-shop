@@ -1,5 +1,6 @@
 package com.minishop.user;
 
+import com.minishop.cart.CartHeaderTestConfig;
 import com.minishop.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -30,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Tầng web của đăng ký và đăng nhập, service được mock (AC-003-1, 2, 4, 6, 7, 8, 11, 17; BR-003-4). */
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, CartHeaderTestConfig.class})
 class AuthControllerTest {
 
     private static final String SECRET = "Zx9SecretPw";

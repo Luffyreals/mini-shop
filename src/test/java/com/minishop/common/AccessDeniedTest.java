@@ -1,5 +1,6 @@
 package com.minishop.common;
 
+import com.minishop.cart.CartHeaderTestConfig;
 import com.minishop.config.SecurityConfig;
 import com.minishop.user.TestUsers;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Trang 403 (AC-003-14, 16; QĐ6). */
 @WebMvcTest(AccessDeniedController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, CartHeaderTestConfig.class})
 class AccessDeniedTest {
 
     @Autowired

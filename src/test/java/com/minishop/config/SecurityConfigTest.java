@@ -190,4 +190,53 @@ class SecurityConfigTest {
         mockMvc.perform(post("/logout"))
                 .andExpect(status().isForbidden());
     }
+
+    /** AC-004-23: giỏ mở cho khách, kể cả khi có query string thật (bài học GĐ3). */
+    @ParameterizedTest
+    @ValueSource(strings = {"/cart", "/cart?x", "/cart?x=1"})
+    void cartGet_isNotRedirectedForAnonymous(String path) throws Exception {
+        MvcResult result = mockMvc.perform(get(path)).andReturn();
+
+        assertThat(result.getResponse().getRedirectedUrl()).isNull();
+        assertThat(result.getResponse().getStatus()).isNotEqualTo(403);
+    }
+
+    /** AC-004-23 */
+    @ParameterizedTest
+    @ValueSource(strings = {"/cart/items", "/cart/items/1", "/cart/items/1/delete"})
+    void cartPost_withCsrf_isNotRedirectedToLoginForAnonymous(String path) throws Exception {
+        MvcResult result = mockMvc.perform(post(path).with(csrf())).andReturn();
+
+        // Slice không có controller nên kỳ vọng 404; 403 hay 5xx đều là lỗi của chuỗi filter.
+        assertThat(result.getResponse().getRedirectedUrl()).isNull();
+        assertThat(result.getResponse().getStatus()).isNotEqualTo(403).isLessThan(500);
+    }
+
+    /** AC-004-19 */
+    @ParameterizedTest
+    @ValueSource(strings = {"/cart/items", "/cart/items/1", "/cart/items/1/delete"})
+    void cartPost_withoutCsrf_asAnonymous_isForbidden(String path) throws Exception {
+        mockMvc.perform(post(path))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"));
+    }
+
+    /** AC-004-19 */
+    @ParameterizedTest
+    @ValueSource(strings = {"/cart/items", "/cart/items/1", "/cart/items/1/delete"})
+    @WithMockUser
+    void cartPost_withoutCsrf_asUser_isForbidden(String path) throws Exception {
+        mockMvc.perform(post(path))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"));
+    }
+
+    /** AC-004-23: /cart/** mở không làm lộ POST vào /products và /products/{id}. */
+    @ParameterizedTest
+    @ValueSource(strings = {"/products", "/products/1"})
+    void productsPost_withCsrf_asAnonymous_stillRedirectsToLogin(String path) throws Exception {
+        mockMvc.perform(post(path).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
 }

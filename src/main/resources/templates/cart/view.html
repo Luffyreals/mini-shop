@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Giỏ hàng | Mini Shop')}"></head>
+<body class="site-body">
+<header th:replace="~{fragments/layout :: header}"></header>
+
+<main class="ms-container site-main">
+  <h1 class="page-title">Giỏ hàng</h1>
+
+  <th:block th:if="${notice != null}">
+    <div th:replace="~{fragments/notice :: notice(${noticeKind}, ${notice})}"></div>
+  </th:block>
+
+  <div class="empty-state" th:if="${cart.empty}">
+    <p class="empty-state__text">Giỏ hàng của bạn đang trống.</p>
+    <a class="btn btn-primary" th:href="@{/products}">Tiếp tục mua sắm</a>
+  </div>
+
+  <div class="cart-table-wrap" th:unless="${cart.empty}">
+    <table class="cart-table">
+      <caption class="visually-hidden">Sản phẩm trong giỏ hàng</caption>
+      <thead>
+        <tr>
+          <th scope="col">Sản phẩm</th>
+          <th scope="col">Đơn giá</th>
+          <th scope="col">Số lượng</th>
+          <th scope="col">Thành tiền</th>
+          <th scope="col"><span class="visually-hidden">Thao tác</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="line : ${cart.lines}" th:classappend="${!line.purchasable} ? 'is-unavailable'">
+          <td class="cart-line__product">
+            <img class="cart-line__img" width="72" height="90" alt=""
+                 th:src="@{${line.imageUrl != null ? line.imageUrl : '/images/placeholder-product.svg'}}">
+            <div class="cart-line__info">
+              <a class="cart-line__name" th:if="${!line.discontinued}"
+                 th:href="@{/products/{id}(id=${line.productId})}" th:text="${line.name}">Tên sản phẩm</a>
+              <span class="cart-line__name" th:if="${line.discontinued}" th:text="${line.name}">Tên sản phẩm</span>
+              <span class="badge stock-badge stock-badge--out" th:if="${line.discontinued}">Sản phẩm đã ngừng bán</span>
+              <span class="badge stock-badge stock-badge--out"
+                    th:if="${!line.discontinued and line.outOfStock}">Hết hàng</span>
+              <span class="badge stock-badge stock-badge--low"
+                    th:if="${!line.discontinued and !line.outOfStock and line.lowStock}"
+                    th:text="|Chỉ còn ${line.availableStock} sản phẩm|">Chỉ còn 2 sản phẩm</span>
+            </div>
+          </td>
+          <td class="cart-line__cell" data-label="Đơn giá">
+            <span class="price" th:text="${#vnd.format(line.unitPrice)}">1.250.000 ₫</span>
+          </td>
+          <td class="cart-line__cell" data-label="Số lượng">
+            <form class="cart-qty" th:if="${line.purchasable}" method="post"
+                  th:action="@{/cart/items/{id}(id=${line.productId})}" novalidate>
+              <label class="visually-hidden" th:for="|qty-${line.productId}|">Số lượng</label>
+              <input class="form-control" type="number" min="1" max="99" step="1" inputmode="numeric"
+                     th:id="|qty-${line.productId}|" name="quantity" th:value="${line.quantity}">
+              <button type="submit" class="btn btn-outline-dark">Cập nhật</button>
+            </form>
+            <span th:unless="${line.purchasable}" th:text="${line.quantity}">1</span>
+          </td>
+          <td class="cart-line__cell" data-label="Thành tiền">
+            <span class="price" th:if="${line.lineTotal != null}" th:text="${#vnd.format(line.lineTotal)}">1.250.000 ₫</span>
+            <span th:if="${line.lineTotal == null}">—</span>
+          </td>
+          <td class="cart-line__actions">
+            <form method="post" th:action="@{/cart/items/{id}/delete(id=${line.productId})}">
+              <button type="submit" class="btn btn-outline-dark">Xóa<span class="visually-hidden"
+                      th:text="| ${line.name}|"> Tên sản phẩm</span></button>
+            </form>
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="cart-total">
+          <th scope="row" colspan="3">Tổng cộng</th>
+          <td colspan="2"><span class="price" th:text="${#vnd.format(cart.total)}">2.500.000 ₫</span></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

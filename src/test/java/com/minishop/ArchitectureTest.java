@@ -1,5 +1,6 @@
 package com.minishop;
 
+import com.minishop.catalog.ProductRepository;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -24,8 +25,19 @@ class ArchitectureTest {
                     "com.minishop.cart..", "com.minishop.order..", "com.minishop.user..", "com.minishop.admin..");
 
     @ArchTest
-    static final ArchRule cart_doesNotDependOnOrderOrAdmin = noClasses().that().resideInAPackage("com.minishop.cart..")
-            .should().dependOnClassesThat().resideInAnyPackage("com.minishop.order..", "com.minishop.admin..");
+    static final ArchRule cart_dependsOnlyOnAllowedPackages = noClasses().that().resideInAPackage("com.minishop.cart..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.minishop.order..", "com.minishop.admin..", "com.minishop.config..", "com.minishop.storage..");
+
+    /** QĐ5: việc gộp giỏ khi đăng nhập nằm trong cart, config không được biết tới cart hay order. */
+    @ArchTest
+    static final ArchRule config_doesNotDependOnCartOrOrder = noClasses().that().resideInAPackage("com.minishop.config..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.minishop.cart..", "com.minishop.order..");
+
+    /** AC-004-21: giỏ hàng không bao giờ đụng tới tồn kho; chỉ đặt hàng (GĐ5) được trừ kho. */
+    @ArchTest
+    static final ArchRule cart_neverDecrementsStock = noClasses().that().resideInAPackage("com.minishop.cart..")
+            .should().callMethod(ProductRepository.class, "decrementStock", Long.class, int.class);
 
     @ArchTest
     static final ArchRule user_dependsOnNoOtherFeature = noClasses().that().resideInAPackage("com.minishop.user..")

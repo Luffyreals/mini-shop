@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 @Entity
 @Table(name = "carts")
@@ -73,6 +74,13 @@ class Cart {
 
     void removeItem(CartItem item) {
         items.remove(item);
+    }
+
+    /** So id sản phẩm qua {@code getProduct().getId()}, không khởi tạo proxy của Product. */
+    Optional<CartItem> findItem(Long productId) {
+        return items.stream()
+                .filter(i -> i.getProduct().getId().equals(productId))
+                .findFirst();
     }
 
     Instant getUpdatedAt() {

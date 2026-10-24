@@ -51,7 +51,7 @@ class ProductService {
         Product p = productRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new NotFoundException("Product not found: " + id));
         return new ProductDetailView(p.getId(), p.getName(), p.getCategory().getName(), p.getPrice(),
-                p.getDescription(), p.getStock() > 0, toImageUrl(p.getImagePath()));
+                p.getDescription(), p.getStock() > 0, ProductImages.toUrl(p.getImagePath()));
     }
 
     /** Sắp bằng Collator tiếng Việt trong Java: collation của DB khác nhau giữa PostgreSQL (Alpine) và H2. */
@@ -65,11 +65,6 @@ class ProductService {
 
     private ProductCardView toCard(Product p) {
         return new ProductCardView(p.getId(), p.getName(), p.getCategory().getName(), p.getPrice(),
-                p.getStock() > 0, toImageUrl(p.getImagePath()));
-    }
-
-    /** Chỗ duy nhất đổi image_path thành URL; GĐ6 sẽ chuyển việc này sang StorageService. */
-    private String toImageUrl(String imagePath) {
-        return imagePath == null || imagePath.isBlank() ? null : imagePath;
+                p.getStock() > 0, ProductImages.toUrl(p.getImagePath()));
     }
 }
