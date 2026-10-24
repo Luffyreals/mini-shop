@@ -5,6 +5,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-25
+
 GĐ7: hoàn thiện ([spec 007](docs/specs/007-polish.md)).
 
 ### Thêm

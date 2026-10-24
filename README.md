@@ -4,7 +4,7 @@
 
 Website bán hàng mini viết bằng Java / Spring Boot, render phía server. Đây là dự án học tập và portfolio, **không bán hàng thật**.
 
-> 🚧 **Đang phát triển.** Đã xong GĐ1 (`v0.1.0`, nền móng), GĐ2 (`v0.2.0`, danh sách và chi tiết sản phẩm tại http://localhost:8080), GĐ3 (`v0.3.0`, đăng ký, đăng nhập, phân quyền), GĐ4 (`v0.4.0`, giỏ hàng), GĐ5 (`v0.5.0`, đặt hàng COD, lịch sử đơn, tự hủy đơn), GĐ6 (`v0.6.0`, trang quản trị: dashboard, danh mục, sản phẩm có ảnh, tồn kho, đơn hàng) và GĐ7 (trang lỗi, validation, truy cập, README). Tiếp theo: GĐ8 deploy online (tùy chọn). Tiến độ xem ở mục [Lộ trình](#lộ-trình).
+> 🚧 **Đang phát triển.** Đã xong GĐ1 (`v0.1.0`, nền móng), GĐ2 (`v0.2.0`, danh sách và chi tiết sản phẩm tại http://localhost:8080), GĐ3 (`v0.3.0`, đăng ký, đăng nhập, phân quyền), GĐ4 (`v0.4.0`, giỏ hàng), GĐ5 (`v0.5.0`, đặt hàng COD, lịch sử đơn, tự hủy đơn), GĐ6 (`v0.6.0`, trang quản trị: dashboard, danh mục, sản phẩm có ảnh, tồn kho, đơn hàng) và GĐ7 (`v0.7.0`, trang lỗi, validation, truy cập, README). Tiếp theo: GĐ8 deploy online (tùy chọn). Tiến độ xem ở mục [Lộ trình](#lộ-trình).
 
 ## Tính năng (MVP)
 
@@ -254,7 +254,7 @@ mini-shop/
 - [x] GĐ4: Giỏ hàng (`v0.4.0`)
 - [x] GĐ5: Đặt hàng và lịch sử đơn (`v0.5.0`)
 - [x] GĐ6: Trang quản trị (`v0.6.0`)
-- [x] GĐ7: Hoàn thiện (validation, xử lý lỗi, giao diện, tài liệu)
+- [x] GĐ7: Hoàn thiện: validation, xử lý lỗi, giao diện, tài liệu (`v0.7.0`)
 - [ ] GĐ8: Deploy online *(tùy chọn)*
 
 ## Hướng phát triển
