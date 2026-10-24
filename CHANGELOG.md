@@ -5,6 +5,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-24
+
 GĐ5: đặt hàng (COD), lịch sử đơn và tự hủy đơn ([spec 005](docs/specs/005-checkout-and-orders.md)).
 
 ### Thêm
