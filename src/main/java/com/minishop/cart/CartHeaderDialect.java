@@ -17,7 +17,7 @@ import java.util.Set;
  *
  * <p>Why a dialect and not a {@code @ControllerAdvice} with {@code @ModelAttribute}: the object is only built
  * when a template actually uses it, so redirect-only POSTs cost nothing, and it also works for views rendered
- * by an {@code @ExceptionHandler} (such as the 404 page), whose model would not contain the advice attributes.
+ * by an exception handler or the error page, whose model would not contain the advice attributes.
  *
  * <p>For a guest the count is read from the session with {@code getSession(false)}: no query, no
  * transaction and no session is created. For a customer it is one {@code sum} query, memoized per render.

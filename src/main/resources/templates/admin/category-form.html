@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   Form thêm / sửa danh mục (cùng một template).
   Model: form (CategoryForm: name, description), mode ('new' | 'edit'), categoryId (chỉ khi sửa).
   POST: new -> /admin/categories ; edit -> /admin/categories/{categoryId}. Field: name, description.
--->
+*/-->
 <head th:replace="~{fragments/admin :: head(${(mode == 'edit' ? 'Sửa danh mục' : 'Thêm danh mục') + ' | Quản trị Mini Shop'})}"></head>
 <body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <div class="admin-shell">
   <aside th:replace="~{fragments/admin :: sidebar('categories')}"></aside>
 
-  <main class="admin-main">
+  <main id="main" tabindex="-1" class="admin-main">
     <div class="admin-pagehead">
       <h1 class="admin-title" th:text="${mode == 'edit'} ? 'Sửa danh mục' : 'Thêm danh mục'">Thêm danh mục</h1>
     </div>

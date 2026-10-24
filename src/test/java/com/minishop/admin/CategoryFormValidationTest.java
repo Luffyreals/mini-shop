@@ -134,12 +134,49 @@ class CategoryFormValidationTest {
         assertThat(all(form)).isEmpty();
     }
 
-    /** BR-006-4: a multi-line field keeps its line breaks. */
+    /** BR-006-4, BR-007-6: a multi-line field keeps its line breaks; {@code \r\n} becomes {@code \n}. */
     @Test
     void description_keepsLineBreaksButStripsTheEnds() {
         CategoryForm form = new CategoryForm("Áo", "  dòng 1\r\ndòng 2\n\tdòng 3  ");
 
-        assertThat(form.description()).isEqualTo("dòng 1\r\ndòng 2\n\tdòng 3");
+        assertThat(form.description()).isEqualTo("dòng 1\ndòng 2\n\tdòng 3");
+    }
+
+    /** BR-007-6: a lone {@code \r} is also a line break, counted once like the browser's maxlength does. */
+    @Test
+    void description_convertsEveryKindOfLineBreakToLf() {
+        assertThat(new CategoryForm("Áo", "a\r\nb\rc\nd").description()).isEqualTo("a\nb\nc\nd");
+    }
+
+    // ---------- invisible characters (AC-007-14, 15) ----------
+
+    /** AC-007-14: a name made only of invisible characters and spaces is "missing", with one error. */
+    @ParameterizedTest
+    @ValueSource(strings = {"​", "‌", "‍", "⁠", "﻿", " ", "​  ﻿",
+            "  "})
+    void name_whenOnlyInvisibleCharacters_hasExactlyOneRequiredError(String name) {
+        CategoryForm form = new CategoryForm(name, null);
+
+        assertThat(all(form)).hasSize(1);
+        assertThat(messages(form, "name")).containsExactly(NAME_REQUIRED);
+    }
+
+    /** AC-007-15 */
+    @Test
+    void name_dropsInvisibleCharactersInTheMiddle() {
+        CategoryForm form = new CategoryForm("Áo​ thun", null);
+
+        assertThat(form.name()).isEqualTo("Áo thun");
+        assertThat(form.toDraft().name()).isEqualTo("Áo thun");
+        assertThat(all(form)).isEmpty();
+    }
+
+    @Test
+    void description_whenOnlyInvisibleCharacters_becomesNull() {
+        CategoryForm form = new CategoryForm("Áo", "​ ﻿");
+
+        assertThat(form.description()).isNull();
+        assertThat(all(form)).isEmpty();
     }
 
     @Test

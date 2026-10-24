@@ -123,7 +123,44 @@ class ProductFormValidationTest {
         assertThat(withName("  Bình\u0000 nước\u0007  ").name()).isEqualTo("Bình nước");
     }
 
+    /** AC-007-14: a name made only of invisible characters is "missing", with one error, on both forms. */
+    @ParameterizedTest
+    @ValueSource(strings = {"​", "‌", "‍", "⁠", "﻿", " ", "​  ﻿"})
+    void name_whenOnlyInvisibleCharacters_hasExactlyOneRequiredError(String name) {
+        NewProductForm form = withName(name);
+        EditProductForm edit = new EditProductForm(name, "2", "1250000", null, null);
+
+        assertThat(all(form)).hasSize(1);
+        assertThat(messages(form, "name")).containsExactly(NAME_REQUIRED);
+        assertThat(all(edit)).hasSize(1);
+        assertThat(messages(edit, "name")).containsExactly(NAME_REQUIRED);
+    }
+
+    /** AC-007-15 */
+    @Test
+    void name_dropsInvisibleCharactersInTheMiddle() {
+        NewProductForm form = withName("Áo​ thun");
+
+        assertThat(form.name()).isEqualTo("Áo thun");
+        assertThat(form.toDraft().name()).isEqualTo("Áo thun");
+        assertThat(all(form)).isEmpty();
+        assertThat(new EditProductForm("Áo​ thun", "2", "1000", null, null).name()).isEqualTo("Áo thun");
+    }
+
     // ---------- description ----------
+
+    /** BR-007-6: a description made only of invisible characters is "no description". */
+    @Test
+    void description_whenOnlyInvisibleCharacters_becomesNull() {
+        assertThat(form("A", "2", "1000", "1", "​ ﻿\n").description()).isNull();
+    }
+
+    /** BR-007-6: {@code \r\n} from a browser becomes {@code \n}, so the length limit counts it once. */
+    @Test
+    void description_convertsCrLfToLf() {
+        assertThat(form("A", "2", "1000", "1", "dòng 1\r\ndòng 2\rdòng 3").description())
+                .isEqualTo("dòng 1\ndòng 2\ndòng 3");
+    }
 
     @Test
     void description_boundaryAtFourThousandCharacters() {
@@ -190,6 +227,39 @@ class ProductFormValidationTest {
         BigDecimal parsed = form.toDraft().price();
         assertThat(parsed).isEqualTo(new BigDecimal("1250000"));
         assertThat(parsed.scale()).isZero();
+    }
+
+    /** AC-007-17, BR-007-8: pasted no-break, narrow no-break and figure spaces give the same price. */
+    @ParameterizedTest
+    @ValueSource(strings = {"1 250 000", "1 250 000", "1 250 000", " 1250000 "})
+    void price_withSpecialSpaces_givesTheSameWholeNumber(String price) {
+        NewProductForm form = withPrice(price);
+        EditProductForm edit = new EditProductForm("Bình nước", "2", price, null, null);
+
+        assertThat(all(form)).isEmpty();
+        assertThat(form.toDraft().price()).isEqualTo(new BigDecimal("1250000"));
+        assertThat(form.toDraft().price().scale()).isZero();
+        assertThat(all(edit)).isEmpty();
+        assertThat(edit.toDraft().price()).isEqualTo(new BigDecimal("1250000"));
+    }
+
+    /** A price made only of invisible characters is "missing", not "invalid". */
+    @Test
+    void price_whenOnlyInvisibleCharacters_hasOnlyTheRequiredError() {
+        NewProductForm form = withPrice("​ ");
+
+        assertThat(all(form)).hasSize(1);
+        assertThat(messages(form, "price")).containsExactly(PRICE_REQUIRED);
+    }
+
+    /** BR-007-8: mixed separators and a leading zero stay invalid with special spaces too. */
+    @ParameterizedTest
+    @ValueSource(strings = {"1 250.000", "1.250 000", "01 250"})
+    void price_withSpecialSpacesButBadGrouping_hasExactlyOnePriceError(String price) {
+        NewProductForm form = withPrice(price);
+
+        assertThat(all(form)).hasSize(1);
+        assertThat(messages(form, "price")).containsExactly(PRICE_INVALID);
     }
 
     @Test

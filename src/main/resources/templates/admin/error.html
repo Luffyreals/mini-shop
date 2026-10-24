@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<!--/*
+  Trang lỗi trong layout quản trị (AC-007-11): chỉ dùng khi lỗi xảy ra ở /admin/** và người xem là ADMIN
+  (sidebar đọc tên người dùng). Controller/resolver trả đúng mã HTTP.
+  Model: errorTitle (tiêu đề tab, đã có hậu tố "| Quản trị Mini Shop"), errorHeading, errorMessage, backUrl, backLabel.
+  Không mục nào của sidebar có aria-current. Khung như admin/not-found.html.
+*/-->
+<head th:replace="~{fragments/admin :: head(${errorTitle})}"></head>
+<body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
+<div class="admin-shell">
+  <aside th:replace="~{fragments/admin :: sidebar(${null})}"></aside>
+
+  <main id="main" tabindex="-1" class="admin-main">
+    <div class="admin-pagehead">
+      <h1 class="admin-title" th:text="${errorHeading}">Không tìm thấy trang</h1>
+    </div>
+    <section class="admin-card admin-card--narrow">
+      <p class="mb-3" th:text="${errorMessage}">Trang bạn tìm không tồn tại hoặc đã bị di chuyển.</p>
+      <a class="btn btn-primary" th:href="@{${backUrl}}" th:text="${backLabel}">Về trang quản trị</a>
+    </section>
+  </main>
+</div>
+</body>
+</html>

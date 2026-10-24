@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -258,6 +259,20 @@ class OrderServiceTest {
                 .containsExactly(new BigDecimal("100000"), new BigDecimal("250000"));
         assertThat(saved.getItems()).extracting(OrderItem::getQuantity).containsExactly(2, 1);
         assertThat(saved.getItems()).extracting(i -> i.getProduct().getId()).containsExactly(3L, 9L);
+    }
+
+    /** AC-007-16, BR-007-7: a +84 phone typed at checkout is stored in the single 0xxxxxxxxx form. */
+    @ParameterizedTest
+    @ValueSource(strings = {"+84 912 345 678", "+84912345678", "+84-912-345-678", "84912345678"})
+    void placeOrder_withInternationalPhone_savesOrderWithNormalizedPhone(String typedPhone) {
+        stubSuccessfulPlacement(twoLines());
+        CheckoutForm international = new CheckoutForm("Nguyễn Văn An", typedPhone, "12 Lê Lợi", null);
+
+        service.placeOrder(USER_ID, international, new BigDecimal("450000"));
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getPhone()).isEqualTo("0912345678");
     }
 
     /** AC-005-18: the order owner is the parameter, never something from the form. */

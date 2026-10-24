@@ -1,19 +1,23 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
-<!--
+<!--/*
   Layout dùng chung cho khu khách hàng (fragment thuần, không dùng Layout Dialect).
-  Mỗi trang gọi: head(title), header, footer. Không có script hay style nội tuyến (CSP).
--->
+  Mỗi trang gọi: head(title), skipLink (con đầu của body), header, footer. Không có script hay style nội tuyến (CSP).
+*/-->
 <head th:fragment="head(title)">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title th:text="${title}">Mini Shop</title>
+  <link rel="icon" th:href="@{/favicon.ico}" sizes="any">
+  <link rel="icon" th:href="@{/images/favicon.svg}" type="image/svg+xml">
   <link rel="preload" as="font" type="font/woff2" crossorigin th:href="@{/fonts/BricolageGrotesque-latin-vi.woff2}">
   <link rel="stylesheet" th:href="@{/webjars/bootstrap/dist/css/bootstrap.min.css}">
   <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
 <body>
+<!--/* Link bỏ qua: con đầu tiên của <body> ở mọi trang (cửa hàng, quản trị, lỗi). Đích là <main id="main" tabindex="-1">. */-->
+<a class="skip-link" href="#main" th:fragment="skipLink">Bỏ qua đến nội dung chính</a>
 <header class="site-header" th:fragment="header">
   <div class="ms-container site-header__bar">
     <a class="site-wordmark" th:href="@{/}">Mini Shop</a>
@@ -21,7 +25,7 @@
       <a class="site-nav-link" th:href="@{/products}">Sản phẩm</a>
       <a class="site-nav-link" th:href="@{/cart}" th:with="cartQty=${#cartHeader.quantity()}"
          th:text="${cartQty > 0} ? |Giỏ hàng (${cartQty})| : 'Giỏ hàng'">Giỏ hàng</a>
-      <!-- Khách vãng lai không có form nào ở đây (không tạo session/CSRF token). Ẩn/hiện chỉ để cho đẹp: quyền thật nằm ở backend. -->
+      <!--/* Khách vãng lai không có form nào ở đây (không tạo session/CSRF token). Ẩn/hiện chỉ để cho đẹp: quyền thật nằm ở backend. */-->
       <a class="site-nav-link" sec:authorize="!isAuthenticated()" th:href="@{/login}">Đăng nhập</a>
       <a class="site-nav-link" sec:authorize="!isAuthenticated()" th:href="@{/register}">Đăng ký</a>
       <a class="site-nav-link" sec:authorize="hasRole('ADMIN')" th:href="@{/admin}">Quản trị</a>

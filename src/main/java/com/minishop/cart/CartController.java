@@ -1,6 +1,7 @@
 package com.minishop.cart;
 
 import com.minishop.common.NotFoundException;
+import com.minishop.common.NotFoundPage;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ import java.util.OptionalInt;
  * the parsed id only (never from Referer or a "return to" parameter).
  */
 @Controller
+@NotFoundPage(view = "product/not-found")
 @RequestMapping("/cart")
 class CartController {
 

@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   Dashboard quản trị. Model: orderStats (OrderDashboard: counts, deliveredRevenue, latest), lowStock (List<LowStockRow>),
   flash tùy chọn: notice, noticeKind. Không biểu đồ.
--->
+*/-->
 <head th:replace="~{fragments/admin :: head('Tổng quan | Quản trị Mini Shop')}"></head>
 <body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <div class="admin-shell">
   <aside th:replace="~{fragments/admin :: sidebar('dashboard')}"></aside>
 
-  <main class="admin-main">
+  <main id="main" tabindex="-1" class="admin-main">
     <div class="admin-pagehead">
       <h1 class="admin-title">Tổng quan</h1>
       <a class="btn btn-primary" th:href="@{/admin/orders}">Xem tất cả đơn hàng</a>

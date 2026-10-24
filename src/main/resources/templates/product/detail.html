@@ -2,9 +2,10 @@
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head(${product.name + ' | Mini Shop'})}"></head>
 <body class="site-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <header th:replace="~{fragments/layout :: header}"></header>
 
-<main class="ms-container site-main">
+<main id="main" tabindex="-1" class="ms-container site-main">
   <div class="notice-bar" th:if="${notice != null}">
     <div th:replace="~{fragments/notice :: notice(${noticeKind}, ${notice})}"></div>
     <a class="notice-bar__link" th:if="${showCartLink != null and showCartLink}" th:href="@{/cart}">Xem giỏ hàng</a>

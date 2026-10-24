@@ -81,6 +81,153 @@ class TemplateCspComplianceTest {
         assertThat(violations).as("CSP violations (file:line)").isEmpty();
     }
 
+    // ---------- GĐ7 (AC-007-13, AC-007-24): page contract of every template ----------
+
+    private static final Pattern H1 = Pattern.compile("<h1\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MAIN_ANY = Pattern.compile("<main\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MAIN_CONTRACT = Pattern.compile("<main\\s[^>]*\\bid=\"main\"[^>]*>");
+    private static final Pattern SKIP_LINK_FIRST_IN_BODY = Pattern.compile(
+            "<body\\b[^>]*>\\s*(?:<!--.*?-->\\s*)*<a\\s+th:replace=\"~\\{fragments/layout :: skipLink\\}\"\\s*>\\s*</a>",
+            Pattern.DOTALL);
+    private static final Pattern SVG_SCRIPT = Pattern.compile("<script\\b", Pattern.CASE_INSENSITIVE);
+
+    /** Files that are fragments or parts of a page, not pages: they hold no skip link, no {@code main}, no h1 rule. */
+    private static boolean isPageTemplate(String path) {
+        return !path.contains("templates/fragments/");
+    }
+
+    private static List<Resource> pageTemplates() throws IOException {
+        List<Resource> pages = new ArrayList<>();
+        for (Resource r : new PathMatchingResourcePatternResolver().getResources("classpath*:templates/**/*.html")) {
+            if (isPageTemplate(r.getDescription().replace("\\", "/"))) {
+                pages.add(r);
+            }
+        }
+        return pages;
+    }
+
+    private static String read(Resource r) throws IOException {
+        return new String(r.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    }
+
+    private static String name(Resource r) {
+        String d = r.getDescription().replace("\\", "/");
+        return d.substring(d.indexOf("templates/") + "templates/".length(), d.length() - 1);
+    }
+
+    /** Anti-false-green: the two GĐ7 error templates and the known pages must really be scanned. */
+    @Test
+    void pageTemplates_includeErrorPagesAndEveryKnownPage() throws IOException {
+        List<String> names = pageTemplates().stream().map(TemplateCspComplianceTest::name).toList();
+
+        assertThat(names).contains("error/page.html", "admin/error.html", "error/403.html", "product/list.html",
+                "product/detail.html", "user/login.html", "user/register.html", "cart/view.html",
+                "order/checkout.html", "admin/index.html", "admin/order-detail.html");
+        assertThat(names).noneMatch(n -> n.startsWith("fragments/"));
+        assertThat(names).hasSizeGreaterThanOrEqualTo(22);
+    }
+
+    /** AC-007-24: html lang="vi" on every page template. */
+    @Test
+    void everyPageTemplate_hasHtmlLangVi() throws IOException {
+        List<String> bad = new ArrayList<>();
+        for (Resource page : pageTemplates()) {
+            if (!Pattern.compile("<html\\b[^>]*\\blang=\"vi\"").matcher(read(page)).find()) {
+                bad.add(name(page));
+            }
+        }
+
+        assertThat(bad).as("page templates without <html lang=\"vi\">").isEmpty();
+    }
+
+    /** AC-007-21: the skip-link include is the first child of {@code <body>} (comments aside) on every page. */
+    @Test
+    void everyPageTemplate_hasSkipLinkIncludeAsFirstChildOfBody() throws IOException {
+        List<String> bad = new ArrayList<>();
+        for (Resource page : pageTemplates()) {
+            if (!SKIP_LINK_FIRST_IN_BODY.matcher(read(page)).find()) {
+                bad.add(name(page));
+            }
+        }
+
+        assertThat(bad).as("page templates whose <body> does not start with the skipLink include").isEmpty();
+    }
+
+    /** AC-007-21: exactly one {@code <main id="main" tabindex="-1" ...>} per page, the skip link's target. */
+    @Test
+    void everyPageTemplate_hasExactlyOneMainWithIdAndTabindex() throws IOException {
+        List<String> bad = new ArrayList<>();
+        for (Resource page : pageTemplates()) {
+            String html = read(page);
+            long mains = MAIN_ANY.matcher(html).results().count();
+            boolean contract = MAIN_CONTRACT.matcher(html).results()
+                    .anyMatch(m -> m.group().contains("tabindex=\"-1\""));
+            if (mains != 1 || !contract) {
+                bad.add(name(page) + " (main tags: " + mains + ", id=main + tabindex=-1: " + contract + ")");
+            }
+        }
+
+        assertThat(bad).as("page templates without exactly one <main id=\"main\" tabindex=\"-1\">").isEmpty();
+    }
+
+    /** AC-007-24: at most one h1 in the page's own markup (the layout fragments never add one). */
+    @Test
+    void everyPageTemplate_hasAtMostOneH1() throws IOException {
+        List<String> bad = new ArrayList<>();
+        for (Resource page : pageTemplates()) {
+            long h1s = H1.matcher(read(page)).results().count();
+            if (h1s > 1) {
+                bad.add(name(page) + " (" + h1s + " h1)");
+            }
+        }
+
+        assertThat(bad).as("page templates with several <h1>").isEmpty();
+    }
+
+    /** AC-007-13: the two error templates have exactly one h1, printed from the model (no hard-coded text). */
+    @ParameterizedTest
+    @CsvSource({"error/page.html", "admin/error.html"})
+    void errorTemplates_haveExactlyOneH1PrintingTheHeading(String template) throws IOException {
+        Resource page = pageTemplates().stream().filter(r -> name(r).equals(template)).findFirst().orElseThrow();
+        String html = read(page);
+
+        assertThat(H1.matcher(html).results().count()).isEqualTo(1);
+        assertThat(html).containsPattern("<h1[^>]*th:text=\"\\$\\{errorHeading\\}\"");
+        assertThat(find(template, html)).isEmpty();
+    }
+
+    /** AC-007-20, AC-007-24: the self-drawn favicon is a plain SVG image: no script, no event handler. */
+    @Test
+    void faviconSvg_hasNoScriptOrEventHandlers() throws IOException {
+        Resource[] svgs = new PathMatchingResourcePatternResolver().getResources("classpath*:static/images/favicon.svg");
+
+        assertThat(svgs).hasSize(1);
+        String svg = read(svgs[0]);
+        assertThat(svg).contains("<svg");
+        assertThat(SVG_SCRIPT.matcher(svg).find()).as("<script in favicon.svg").isFalse();
+        assertThat(EVENT_ATTR.matcher(svg).find()).as("on...= in favicon.svg").isFalse();
+        assertThat(JS_URL.matcher(svg).find()).as("javascript: in favicon.svg").isFalse();
+    }
+
+    /** Every self-hosted SVG (favicon and placeholder) is a plain image: nothing that could run script. */
+    @Test
+    void everyStaticSvg_hasNoScriptEventHandlerOrJavascriptUrl() throws IOException {
+        Resource[] svgs = new PathMatchingResourcePatternResolver().getResources("classpath*:static/**/*.svg");
+
+        assertThat(svgs).extracting(Resource::getFilename).contains("favicon.svg", "placeholder-product.svg");
+        List<String> violations = new ArrayList<>();
+        for (Resource svg : svgs) {
+            String content = read(svg);
+            for (Rule rule : List.of(new Rule("<script", SVG_SCRIPT), new Rule("on...= attribute", EVENT_ATTR),
+                    new Rule("javascript: URL", JS_URL))) {
+                if (rule.pattern().matcher(content).find()) {
+                    violations.add(svg.getFilename() + " " + rule.name());
+                }
+            }
+        }
+        assertThat(violations).isEmpty();
+    }
+
     /** Bộ phát hiện phải bắt được các đoạn vi phạm mẫu. */
     @ParameterizedTest(name = "detects: {0}")
     @CsvSource(delimiter = '|', value = {

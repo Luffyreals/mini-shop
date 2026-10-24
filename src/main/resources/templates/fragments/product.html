@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--
+<!--/*
   Ô ảnh "mẫu vật": ô màu phẳng cố định tỉ lệ, ảnh object-fit: cover.
   Màu ô lấy theo id sản phẩm nên một sản phẩm luôn cùng một màu ở danh sách và chi tiết.
   src là null thì dùng ảnh thay thế; alt luôn là tên sản phẩm (AC-002-16).
--->
+*/-->
 <div th:fragment="tile(productId, src, alt, lazy)"
      th:with="tone=${(productId + productId / 4) % 4 + 1}"
      th:classappend="'tile-field-' + ${tone}"
@@ -16,13 +16,13 @@
        th:attr="loading=${lazy} ? 'lazy' : 'eager'">
 </div>
 
-<!-- Nhãn kho: luôn có chữ. showInStock=false ở danh sách: chỉ hiện "Hết hàng". -->
+<!--/* Nhãn kho: luôn có chữ. showInStock=false ở danh sách: chỉ hiện "Hết hàng". */-->
 <th:block th:fragment="stock(inStock, showInStock)">
   <span class="badge stock-badge stock-badge--out" th:if="${!inStock}">Hết hàng</span>
   <span class="badge stock-badge stock-badge--in" th:if="${inStock and showInStock}">Còn hàng</span>
 </th:block>
 
-<!-- Thẻ sản phẩm ở danh sách: ô ảnh, rồi tên, danh mục và giá canh trái theo mép ô. -->
+<!--/* Thẻ sản phẩm ở danh sách: ô ảnh, rồi tên, danh mục và giá canh trái theo mép ô. */-->
 <article th:fragment="card(p, lazy)" class="product-card" th:classappend="${!p.inStock} ? 'is-out-of-stock'">
   <div th:replace="~{fragments/product :: tile(${p.id}, ${p.imageUrl}, ${p.name}, ${lazy})}"></div>
   <h2 class="product-card__name">

@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   404 trong layout quản trị (AC-006-5). Model: notFoundTitle, backUrl, backLabel, section (dashboard | orders | products | categories).
   Controller trả HTTP 404; tiêu đề tab nối chuỗi trong biểu thức, không dùng literal |...|.
--->
+*/-->
 <head th:replace="~{fragments/admin :: head(${notFoundTitle + ' | Quản trị Mini Shop'})}"></head>
 <body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <div class="admin-shell">
   <aside th:replace="~{fragments/admin :: sidebar(${section})}"></aside>
 
-  <main class="admin-main">
+  <main id="main" tabindex="-1" class="admin-main">
     <div class="admin-pagehead">
       <h1 class="admin-title" th:text="${notFoundTitle}">Không tìm thấy trang</h1>
     </div>

@@ -1,6 +1,7 @@
 package com.minishop.order;
 
 import com.minishop.common.NotFoundException;
+import com.minishop.common.NotFoundPage;
 import com.minishop.common.PageNav;
 import com.minishop.user.CurrentUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +20,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * parsed id only, never from Referer.
  */
 @Controller
+@NotFoundPage(view = "order/not-found")
 @RequestMapping("/orders")
 class OrderController {
 

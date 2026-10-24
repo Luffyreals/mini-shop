@@ -2,9 +2,10 @@
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('Không có quyền truy cập | Mini Shop')}"></head>
 <body class="site-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <header th:replace="~{fragments/layout :: header}"></header>
 
-<main class="ms-container site-main">
+<main id="main" tabindex="-1" class="ms-container site-main">
   <h1 class="page-title">Bạn không có quyền truy cập trang này.</h1>
   <a class="btn btn-primary" th:href="@{/}">Về trang chủ</a>
 </main>

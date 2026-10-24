@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   Form thêm sản phẩm (multipart). Model: form (NewProductForm), categories (List<CategoryOption>: id, name).
   POST /admin/products (multipart/form-data). Field: name, categoryId, price, initialStock, description, active (checkbox, value=true), image (file).
   Không có danh mục nào: không hiện form, chỉ lời nhắn và link tạo danh mục.
--->
+*/-->
 <head th:replace="~{fragments/admin :: head('Thêm sản phẩm | Quản trị Mini Shop')}"></head>
 <body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <div class="admin-shell">
   <aside th:replace="~{fragments/admin :: sidebar('products')}"></aside>
 
-  <main class="admin-main">
+  <main id="main" tabindex="-1" class="admin-main">
     <div class="admin-pagehead">
       <h1 class="admin-title">Thêm sản phẩm</h1>
     </div>

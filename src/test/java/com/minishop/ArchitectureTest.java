@@ -1,21 +1,34 @@
 package com.minishop;
 
 import com.minishop.catalog.ProductRepository;
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaCodeUnit;
+import com.tngtech.archunit.core.domain.TryCatchBlock;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.persistence.Entity;
 import org.springframework.data.repository.Repository;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.Set;
 
 import static com.tngtech.archunit.base.DescribedPredicate.not;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleName;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.codeUnits;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 /** AC-001-15: quy tắc phụ thuộc giữa các tính năng được kiểm tự động, không cần Docker. */
@@ -134,4 +147,45 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule noFieldInjection = fields()
             .should().notBeAnnotatedWith(Autowired.class);
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // GĐ7, spec 007 §8 và ADR-0011: xử lý lỗi nằm một chỗ (common), controller chỉ khai báo trang 404 bằng @NotFoundPage.
+
+    /** Spec 007 §8: không còn @ControllerAdvice 404 lặp lại trong catalog, cart, order, admin; chỉ common được có advice. */
+    @ArchTest
+    static final ArchRule onlyCommonDeclaresControllerAdvice = noClasses()
+            .that().resideOutsideOfPackage("com.minishop.common..")
+            .should().beAnnotatedWith(ControllerAdvice.class)
+            .orShould().beAnnotatedWith(RestControllerAdvice.class);
+
+    /** Spec 007 §8: không method @ExceptionHandler nào ngoài common (kể cả trong controller, như 404 quản trị của GĐ6). */
+    @ArchTest
+    static final ArchRule exceptionHandlersOnlyInCommon = noMethods()
+            .that().areDeclaredInClassesThat().resideOutsideOfPackage("com.minishop.common..")
+            .should().beAnnotatedWith(ExceptionHandler.class);
+
+    /** Spec 007 §8: controller không bắt Exception, RuntimeException hay Throwable (lỗi lạ để resolver cuối chuỗi log). */
+    @ArchTest
+    static final ArchRule controllers_doNotCatchGenericExceptions = codeUnits()
+            .that().areDeclaredInClassesThat().areMetaAnnotatedWith(Controller.class)
+            .should(notCatchGenericExceptions());
+
+    private static final Set<String> GENERIC_EXCEPTIONS = Set.of(
+            Exception.class.getName(), RuntimeException.class.getName(), Throwable.class.getName());
+
+    static ArchCondition<JavaCodeUnit> notCatchGenericExceptions() {
+        return new ArchCondition<>("not catch Exception, RuntimeException or Throwable") {
+            @Override
+            public void check(JavaCodeUnit unit, ConditionEvents events) {
+                for (TryCatchBlock block : unit.getTryCatchBlocks()) {
+                    for (JavaClass caught : block.getCaughtThrowables()) {
+                        if (GENERIC_EXCEPTIONS.contains(caught.getName())) {
+                            events.add(SimpleConditionEvent.violated(unit, unit.getFullName() + " catches "
+                                    + caught.getName() + " at " + block.getSourceCodeLocation()));
+                        }
+                    }
+                }
+            }
+        };
+    }
 }

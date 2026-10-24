@@ -1,13 +1,15 @@
 package com.minishop.order;
 
+import com.minishop.common.FormText;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
  * Checkout input. It deliberately has no user id, status, total, payment method, price or id component, so
- * request parameters cannot set them (AC-005-18). Fields are stripped and cleaned of control characters
- * before validation. The phone keeps the separators the customer typed so a rejected form is shown back
- * unchanged; {@link #normalizedPhone()} is what gets stored.
+ * request parameters cannot set them (AC-005-18). Fields are cleaned by {@link FormText} before validation
+ * (invisible characters, control characters, special spaces, NFC, line breaks, strip; BR-007-6). The phone keeps
+ * the separators the customer typed so a rejected form is shown back unchanged; {@link #normalizedPhone()} is
+ * what gets stored. The phone accepts {@code 0xxxxxxxxx} and {@code +84}/{@code 84} forms (BR-007-7).
  */
 record CheckoutForm(
         @NotBlank(message = "Vui lòng nhập họ tên người nhận.")
@@ -26,13 +28,10 @@ record CheckoutForm(
         String note) {
 
     CheckoutForm {
-        receiverName = clean(receiverName, false);
-        phone = clean(phone, false);
-        shippingAddress = clean(shippingAddress, true);
-        note = clean(note, true);
-        if (note != null && note.isEmpty()) {
-            note = null;
-        }
+        receiverName = FormText.clean(receiverName, false);
+        phone = FormText.clean(phone, false);
+        shippingAddress = FormText.clean(shippingAddress, true);
+        note = FormText.blankToNull(FormText.clean(note, true));
     }
 
     static CheckoutForm prefill(String fullName, String phone) {
@@ -41,18 +40,6 @@ record CheckoutForm(
 
     String normalizedPhone() {
         return PhoneNumberValidator.normalize(phone);
-    }
-
-    /** Strip, then drop control characters (PostgreSQL rejects 0x00); multi-line fields keep CR, LF and tab. */
-    private static String clean(String value, boolean multiline) {
-        if (value == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder(value.length());
-        value.strip().codePoints()
-                .filter(cp -> !Character.isISOControl(cp) || (multiline && (cp == '\n' || cp == '\r' || cp == '\t')))
-                .forEach(sb::appendCodePoint);
-        return sb.toString();
     }
 
     @Override

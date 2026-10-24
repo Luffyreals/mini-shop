@@ -2,17 +2,18 @@
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('Đăng ký | Mini Shop')}"></head>
 <body class="site-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <header th:replace="~{fragments/layout :: header}"></header>
 
-<main class="ms-container site-main">
+<main id="main" tabindex="-1" class="ms-container site-main">
   <div class="auth-panel">
     <h1 class="page-title">Đăng ký</h1>
 
-    <!-- Hai ô mật khẩu cố ý không dùng th:field/th:value: không bao giờ điền lại mật khẩu (BR-003-4). -->
+    <!--/* Hai ô mật khẩu cố ý không dùng th:field/th:value: không bao giờ điền lại mật khẩu (BR-003-4). */-->
     <form method="post" th:action="@{/register}" th:object="${form}" novalidate>
       <div class="auth-field">
         <label class="form-label" for="fullName">Họ và tên</label>
-        <input class="form-control" type="text" th:field="*{fullName}" autocomplete="name"
+        <input class="form-control" type="text" th:field="*{fullName}" autocomplete="name" maxlength="100"
                th:classappend="${#fields.hasErrors('fullName')} ? 'is-invalid'"
                th:aria-invalid="${#fields.hasErrors('fullName')} ? 'true'"
                th:aria-describedby="${#fields.hasErrors('fullName')} ? 'fullName-error'">
@@ -21,7 +22,7 @@
 
       <div class="auth-field">
         <label class="form-label" for="email">Email</label>
-        <input class="form-control" type="email" th:field="*{email}" autocomplete="email"
+        <input class="form-control" type="email" th:field="*{email}" autocomplete="email" maxlength="255"
                th:classappend="${#fields.hasErrors('email')} ? 'is-invalid'"
                th:aria-invalid="${#fields.hasErrors('email')} ? 'true'"
                th:aria-describedby="${#fields.hasErrors('email')} ? 'email-error'">
@@ -30,7 +31,7 @@
 
       <div class="auth-field">
         <label class="form-label" for="password">Mật khẩu</label>
-        <input class="form-control" type="password" id="password" name="password" autocomplete="new-password"
+        <input class="form-control" type="password" id="password" name="password" autocomplete="new-password" maxlength="64"
                th:classappend="${#fields.hasErrors('password')} ? 'is-invalid'"
                th:aria-invalid="${#fields.hasErrors('password')} ? 'true'"
                th:aria-describedby="${#fields.hasErrors('password')} ? 'password-hint password-error' : 'password-hint'">
@@ -40,7 +41,7 @@
 
       <div class="auth-field">
         <label class="form-label" for="confirmPassword">Nhập lại mật khẩu</label>
-        <input class="form-control" type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password"
+        <input class="form-control" type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password" maxlength="64"
                th:classappend="${#fields.hasErrors('confirmPassword')} ? 'is-invalid'"
                th:aria-invalid="${#fields.hasErrors('confirmPassword')} ? 'true'"
                th:aria-describedby="${#fields.hasErrors('confirmPassword')} ? 'confirmPassword-error'">

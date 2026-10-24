@@ -4,7 +4,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.WebAttributes;
+import org.springframework.security.web.csrf.CsrfException;
+import org.springframework.security.web.csrf.InvalidCsrfTokenException;
+import org.springframework.security.web.csrf.MissingCsrfTokenException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.ApplicationContext;
@@ -20,6 +25,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,6 +36,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -448,6 +456,132 @@ class SecurityConfigTest {
         mockMvc.perform(delete("/uploads/x.png").with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
+    }
+
+    // ---------- GĐ7: unknown URLs, CSRF versus permission denial, favicon (spec 007) ----------
+
+    /** AC-007-2: an unknown URL outside every public prefix is "not public", so a guest goes to /login. */
+    @ParameterizedTest
+    @ValueSource(strings = {"/khong-co-trang-nay", "/khong-co/trang/nay", "/khong-co-trang-nay?x=1", "/productsx",
+            "/products-old", "/cartx", "/Products", "/admin-panel", "/administrator"})
+    void unknownNonPublicUrl_asAnonymous_redirectsToLogin(String path) throws Exception {
+        mockMvc.perform(get(path))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    /**
+     * AC-007-2: under a public prefix an unknown URL is not a login matter: the filter chain lets it through (the
+     * slice has no handler, so 404; on the real app it is the generic 404 page).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"/products/", "/products/abc/xyz", "/products/abc", "/css/khong-co.css",
+            "/js/khong-co.js", "/images/khong-co.png", "/fonts/khong-co.woff2", "/uploads/khong-co.png",
+            "/webjars/khong-co", "/cart/khong-co"})
+    void unknownUrlUnderPublicPrefix_asAnonymous_isNotRedirectedToLogin(String path) throws Exception {
+        MvcResult result = mockMvc.perform(get(path)).andReturn();
+
+        assertThat(result.getResponse().getRedirectedUrl()).as(path).isNull();
+        assertThat(result.getResponse().getStatus()).as(path).isNotEqualTo(403);
+        assertThat(result.getResponse().getForwardedUrl()).as(path).isNull();
+    }
+
+    /** AC-007-2: a logged-in user opening an unknown URL gets through the filter chain too (404 page, not /login). */
+    @Test
+    @WithMockUser
+    void unknownNonPublicUrl_asLoggedInUser_isNotRedirectedToLogin() throws Exception {
+        MvcResult result = mockMvc.perform(get("/khong-co-trang-nay")).andReturn();
+
+        assertThat(result.getResponse().getRedirectedUrl()).isNull();
+        assertThat(result.getResponse().getStatus()).isNotEqualTo(403);
+    }
+
+    /** AC-007-8 at filter level: the exception that explains the 403 is a CSRF exception (missing token). */
+    @Test
+    void csrfMissing_asAnonymousCartPost_forwardsToAccessDeniedWithMissingCsrfTokenException() throws Exception {
+        mockMvc.perform(post("/cart/items"))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"))
+                .andExpect(request().attribute(WebAttributes.ACCESS_DENIED_403,
+                        instanceOf(MissingCsrfTokenException.class)));
+    }
+
+    /** AC-007-8: customer form, cancel an order, and logout without a token. */
+    @ParameterizedTest
+    @ValueSource(strings = {"/orders/1/cancel", "/logout", "/checkout"})
+    @WithMockUser
+    void csrfMissing_asLoggedInUser_forwardsToAccessDeniedWithCsrfException(String path) throws Exception {
+        mockMvc.perform(post(path))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"))
+                .andExpect(request().attribute(WebAttributes.ACCESS_DENIED_403, instanceOf(CsrfException.class)));
+    }
+
+    /** AC-007-8: every admin POST (urlencoded and multipart) without a token, as ADMIN. */
+    @ParameterizedTest
+    @MethodSource("adminPostUrls")
+    @WithMockUser(roles = "ADMIN")
+    void csrfMissing_asAdmin_forwardsToAccessDeniedWithCsrfException(String path) throws Exception {
+        mockMvc.perform(adminPost(path))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"))
+                .andExpect(request().attribute(WebAttributes.ACCESS_DENIED_403, instanceOf(CsrfException.class)));
+    }
+
+    /** AC-007-8: a wrong token is a CSRF exception as well (the expired-session case of a stale form). */
+    @ParameterizedTest
+    @ValueSource(strings = {"/admin/categories", "/orders/1/cancel", "/cart/items"})
+    @WithMockUser(roles = "ADMIN")
+    void csrfInvalidToken_forwardsToAccessDeniedWithInvalidCsrfTokenException(String path) throws Exception {
+        mockMvc.perform(post(path).with(csrf().useInvalidToken()))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"))
+                .andExpect(request().attribute(WebAttributes.ACCESS_DENIED_403,
+                        instanceOf(InvalidCsrfTokenException.class)));
+    }
+
+    /** AC-007-8: the multipart product upload without a token, with a file part, as ADMIN. */
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void csrfMissing_asAdminMultipartUpload_forwardsToAccessDeniedWithCsrfException() throws Exception {
+        mockMvc.perform(multipart("/admin/products")
+                        .file(new MockMultipartFile("image", "a.png", "image/png", new byte[]{1, 2, 3}))
+                        .param("name", "X"))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"))
+                .andExpect(request().attribute(WebAttributes.ACCESS_DENIED_403, instanceOf(CsrfException.class)));
+    }
+
+    /** AC-007-9: a USER opening /admin is a permission denial, never a CSRF exception. */
+    @ParameterizedTest
+    @ValueSource(strings = {"/admin", "/admin/products", "/admin/orders/1"})
+    @WithMockUser(roles = "USER")
+    void adminGet_asUser_isPermissionDenialNotCsrfException(String path) throws Exception {
+        mockMvc.perform(get(path))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"))
+                .andExpect(request().attribute(WebAttributes.ACCESS_DENIED_403, instanceOf(AccessDeniedException.class)))
+                .andExpect(request().attribute(WebAttributes.ACCESS_DENIED_403, not(instanceOf(CsrfException.class))));
+    }
+
+    /** AC-007-9: a USER with a valid token posting to /admin is still the permission denial. */
+    @Test
+    @WithMockUser(roles = "USER")
+    void adminPost_asUserWithCsrf_isPermissionDenialNotCsrfException() throws Exception {
+        mockMvc.perform(post("/admin/categories").with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/access-denied"))
+                .andExpect(request().attribute(WebAttributes.ACCESS_DENIED_403, not(instanceOf(CsrfException.class))));
+    }
+
+    /** AC-007-20: the favicon files are public for a guest (no redirect to /login, no 403). */
+    @ParameterizedTest
+    @ValueSource(strings = {"/images/favicon.svg", "/favicon.ico"})
+    void favicon_asAnonymous_isNotRedirectedToLogin(String path) throws Exception {
+        MvcResult result = mockMvc.perform(get(path)).andReturn();
+
+        assertThat(result.getResponse().getRedirectedUrl()).as(path).isNull();
+        assertThat(result.getResponse().getStatus()).as(path).isNotEqualTo(403);
     }
 
     /** BR-006-1: opening /uploads/** must not open anything else: the sidebar of the shop stays closed too. */

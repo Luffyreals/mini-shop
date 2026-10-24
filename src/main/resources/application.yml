@@ -12,6 +12,30 @@ spring:
       # Trần của Tomcat; giới hạn ảnh 2 MB kiểm trong ứng dụng (ImageUpload) để hiện lỗi trên form thay vì 403/ngắt kết nối, xem ADR-0010
       max-file-size: 10MB
       max-request-size: 10MB
+  web:
+    # Boot 4: thay cho server.error.*. Đặt tường minh để mọi profile (kể cả dev) đều không đổi được mặc định; trang lỗi không bao giờ lộ chi tiết (BR-007-2), xem ADR-0011
+    error:
+      include-stacktrace: never
+      include-message: never
+      include-binding-errors: never
+      include-exception: false
+      # Boot 4.1 mặc định là always và phản chiếu lại đường dẫn người dùng gửi lên trong thân JSON; tắt hẳn (BR-007-2), xem ADR-0011
+      include-path: never
+  datasource:
+    hikari:
+      data-source-properties:
+        # pgjdbc không đưa "Detail: Key (...)=(...)" vào thông điệp lỗi, vì phần đó có thể chứa dữ liệu cá nhân; tên ràng buộc vẫn còn nên ConstraintViolations chạy, xem ADR-0011
+        logServerErrorDetail: false
+
+server:
+  tomcat:
+    # Đọc bỏ phần thân tới 50 MB (mặc định 2 MB thì Tomcat đóng kết nối) để trả được trang 413 thay vì "connection reset"; trên 50 MB vẫn ngắt, xem ADR-0011
+    max-swallow-size: 50MB
+
+logging:
+  level:
+    # Hibernate tự log lỗi JDBC ở mức ERROR, kể cả ca đã xử lý êm; tắt để mỗi lỗi chỉ một dòng ERROR (UnhandledExceptionResolver), xem ADR-0011
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: off
 
 management:
   endpoints:
