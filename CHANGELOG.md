@@ -5,6 +5,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-24
+
 GĐ4: giỏ hàng ([spec 004](docs/specs/004-shopping-cart.md)).
 
 ### Thêm

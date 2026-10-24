@@ -2,7 +2,7 @@
 
 Website bán hàng mini viết bằng Java / Spring Boot, render phía server. Đây là dự án học tập và portfolio, **không bán hàng thật**.
 
-> 🚧 **Đang phát triển.** Đã xong GĐ1 (`v0.1.0`, nền móng), GĐ2 (`v0.2.0`, danh sách và chi tiết sản phẩm tại http://localhost:8080) GĐ3 (`v0.3.0`, đăng ký, đăng nhập, phân quyền) và GĐ4 (giỏ hàng; chờ nghiệm thu). Tiếp theo: GĐ5 đặt hàng và lịch sử đơn. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
+> 🚧 **Đang phát triển.** Đã xong GĐ1 (`v0.1.0`, nền móng), GĐ2 (`v0.2.0`, danh sách và chi tiết sản phẩm tại http://localhost:8080) GĐ3 (`v0.3.0`, đăng ký, đăng nhập, phân quyền) và GĐ4 (`v0.4.0`, giỏ hàng). Tiếp theo: GĐ5 đặt hàng và lịch sử đơn. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
 
 ## Tính năng (MVP)
 
@@ -115,7 +115,7 @@ mini-shop/
 - [x] GĐ1: Khởi tạo project, CI, entity, migration, dữ liệu mẫu (`v0.1.0`)
 - [x] GĐ2: Danh sách và chi tiết sản phẩm (`v0.2.0`)
 - [x] GĐ3: Đăng ký, đăng nhập, phân quyền (`v0.3.0`)
-- [x] GĐ4: Giỏ hàng
+- [x] GĐ4: Giỏ hàng (`v0.4.0`)
 - [ ] GĐ5: Đặt hàng và lịch sử đơn
 - [ ] GĐ6: Trang quản trị
 - [ ] GĐ7: Hoàn thiện (validation, xử lý lỗi, giao diện, tài liệu)
