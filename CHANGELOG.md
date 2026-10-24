@@ -5,6 +5,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-24
+
 GĐ6: trang quản trị ([spec 006](docs/specs/006-admin.md)).
 
 ### Thêm
