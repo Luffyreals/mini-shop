@@ -14,6 +14,7 @@ import org.springframework.web.servlet.FlashMapManager;
  * <p>GĐ3 thêm: trang đăng nhập riêng {@code /login}, phân quyền ({@code /admin/**} chỉ ADMIN, {@code /orders/**} và
  * {@code /checkout/**} cần đăng nhập) và trang 403 {@code /access-denied}. Đường dẫn công khai vẫn chỉ cho GET;
  * {@code /register} và {@code /access-denied} mở cho mọi method (CSRF vẫn áp dụng). Quy tắc theo vai trò đứng đầu.
+ * <p>GĐ4 mở {@code /cart} và {@code /cart/**} cho mọi người và mọi method (khách cũng có giỏ), có CSRF.
  */
 @Configuration
 public class SecurityConfig {
@@ -43,6 +44,8 @@ public class SecurityConfig {
                         // Mọi method: forward (403) và error dispatch giữ nguyên method gốc, nên POST lỗi cũng phải
                         // tới được /access-denied và /error thay vì bị chuyển sang /login. CSRF vẫn áp dụng.
                         .requestMatchers("/register", "/access-denied", "/error").permitAll()
+                        // GĐ4: giỏ hàng cho cả khách, mọi method; CSRF vẫn áp dụng (POST không token -> 403).
+                        .requestMatchers("/cart", "/cart/**").permitAll()
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login")

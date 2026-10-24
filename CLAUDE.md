@@ -11,7 +11,7 @@ Mini Shop is a learning/portfolio e-commerce site (Java / Spring Boot, server-re
 - the `DataInitializer` seed;
 - architecture, data, and security tests.
 
-GĐ2 ([spec 002](docs/specs/002-product-catalog.md), [plan](docs/plans/phase-2.md)) is **done and released as `v0.2.0`**: the storefront product listing and detail pages. GĐ3 ([spec 003](docs/specs/003-authentication.md), [plan](docs/plans/phase-3.md)) is **done and released as `v0.3.0`**: registration, login/logout, `USER`/`ADMIN` access rules, the `/admin` placeholder and the 403 page. Next is GĐ4 (cart), which starts with `/write-spec`. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
+GĐ2 ([spec 002](docs/specs/002-product-catalog.md), [plan](docs/plans/phase-2.md)) is **done and released as `v0.2.0`**: the storefront product listing and detail pages. GĐ3 ([spec 003](docs/specs/003-authentication.md), [plan](docs/plans/phase-3.md)) is **done and released as `v0.3.0`**: registration, login/logout, `USER`/`ADMIN` access rules, the `/admin` placeholder and the 403 page. GĐ4 ([spec 004](docs/specs/004-shopping-cart.md), [plan](docs/plans/phase-4.md)) is **done and released as `v0.4.0`**: guest session cart, DB cart for logged-in users, merge on login, the `/cart` page and the header count. Next is GĐ5 (checkout and order history), which starts with `/write-spec`. The source of truth for scope, tech choices, and the phase plan is [docs/project-brief.md](docs/project-brief.md). The reasons behind key decisions are in [docs/adr/](docs/adr/README.md). Read it before starting any phase, and update this file once real commands and packages exist.
 
 ## How to work with the user
 
@@ -93,7 +93,7 @@ Modular monolith, **package-by-feature** under `com.minishop`: `catalog`, `cart`
 - **Seed data** comes from `config.DataInitializer`, an `ApplicationRunner`. Passwords are hashed at runtime by the `DelegatingPasswordEncoder` from `config.PasswordEncoderConfig` (`{bcrypt}…`). Users and catalog have independent "table is empty" guards. Demo accounts: `admin@minishop.local`, `user@minishop.local`.
 - **Repositories exist only for aggregate roots** (`User`, `Category`, `Product`, `Cart`, `Order`). `CartItem` and `OrderItem` are saved only through their parent (`cascade = ALL`, `orphanRemoval`). Use `Cart.addItem`/`removeItem` and `Order.addItem`; `getItems()` is read-only.
 - **The seed must be gated before any deployment (GĐ8):** with the dev defaults, an empty production DB would get `admin@minishop.local` with a known password. Add `app.seed.enabled` or remove the defaults before deploying. Also before deploying: there is no login rate limiting or account lockout yet (spec 003, open question 7), and the session cookie should get `same-site=lax` and `secure=true` behind HTTPS.
-- **Visibility today:** `user.User`, `user.Role`, `user.UserRepository`, `user.CurrentUser`, `catalog.Category`, `catalog.Product` and the catalog repositories are public; everything in `cart` and `order` is package-private.
+- **Visibility today:** `user.User`, `user.Role`, `user.UserRepository`, `user.CurrentUser`, `catalog.Category`, `catalog.Product`, `catalog.ProductImages` and the catalog repositories are public; everything in `cart` and `order` is package-private. GĐ5 will need a narrow public `cart` API for `order` (read a user's DB cart lines, clear the cart after locking per ADR-0008).
 - **Entity conventions:** a protected no-arg constructor plus a constructor taking the required fields; setters only where used. `created_at` and `updated_at` are set by `@PrePersist`/`@PreUpdate`. Money is `numeric(12,0)` with whole VND, so keep amounts integral in services.
 
 ### Storefront patterns (GĐ2), reuse these in later phases
@@ -123,7 +123,19 @@ See [ADR-0007](docs/adr/0007-session-form-login-current-user.md) and [spec 003](
 - **403:** `accessDeniedPage("/access-denied")` forwards to `common.AccessDeniedController`, which renders `error/403.html` with status 403. GĐ7 adds the other error pages next to it.
 - **Logged-in users** opening `/login` or `/register` are redirected to `/` by `AuthController` (checks the `Principal` parameter).
 - **Tests:** web tests that render a page for a logged-in user need a real `CurrentUser` principal (the `TestUsers` fixture), because `@WithMockUser` has no `fullName`. Filter-only tests (`SecurityConfigTest`) can keep `@WithMockUser`.
-- **GĐ4 cart merge:** hook it on successful login (an `AuthenticationSuccessEvent` listener or a wrapping success handler) and keep the saved-request redirect behaviour.
+- **Cart merge on login** is `cart.CartMergeOnLogin`, an `InteractiveAuthenticationSuccessEvent` listener (fires after the session-id change, before the redirect). It never fails the login and clears the guest cart only after the merge commits.
+
+### Cart patterns (GĐ4), reuse these in later phases
+
+See [spec 004](docs/specs/004-shopping-cart.md), [ADR-0006](docs/adr/0006-session-cart-merged-on-login.md) and [ADR-0008](docs/adr/0008-cart-writes-serialized-per-user.md).
+
+- **One API, two stores:** every `CartService` method takes a sealed `CartOwner` (`Customer(userId)` or `Guest(GuestCartStore)`). Controllers declare a `CartOwner` parameter (resolved by `CartOwnerArgumentResolver` from `CurrentUser` or the session) and never branch on where the cart lives. `@WithMockUser` resolves to `Guest`.
+- **Guest cart** is a small serializable `SessionCart` (product id → quantity, no prices) stored as a session attribute. It is read with `getSession(false)`, so pages that only *read* the cart never create a session; a session is created only on the first write.
+- **Every DB-cart write locks the owner's `users` row first** (`CartRepository.lockOwner`, `FOR NO KEY UPDATE` on PostgreSQL), then loads the cart with its items in one query. Unique constraints are a safety net and are not caught. `placeOrder` in GĐ5 must take the same lock before reading the cart.
+- **Quantity rules** live only in `CartService` (1–99, never above current stock; capped values are reported through `CartChange`). The web layer turns outcomes into flash messages (`notice`, `noticeKind`, `showCartLink`). The cart never stores prices and never touches `products.stock` (ArchUnit forbids `decrementStock` in `cart`).
+- **Viewing never mutates:** `view` is read-only and labels lines `DISCONTINUED` / `OUT_OF_STOCK` / `LOW_STOCK`; non-purchasable lines are excluded from the total.
+- **Header count** is the Thymeleaf expression object `#cartHeader.quantity()` (`cart.CartHeaderDialect`): at most one query per render, none for guests. Every `@WebMvcTest` that renders the layout must `@Import(CartHeaderTestConfig.class)` (a mock `CartService`).
+- **Request input** arrives as raw strings parsed by `CartInput`: a bad product id is a 404 (`CartNotFoundAdvice` → `product/not-found`), a bad quantity is the flash "Số lượng không hợp lệ.". Redirects are built from the parsed id, never from `Referer`.
 
 ### Domain invariants to preserve
 

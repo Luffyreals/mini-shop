@@ -1,5 +1,6 @@
 package com.minishop.admin;
 
+import com.minishop.cart.CartHeaderTestConfig;
 import com.minishop.config.SecurityConfig;
 import com.minishop.user.Role;
 import com.minishop.user.TestUsers;
@@ -20,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Trang quản trị tạm và header đã đăng nhập (AC-003-9 phần header, 14, 16, 21 bản slice). */
 @WebMvcTest(AdminController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, CartHeaderTestConfig.class})
 class AdminControllerTest {
 
     @Autowired

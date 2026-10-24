@@ -19,6 +19,8 @@
     <a class="site-wordmark" th:href="@{/}">Mini Shop</a>
     <nav class="site-nav" aria-label="Menu chính">
       <a class="site-nav-link" th:href="@{/products}">Sản phẩm</a>
+      <a class="site-nav-link" th:href="@{/cart}" th:with="cartQty=${#cartHeader.quantity()}"
+         th:text="${cartQty > 0} ? |Giỏ hàng (${cartQty})| : 'Giỏ hàng'">Giỏ hàng</a>
       <!-- Khách vãng lai không có form nào ở đây (không tạo session/CSRF token). Ẩn/hiện chỉ để cho đẹp: quyền thật nằm ở backend. -->
       <a class="site-nav-link" sec:authorize="!isAuthenticated()" th:href="@{/login}">Đăng nhập</a>
       <a class="site-nav-link" sec:authorize="!isAuthenticated()" th:href="@{/register}">Đăng ký</a>

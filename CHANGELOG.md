@@ -5,6 +5,22 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-24
+
+GĐ4: giỏ hàng ([spec 004](docs/specs/004-shopping-cart.md)).
+
+### Thêm
+- Nút "Thêm vào giỏ" kèm ô số lượng ở trang chi tiết sản phẩm (chỉ khi còn hàng).
+- Trang giỏ hàng `/cart`: đơn giá, thành tiền, tổng cộng theo giá hiện tại; sửa số lượng, xóa dòng; nhãn "Sản phẩm đã ngừng bán", "Hết hàng", "Chỉ còn {n} sản phẩm".
+- Giỏ trong session cho khách vãng lai, giỏ trong DB cho người đã đăng nhập; gộp giỏ session vào giỏ DB khi đăng nhập.
+- Link "Giỏ hàng (n)" trên header ở mọi trang.
+- Số lượng mỗi dòng từ 1 đến 99 và không vượt tồn kho; vượt thì được đặt bằng giới hạn kèm thông báo.
+- ADR-0008: ghi giỏ hàng DB tuần tự theo từng người dùng bằng khóa dòng `users`.
+
+### Bảo mật
+- Mọi form giỏ là POST có CSRF; giỏ luôn xác định từ người đang đăng nhập hoặc session, không có id giỏ trong URL.
+- Hai yêu cầu thêm giỏ đồng thời của cùng một người không gây lỗi và không mất số lượng.
+
 ## [0.3.0] - 2026-10-24
 
 GĐ3: đăng ký, đăng nhập và phân quyền ([spec 003](docs/specs/003-authentication.md)).

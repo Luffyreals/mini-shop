@@ -19,3 +19,4 @@ Mỗi quyết định kiến trúc quan trọng được ghi thành một file n
 | [0005](0005-atomic-stock-decrement.md) | Trừ tồn kho bằng câu UPDATE có điều kiện | Chấp nhận |
 | [0006](0006-session-cart-merged-on-login.md) | Giỏ hàng: session cho khách, DB cho user, gộp khi đăng nhập | Chấp nhận |
 | [0007](0007-session-form-login-current-user.md) | Đăng nhập bằng form trên session, principal riêng, email luôn chữ thường | Chấp nhận |
+| [0008](0008-cart-writes-serialized-per-user.md) | Ghi giỏ hàng DB tuần tự theo từng người dùng bằng khóa dòng `users` | Chấp nhận |

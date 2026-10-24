@@ -51,6 +51,10 @@ class TemplateCspComplianceTest {
                         "product.html", "credits.html", "login.html", "register.html", "403.html", "index.html",
                         "notice.html");
 
+        // trang giỏ hàng (GĐ4) phải nằm trong phạm vi quét
+        assertThat(files).extracting(f -> f.getDescription().replace("\\", "/"))
+                .anyMatch(d -> d.contains("templates/cart/view.html"));
+
         List<String> violations = new ArrayList<>();
         for (Resource file : files) {
             violations.addAll(find(file.getDescription(), new String(file.getInputStream().readAllBytes(),

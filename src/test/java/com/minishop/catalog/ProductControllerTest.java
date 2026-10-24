@@ -1,6 +1,7 @@
 package com.minishop.catalog;
 
 import com.minishop.common.NotFoundException;
+import com.minishop.cart.CartHeaderTestConfig;
 import com.minishop.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -11,6 +12,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -34,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * (AC-002-1, 2, 6, 8..17; AC-001-5 được AC-002-2 thay thế; AC-001-16 trên /products).
  */
 @WebMvcTest(ProductController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, CartHeaderTestConfig.class})
 class ProductControllerTest {
 
     private static final String PLACEHOLDER = "/images/placeholder-product.svg";
@@ -358,6 +360,108 @@ class ProductControllerTest {
                 .andExpect(content().string(containsString("Sản phẩm không tồn tại hoặc đã ngừng bán.")))
                 .andExpect(content().string(containsString("Về danh sách sản phẩm")))
                 .andExpect(header().string("Content-Security-Policy", containsString("default-src 'self'")));
+    }
+
+
+    // ---------- GĐ4: form thêm vào giỏ (AC-004-1, AC-004-2) ----------
+
+    @Test
+    void detail_inStock_hasAddToCartFormWithCsrfAndQuantityLimit() throws Exception {
+        when(productService.getDetail(7L)).thenReturn(detail(true, null));
+
+        String html = body("/products/7");
+
+        assertThat(matches("<form(?=[^>]*method=\"post\")(?=[^>]*action=\"/cart/items\")[^>]*>", html)).isTrue();
+        assertThat(matches("<input(?=[^>]*name=\"_csrf\")(?=[^>]*type=\"hidden\")[^>]*>", html)).isTrue();
+        assertThat(matches("<input(?=[^>]*name=\"productId\")(?=[^>]*value=\"7\")(?=[^>]*type=\"hidden\")[^>]*>",
+                html)).isTrue();
+        assertThat(matches("<input(?=[^>]*name=\"quantity\")(?=[^>]*value=\"1\")(?=[^>]*max=\"99\")"
+                + "(?=[^>]*min=\"1\")[^>]*>", html)).isTrue();
+        assertThat(matches("<label[^>]*for=\"quantity\"[^>]*>Số lượng</label>", html)).isTrue();
+        assertThat(html).contains("Thêm vào giỏ");
+    }
+
+    @Test
+    void detail_inStock_neverRevealsStockNumberInQuantityInput() throws Exception {
+        when(productService.getDetail(7L)).thenReturn(detail(true, null));
+
+        String html = body("/products/7");
+
+        // max cố định 99, không phải tồn kho; không có thuộc tính hay chữ nào nói số tồn kho
+        assertThat(matches("max=\"(?!99\")", html)).isFalse();
+        assertThat(html).doesNotContainPattern("(?i)tồn kho|còn \\d+|stock=");
+    }
+
+    @Test
+    void detail_outOfStock_hasNoAddToCartForm() throws Exception {
+        when(productService.getDetail(8L)).thenReturn(detail(false, null));
+
+        String html = body("/products/8");
+
+        assertThat(html).contains("Hết hàng").doesNotContain("Thêm vào giỏ").doesNotContain("action=\"/cart/items\"");
+    }
+
+    @Test
+    void detail_withSuccessFlash_showsStatusNoticeAndViewCartLink() throws Exception {
+        when(productService.getDetail(7L)).thenReturn(detail(true, null));
+
+        String html = mockMvc.perform(get("/products/7").flashAttr("notice", "Đã thêm vào giỏ hàng.")
+                        .flashAttr("noticeKind", "success").flashAttr("showCartLink", true))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("Đã thêm vào giỏ hàng.");
+        assertThat(matches("role=\"status\"[^>]*>Đã thêm vào giỏ hàng\\.", html)).isTrue();
+        assertThat(matches("<a[^>]*href=\"/cart\"[^>]*>\s*Xem giỏ hàng", html)).isTrue();
+    }
+
+    @Test
+    void detail_withErrorFlash_usesAlertRoleAndNoCartLink() throws Exception {
+        when(productService.getDetail(7L)).thenReturn(detail(true, null));
+
+        String html = mockMvc.perform(get("/products/7").flashAttr("notice", "Số lượng không hợp lệ.")
+                        .flashAttr("noticeKind", "error"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(matches("role=\"alert\"[^>]*>Số lượng không hợp lệ\\.", html)).isTrue();
+        assertThat(html).doesNotContain("Xem giỏ hàng");
+    }
+
+    @Test
+    void detail_withoutFlash_hasNoNoticeOrCartLink() throws Exception {
+        when(productService.getDetail(7L)).thenReturn(detail(true, null));
+
+        assertThat(body("/products/7")).doesNotContain("Xem giỏ hàng").doesNotContain("role=\"status\"")
+                .doesNotContain("role=\"alert\"");
+    }
+
+    @Test
+    void detail_escapesFlashNotice() throws Exception {
+        when(productService.getDetail(7L)).thenReturn(detail(true, null));
+
+        String html = mockMvc.perform(get("/products/7").flashAttr("notice", "<b>x</b>")
+                        .flashAttr("noticeKind", "info"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("&lt;b&gt;x&lt;/b&gt;").doesNotContain("<b>x</b>");
+    }
+
+    // ---------- header giỏ hàng (AC-004-22) và spec §8 ----------
+
+    @Test
+    void header_hasCartLinkToCart() throws Exception {
+        when(productService.search(any())).thenReturn(singleProductList());
+
+        assertThat(matches("<a[^>]*href=\"/cart\"[^>]*>\s*Giỏ hàng\s*</a>", body("/products"))).isTrue();
+    }
+
+    @Test
+    void list_asGuest_doesNotCreateSessionOrSetCookie() throws Exception {
+        when(productService.search(any())).thenReturn(singleProductList());
+
+        MvcResult result = mockMvc.perform(get("/products")).andExpect(status().isOk()).andReturn();
+
+        assertThat(result.getRequest().getSession(false)).isNull();
+        assertThat(result.getResponse().getHeaders("Set-Cookie")).noneMatch(c -> c.contains("JSESSIONID"));
     }
 
     // ---------- layout chung ----------

@@ -2,7 +2,12 @@ package com.minishop;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.ClassPathResource;
@@ -15,7 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -38,6 +46,9 @@ class H2ProfileSmokeTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Value("${app.seed.user-password}")
+    String userPassword;
 
     @Test
     void contextLoads_withFlywayAndHibernateValidateOnH2() {
@@ -110,5 +121,54 @@ class H2ProfileSmokeTest {
         assertThat(paths).isNotEmpty();
         assertThat(paths).allSatisfy(path -> assertThat(new ClassPathResource("static" + path).exists())
                 .as("static resource for %s", path).isTrue());
+    }
+
+    /**
+     * GĐ4 trên H2: thêm giỏ của người dùng đăng nhập chạy {@code lockOwner} (select ... for update) và ghi
+     * giỏ DB; khách thêm giỏ chỉ ghi session. Dọn giỏ của tài khoản seed ở cuối, không thêm người dùng.
+     */
+    @Test
+    void cart_guestAddAndLoggedInAdd_workOnH2() throws Exception {
+        Long productId = jdbc.queryForObject(
+                "select id from products where active = true and stock > 0 order by id limit 1", Long.class);
+        String name = jdbc.queryForObject("select name from products where id = ?", String.class, productId);
+        Long userId = jdbc.queryForObject("select id from users where email = 'user@minishop.local'", Long.class);
+        try {
+            MockHttpSession guest = new MockHttpSession();
+            mockMvc.perform(post("/cart/items").with(csrf()).session(guest)
+                            .param("productId", String.valueOf(productId)).param("quantity", "1"))
+                    .andExpect(status().is3xxRedirection());
+            mockMvc.perform(get("/cart").session(guest))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString(name)));
+            // Chỉ xét giỏ của tài khoản seed, để test không phụ thuộc dữ liệu do test khác để lại.
+            assertThat(jdbc.queryForObject("select count(*) from carts where user_id = ?", Integer.class, userId))
+                    .isZero();
+
+            // Real login carries the guest cart; merge runs lockOwner on H2.
+            RequestBuilder login = formLogin("/login").userParameter("email")
+                    .user("user@minishop.local").password(userPassword);
+            MvcResult result = mockMvc.perform(context -> {
+                MockHttpServletRequest request = login.buildRequest(context);
+                request.setSession(guest);
+                return request;
+            }).andExpect(status().is3xxRedirection()).andReturn();
+            MockHttpSession session = (MockHttpSession) result.getRequest().getSession(false);
+            assertThat(jdbc.queryForObject("select count(*) from cart_items i join carts c on c.id = i.cart_id "
+                    + "where c.user_id = ? and i.product_id = ?", Integer.class, userId, productId)).isEqualTo(1);
+
+            mockMvc.perform(post("/cart/items").with(csrf()).session(session)
+                            .param("productId", String.valueOf(productId)).param("quantity", "1"))
+                    .andExpect(status().is3xxRedirection());
+            assertThat(jdbc.queryForObject("select quantity from cart_items i join carts c on c.id = i.cart_id "
+                    + "where c.user_id = ?", Integer.class, userId)).isEqualTo(Math.min(2,
+                    jdbc.queryForObject("select stock from products where id = ?", Integer.class, productId)));
+            mockMvc.perform(get("/cart").session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString(name)));
+        } finally {
+            jdbc.update("delete from cart_items where cart_id in (select id from carts where user_id = ?)", userId);
+            jdbc.update("delete from carts where user_id = ?", userId);
+        }
     }
 }
