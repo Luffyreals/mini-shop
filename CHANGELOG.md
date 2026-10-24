@@ -5,6 +5,27 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+GĐ6: trang quản trị ([spec 006](docs/specs/006-admin.md)).
+
+### Thêm
+- Layout quản trị riêng có sidebar (`Tổng quan`, `Đơn hàng`, `Sản phẩm`, `Danh mục`, `Về cửa hàng`) cho mọi trang `/admin/**`; trang 404 trong layout quản trị.
+- Dashboard `/admin` thay trang tạm của GĐ3: số đơn theo từng trạng thái (bấm để lọc), doanh thu đơn đã giao, sản phẩm đang bán sắp hết hàng (tồn kho ≤ 5), 5 đơn mới nhất.
+- Quản lý danh mục: thêm, sửa, xóa (chỉ khi không còn sản phẩm nào, kể cả sản phẩm đã ẩn); tên không được trùng, không phân biệt hoa thường.
+- Quản lý sản phẩm: danh sách gồm cả sản phẩm đã ẩn (tìm theo tên, 20 sản phẩm/trang), thêm, sửa, ẩn và hiện lại; giá nhận dạng `1.250.000`.
+- Upload ảnh sản phẩm (JPG, PNG, WebP, tối đa 2 MB) qua interface `StorageService`, lưu ở `uploads/` (đổi bằng `UPLOAD_DIR`) và phục vụ tại `/uploads/**`; thay ảnh thì file cũ bị xóa.
+- Điều chỉnh tồn kho bằng một lượng tăng hoặc giảm, chạy bằng một câu `UPDATE` có điều kiện (0–100.000).
+- Quản lý đơn hàng: danh sách mọi đơn (lọc theo trạng thái, 20 đơn/trang), chi tiết đơn kèm tài khoản đặt hàng, chuyển trạng thái `Xác nhận đơn` → `Bắt đầu giao hàng` → `Xác nhận đã giao`, admin hủy đơn chờ xử lý hoặc đã xác nhận và hoàn kho.
+- ADR-0010: ảnh qua `StorageService`, điều chỉnh tồn kho nguyên tử, khóa `categories` trước `products`.
+
+### Thay đổi
+- Trần upload của Tomcat (`spring.servlet.multipart.max-file-size`) tăng từ 2 MB lên 10 MB; giới hạn 2 MB của ảnh được kiểm trong ứng dụng để hiện lỗi ngay trên form.
+- `catalog.ProductImages` thành bean, chuyển đường dẫn ảnh thành URL qua `StorageService`.
+
+### Bảo mật
+- File upload được kiểm cả đuôi, content type và chữ ký đầu file (magic bytes); không nhận SVG, GIF; lưu bằng tên UUID, không bao giờ dùng tên gốc; chặn path traversal khi ghi và khi phục vụ file.
+- Mọi form quản trị là POST có CSRF, kể cả form upload `multipart/form-data`; tham số giả mạo (`stock`, `active`, `imagePath`, `id`) bị bỏ qua.
+- Admin và khách đổi cùng một đơn được xếp hàng bằng khóa dòng `orders`: kho chỉ được hoàn một lần.
+
 ## [0.5.0] - 2026-10-24
 
 GĐ5: đặt hàng (COD), lịch sử đơn và tự hủy đơn ([spec 005](docs/specs/005-checkout-and-orders.md)).

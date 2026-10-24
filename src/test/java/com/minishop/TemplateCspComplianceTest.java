@@ -62,6 +62,16 @@ class TemplateCspComplianceTest {
                 .anyMatch(d -> d.contains("templates/order/detail.html"))
                 .anyMatch(d -> d.contains("templates/order/not-found.html"));
 
+        // the admin area (GĐ6, AC-006-50): the layout fragment and every admin page must be in the scan
+        List<String> scanned = files.stream().map(f -> f.getDescription().replace("\\", "/")).toList();
+        for (String template : List.of("fragments/admin.html", "admin/index.html", "admin/not-found.html",
+                "admin/category-list.html", "admin/category-form.html", "admin/product-list.html",
+                "admin/product-new.html", "admin/product-edit.html", "admin/order-list.html",
+                "admin/order-detail.html")) {
+            assertThat(scanned).as("scanned " + template).anyMatch(d -> d.contains("templates/" + template));
+        }
+        assertThat(scanned).filteredOn(d -> d.contains("templates/admin/")).hasSizeGreaterThanOrEqualTo(9);
+
         List<String> violations = new ArrayList<>();
         for (Resource file : files) {
             violations.addAll(find(file.getDescription(), new String(file.getInputStream().readAllBytes(),

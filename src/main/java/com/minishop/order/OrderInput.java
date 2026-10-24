@@ -24,6 +24,20 @@ final class OrderInput {
         return ORDER_ID.matcher(s).matches() ? Optional.of(Long.valueOf(s)) : Optional.empty();
     }
 
+    /** A target or filter status: the exact enum name after strip (case-sensitive); anything else is empty. */
+    static Optional<OrderStatus> status(String raw) {
+        if (raw == null) {
+            return Optional.empty();
+        }
+        String s = raw.strip();
+        for (OrderStatus status : OrderStatus.values()) {
+            if (status.name().equals(s)) {
+                return Optional.of(status);
+            }
+        }
+        return Optional.empty();
+    }
+
     /** The total the customer saw. Only compared, never stored. */
     static Optional<BigDecimal> amount(String raw) {
         if (raw == null) {

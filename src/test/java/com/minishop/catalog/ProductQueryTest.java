@@ -2,6 +2,8 @@ package com.minishop.catalog;
 
 import com.minishop.TestcontainersConfiguration;
 import com.minishop.common.NotFoundException;
+import com.minishop.storage.ImageUpload;
+import com.minishop.storage.StorageService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
@@ -11,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -28,9 +32,33 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({TestcontainersConfiguration.class, ProductService.class})
+@Import({TestcontainersConfiguration.class, ProductService.class, ProductImages.class,
+        ProductQueryTest.StorageStub.class})
 @Testcontainers(disabledWithoutDocker = true)
 class ProductQueryTest {
+
+    /** Giống LocalStorageService.toUrl: null/trống thành null, còn lại giữ nguyên. */
+    @TestConfiguration
+    static class StorageStub {
+        @Bean
+        StorageService storageService() {
+            return new StorageService() {
+                @Override
+                public String store(ImageUpload image) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public void deleteAfterCommit(String imagePath) {
+                }
+
+                @Override
+                public String toUrl(String imagePath) {
+                    return imagePath == null || imagePath.isBlank() ? null : imagePath;
+                }
+            };
+        }
+    }
 
     @Autowired
     ProductService service;

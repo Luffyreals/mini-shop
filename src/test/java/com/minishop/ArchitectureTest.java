@@ -22,10 +22,12 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 @AnalyzeClasses(packages = "com.minishop", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
+    /** GĐ6 (QĐ2): catalog chỉ được dùng storage (ảnh) và common; không biết cart, order, user, admin, config. */
     @ArchTest
-    static final ArchRule catalog_dependsOnNoOtherFeature = noClasses().that().resideInAPackage("com.minishop.catalog..")
+    static final ArchRule catalog_dependsOnlyOnStorageAndCommon = noClasses().that().resideInAPackage("com.minishop.catalog..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                    "com.minishop.cart..", "com.minishop.order..", "com.minishop.user..", "com.minishop.admin..");
+                    "com.minishop.cart..", "com.minishop.order..", "com.minishop.user..", "com.minishop.admin..",
+                    "com.minishop.config..");
 
     @ArchTest
     static final ArchRule cart_dependsOnlyOnAllowedPackages = noClasses().that().resideInAPackage("com.minishop.cart..")
@@ -54,12 +56,26 @@ class ArchitectureTest {
             .should().dependOnClassesThat(resideInAPackage("com.minishop.cart..")
                     .and(not(simpleName("CartCheckout"))).and(not(simpleName("CheckoutLine"))));
 
-    /** Spec 005 §8: chỉ đặt hàng và hủy đơn (order) được đổi tồn kho; catalog là nơi định nghĩa. */
+    /**
+     * Spec 006 §8, QĐ3: chỉ {@code order} trừ và cộng kho theo đơn hàng; ngay cả {@code catalog} (nơi định nghĩa
+     * truy vấn) không được gọi, vì điều chỉnh của admin có câu riêng {@code adjustStock}.
+     */
     @ArchTest
-    static final ArchRule onlyOrderChangesStock = noClasses()
-            .that().resideOutsideOfPackages("com.minishop.order..", "com.minishop.catalog..")
+    static final ArchRule onlyOrderDecrementsOrRestoresStock = noClasses()
+            .that().resideOutsideOfPackage("com.minishop.order..")
             .should().callMethod(ProductRepository.class, "decrementStock", Long.class, int.class)
             .orShould().callMethod(ProductRepository.class, "incrementStock", Long.class, int.class);
+
+    /** Spec 006 BR-006-7, QĐ3: chỉ ProductAdminService gọi câu điều chỉnh kho của admin. */
+    @ArchTest
+    static final ArchRule onlyProductAdminServiceAdjustsStock = noClasses()
+            .that().doNotHaveFullyQualifiedName("com.minishop.catalog.ProductAdminService")
+            .should().callMethod(ProductRepository.class, "adjustStock", Long.class, int.class);
+
+    /** Ngược lại với hai rule trên: không ai ngoài order được gọi, và order không được dùng câu của admin. */
+    @ArchTest
+    static final ArchRule order_neverAdjustsStockLikeAnAdmin = noClasses().that().resideInAPackage("com.minishop.order..")
+            .should().callMethod(ProductRepository.class, "adjustStock", Long.class, int.class);
 
     @ArchTest
     static final ArchRule user_dependsOnNoOtherFeature = noClasses().that().resideInAPackage("com.minishop.user..")
@@ -93,6 +109,22 @@ class ArchitectureTest {
             .that().areAnnotatedWith(Controller.class)
             .or().areAnnotatedWith(RestController.class)
             .should().dependOnClassesThat().areAnnotatedWith(Entity.class);
+
+    /** GĐ6: admin chỉ được dùng catalog, order, storage, user và common (không cart, không config). */
+    @ArchTest
+    static final ArchRule admin_dependsOnlyOnAllowedFeatures = noClasses().that().resideInAPackage("com.minishop.admin..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.minishop.cart..", "com.minishop.config..");
+
+    /** Spec 006 BR-006-15: admin không thấy entity (User, Category, Product đang public). */
+    @ArchTest
+    static final ArchRule admin_doesNotDependOnEntities = noClasses().that().resideInAPackage("com.minishop.admin..")
+            .should().dependOnClassesThat().areAnnotatedWith(Entity.class);
+
+    /** GĐ6: chỉ catalog (ảnh sản phẩm) và admin (upload) dùng storage; ADR-0010. */
+    @ArchTest
+    static final ArchRule onlyCatalogAndAdminUseStorage = noClasses()
+            .that().resideOutsideOfPackages("com.minishop.catalog..", "com.minishop.admin..", "com.minishop.storage..")
+            .should().dependOnClassesThat().resideInAPackage("com.minishop.storage..");
 
     /** CLAUDE.md: admin chỉ là tầng web, gọi service của tính năng khác, không đụng repository. */
     @ArchTest

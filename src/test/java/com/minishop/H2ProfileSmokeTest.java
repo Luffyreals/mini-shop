@@ -18,12 +18,28 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
+import com.minishop.catalog.CategoryAdminService;
+import com.minishop.catalog.CategoryDeleteResult;
+import com.minishop.catalog.LowStockRow;
+import com.minishop.catalog.ProductAdminService;
+import com.minishop.catalog.StockAdjustResult;
+import com.minishop.order.AdminOrderRow;
+import com.minishop.order.OrderAdminService;
+import com.minishop.order.OrderDashboard;
+import com.minishop.order.StatusCount;
+import com.minishop.support.TestImages;
+import org.springframework.mock.web.MockMultipartFile;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.hamcrest.Matchers.containsString;
@@ -50,6 +66,21 @@ class H2ProfileSmokeTest {
 
     @Value("${app.seed.user-password}")
     String userPassword;
+
+    @Autowired
+    CategoryAdminService categoryAdminService;
+
+    @Autowired
+    ProductAdminService productAdminService;
+
+    @Autowired
+    OrderAdminService orderAdminService;
+
+    @Value("${app.seed.admin-password}")
+    String adminPassword;
+
+    @Value("${app.storage.local.upload-dir}")
+    String uploadDirSetting;
 
     @Test
     void contextLoads_withFlywayAndHibernateValidateOnH2() {
@@ -229,5 +260,151 @@ class H2ProfileSmokeTest {
             jdbc.update("delete from carts where user_id = ?", userId);
             jdbc.update("update products set stock = ? where id = ?", stockBefore, productId);
         }
+    }
+
+    private MockHttpSession login(String email, String password) throws Exception {
+        RequestBuilder login = formLogin("/login").userParameter("email").user(email).password(password);
+        return (MockHttpSession) mockMvc.perform(login).andExpect(status().is3xxRedirection())
+                .andReturn().getRequest().getSession(false);
+    }
+
+    /**
+     * GĐ6 trên H2 (AC-006-51): admin thêm danh mục, thêm sản phẩm có ảnh PNG, điều chỉnh kho; khách seed đặt hai
+     * đơn; admin đưa đơn một CONFIRMED, SHIPPING, DELIVERED và hủy đơn hai (kho về đúng). Chạy cả các truy vấn mới
+     * ({@code countByStatus}, {@code sumTotalByStatus}, {@code findAllWithProductCount}, {@code adjustStock} ở hai
+     * đầu 0 và 100000, {@code lockById} của đơn và danh mục) trên H2. Dọn đơn, sản phẩm, danh mục và file ở finally.
+     */
+    @Test
+    void admin_fullFlow_worksOnH2AndRestoresStockOnCancel() throws Exception {
+        String categoryName = "Admin test H2 category";
+        String productName = "Admin test H2 product";
+        Path uploadDir = Path.of(uploadDirSetting).toAbsolutePath().normalize();
+        Long userId = jdbc.queryForObject("select id from users where email = 'user@minishop.local'", Long.class);
+        try {
+            MockHttpSession admin = login("admin@minishop.local", adminPassword);
+            MockHttpSession customer = login("user@minishop.local", userPassword);
+            for (String url : List.of("/admin", "/admin/orders", "/admin/products", "/admin/categories",
+                    "/admin/categories/new", "/admin/products/new")) {
+                mockMvc.perform(get(url).session(admin)).andExpect(status().isOk());
+            }
+            // No order at all: no row from countByStatus, and 0 (not null) from sumTotalByStatus.
+            OrderDashboard empty = orderAdminService.dashboard();
+            assertThat(empty.counts()).extracting(StatusCount::count).containsOnly(0L);
+            assertThat(empty.deliveredRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
+
+            // Category and product (with a PNG) through the real controllers.
+            mockMvc.perform(post("/admin/categories").with(csrf()).session(admin).param("name", categoryName))
+                    .andExpect(status().is3xxRedirection());
+            Long categoryId = jdbc.queryForObject("select id from categories where name = ?", Long.class, categoryName);
+            mockMvc.perform(post("/admin/categories").with(csrf()).session(admin)
+                            .param("name", categoryName.toUpperCase(java.util.Locale.ROOT)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Tên danh mục đã tồn tại.")));
+            byte[] png = TestImages.png(10 * 1024);
+            String location = mockMvc.perform(multipart("/admin/products")
+                            .file(new MockMultipartFile("image", "a.png", "image/png", png))
+                            .with(csrf()).session(admin)
+                            .param("name", productName).param("categoryId", String.valueOf(categoryId))
+                            .param("price", "100.000").param("initialStock", "10").param("active", "true"))
+                    .andExpect(status().is3xxRedirection()).andReturn().getResponse().getRedirectedUrl();
+            assertThat(location).matches("/admin/products/\\d+/edit");
+            long productId = Long.parseLong(location.split("/")[3]);
+            String imagePath = jdbc.queryForObject("select image_path from products where id = ?", String.class, productId);
+            assertThat(imagePath).matches("/uploads/[0-9a-f-]{36}\\.png");
+            assertThat(uploadDir.resolve(imagePath.substring("/uploads/".length()))).exists();
+            mockMvc.perform(get(imagePath)).andExpect(status().isOk());
+            assertThat(categoryAdminService.list()).filteredOn(r -> r.id() == categoryId).singleElement()
+                    .satisfies(r -> assertThat(r.productCount()).isEqualTo(1));
+            assertThat(categoryAdminService.delete(1L, categoryId)).isInstanceOf(CategoryDeleteResult.InUse.class);
+
+            // Stock +5, then two orders by the seed user (1 each).
+            mockMvc.perform(post("/admin/products/" + productId + "/stock").with(csrf()).session(admin)
+                            .param("delta", "5"))
+                    .andExpect(status().is3xxRedirection());
+            assertThat(stockOf(productId)).isEqualTo(15);
+            long first = placeOrder(customer, productId);
+            long second = placeOrder(customer, productId);
+            assertThat(stockOf(productId)).isEqualTo(13);
+
+            for (String step : List.of("CONFIRMED", "SHIPPING", "DELIVERED")) {
+                mockMvc.perform(post("/admin/orders/" + first + "/status").with(csrf()).session(admin)
+                                .param("status", step))
+                        .andExpect(status().is3xxRedirection());
+                assertThat(statusOf(first)).isEqualTo(step);
+            }
+            assertThat(stockOf(productId)).isEqualTo(13);
+            mockMvc.perform(get("/admin/orders/" + first).session(admin)).andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Đơn hàng đã ở trạng thái cuối.")));
+            mockMvc.perform(get("/admin/orders?status=DELIVERED").session(admin)).andExpect(status().isOk())
+                    .andExpect(content().string(containsString("href=\"/admin/orders/" + first + "\"")));
+            OrderDashboard after = orderAdminService.dashboard();
+            assertThat(after.counts()).extracting(StatusCount::status, StatusCount::count)
+                    .containsExactly(tuple("PENDING", 1L), tuple("CONFIRMED", 0L), tuple("SHIPPING", 0L),
+                            tuple("DELIVERED", 1L), tuple("CANCELLED", 0L));
+            assertThat(after.deliveredRevenue()).isEqualByComparingTo("100000");
+            assertThat(after.latest()).extracting(AdminOrderRow::id).containsExactly(second, first);
+
+            mockMvc.perform(post("/admin/orders/" + second + "/status").with(csrf()).session(admin)
+                            .param("status", "CANCELLED"))
+                    .andExpect(status().is3xxRedirection());
+            assertThat(statusOf(second)).isEqualTo("CANCELLED");
+            assertThat(stockOf(productId)).isEqualTo(14);
+            // A refused step changes nothing.
+            mockMvc.perform(post("/admin/orders/" + second + "/status").with(csrf()).session(admin)
+                            .param("status", "CANCELLED"))
+                    .andExpect(status().is3xxRedirection());
+            assertThat(stockOf(productId)).isEqualTo(14);
+
+            // adjustStock at both ends of 0..100000 on H2.
+            String name = jdbc.queryForObject("select name from products where id = ?", String.class, productId);
+            assertThat(productAdminService.adjustStock(1L, productId, -14))
+                    .isEqualTo(new StockAdjustResult.Adjusted(name, 0));
+            assertThat(productAdminService.adjustStock(1L, productId, -1))
+                    .isEqualTo(new StockAdjustResult.NotEnough(name, 1, 0));
+            assertThat(productAdminService.lowStock()).extracting(LowStockRow::id).contains(productId);
+            assertThat(productAdminService.adjustStock(1L, productId, 100_000))
+                    .isEqualTo(new StockAdjustResult.Adjusted(name, 100_000));
+            assertThat(productAdminService.adjustStock(1L, productId, 1))
+                    .isEqualTo(new StockAdjustResult.WouldExceed(name));
+            assertThat(productAdminService.adjustStock(1L, productId, -100_000))
+                    .isEqualTo(new StockAdjustResult.Adjusted(name, 0));
+        } finally {
+            Long product = jdbc.query("select id from products where name = ?",
+                    rs -> rs.next() ? rs.getLong(1) : null, productName);
+            String imagePath = jdbc.query("select image_path from products where name = ?",
+                    rs -> rs.next() ? rs.getString(1) : null, productName);
+            jdbc.update("delete from order_items where order_id in (select id from orders where user_id = ?)", userId);
+            jdbc.update("delete from orders where user_id = ?", userId);
+            jdbc.update("delete from cart_items where cart_id in (select id from carts where user_id = ?)", userId);
+            jdbc.update("delete from carts where user_id = ?", userId);
+            if (product != null) {
+                jdbc.update("delete from products where id = ?", product);
+            }
+            jdbc.update("delete from categories where name = ?", categoryName);
+            if (imagePath != null && imagePath.startsWith("/uploads/")) {
+                Files.deleteIfExists(uploadDir.resolve(imagePath.substring("/uploads/".length())));
+            }
+        }
+        assertThat(jdbc.queryForObject("select count(*) from users", Integer.class)).isEqualTo(2);
+    }
+
+    private long placeOrder(MockHttpSession customer, long productId) throws Exception {
+        mockMvc.perform(post("/cart/items").with(csrf()).session(customer)
+                        .param("productId", String.valueOf(productId)).param("quantity", "1"))
+                .andExpect(status().is3xxRedirection());
+        String location = mockMvc.perform(post("/checkout").with(csrf()).session(customer)
+                        .param("receiverName", "Khách hàng mẫu").param("phone", "0912 345 678")
+                        .param("shippingAddress", "12 Lê Lợi").param("expectedTotal", "100000"))
+                .andExpect(status().is3xxRedirection()).andReturn().getResponse().getRedirectedUrl();
+        assertThat(location).startsWith("/orders/");
+        return Long.parseLong(location.substring("/orders/".length()));
+    }
+
+    private int stockOf(long productId) {
+        return jdbc.queryForObject("select stock from products where id = ?", Integer.class, productId);
+    }
+
+    private String statusOf(long orderId) {
+        return jdbc.queryForObject("select status from orders where id = ?", String.class, orderId);
     }
 }

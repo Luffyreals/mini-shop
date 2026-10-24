@@ -2,7 +2,7 @@
 
 Website bán hàng mini viết bằng Java / Spring Boot, render phía server. Đây là dự án học tập và portfolio, **không bán hàng thật**.
 
-> 🚧 **Đang phát triển.** Đã xong GĐ1 (`v0.1.0`, nền móng), GĐ2 (`v0.2.0`, danh sách và chi tiết sản phẩm tại http://localhost:8080), GĐ3 (`v0.3.0`, đăng ký, đăng nhập, phân quyền), GĐ4 (`v0.4.0`, giỏ hàng) và GĐ5 (`v0.5.0`, đặt hàng COD, lịch sử đơn, tự hủy đơn). Tiếp theo: GĐ6 trang quản trị. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
+> 🚧 **Đang phát triển.** Đã xong GĐ1 (`v0.1.0`, nền móng), GĐ2 (`v0.2.0`, danh sách và chi tiết sản phẩm tại http://localhost:8080), GĐ3 (`v0.3.0`, đăng ký, đăng nhập, phân quyền), GĐ4 (`v0.4.0`, giỏ hàng), GĐ5 (`v0.5.0`, đặt hàng COD, lịch sử đơn, tự hủy đơn) và GĐ6 (trang quản trị: dashboard, danh mục, sản phẩm có ảnh, tồn kho, đơn hàng). Tiếp theo: GĐ7 hoàn thiện. Tiến độ xem ở mục [Lộ trình](#lộ-trình).
 
 ## Tính năng (MVP)
 
@@ -13,8 +13,8 @@ Website bán hàng mini viết bằng Java / Spring Boot, render phía server. �
 - Đặt hàng thanh toán khi nhận hàng (COD), xem lịch sử đơn, tự hủy đơn đang chờ xử lý
 
 **Quản trị (`/admin`)**
-- Dashboard: số đơn hôm nay, doanh thu, số đơn chờ xử lý
-- Quản lý danh mục và sản phẩm (có upload ảnh)
+- Dashboard: số đơn theo từng trạng thái, doanh thu đơn đã giao, sản phẩm sắp hết hàng, đơn mới nhất
+- Quản lý danh mục và sản phẩm (có upload ảnh JPG/PNG/WebP), ẩn/hiện sản phẩm, nhập thêm hoặc giảm tồn kho
 - Quản lý đơn hàng: lọc theo trạng thái, đổi trạng thái; hủy đơn thì tự hoàn lại tồn kho
 
 ## Công nghệ
@@ -37,6 +37,7 @@ Modular monolith: chia package theo tính năng (`catalog`, `cart`, `order`, `us
 - Trừ tồn kho bằng câu `UPDATE` nguyên tử nên không bán vượt kho khi nhiều người đặt cùng lúc ([ADR-0005](docs/adr/0005-atomic-stock-decrement.md))
 - Đơn hàng lưu lại tên và giá sản phẩm tại thời điểm mua
 - Luồng trạng thái đơn được kiểm soát chặt: `PENDING → CONFIRMED → SHIPPING → DELIVERED`, hoặc `CANCELLED`
+- Admin chỉnh tồn kho bằng một câu `UPDATE` có điều kiện nên không ghi đè số khách vừa mua; ảnh upload được kiểm cả nội dung file (magic bytes) và lưu bằng tên ngẫu nhiên ([ADR-0010](docs/adr/0010-product-images-and-admin-stock-adjustment.md))
 
 Chi tiết: [docs/project-brief.md](docs/project-brief.md).
 
@@ -73,6 +74,8 @@ Trên Windows PowerShell, thay `./mvnw` bằng `.\mvnw.cmd`. Máy không bật D
 Đổi mật khẩu demo bằng biến môi trường `SEED_ADMIN_PASSWORD` và `SEED_USER_PASSWORD`.
 
 Đăng nhập ở http://localhost:8080/login. Tạo tài khoản mới (luôn là `USER`) ở http://localhost:8080/register: mật khẩu 8–64 ký tự, có cả chữ và số. Chỉ tài khoản `ADMIN` vào được `/admin`. Sau khi đăng nhập, bấm "Đặt hàng" ở trang giỏ để thanh toán khi nhận hàng (COD); đơn đã đặt nằm ở "Đơn hàng của tôi" (http://localhost:8080/orders), đơn đang "Chờ xử lý" có thể tự hủy.
+
+Đăng nhập bằng `admin@minishop.local` rồi bấm "Quản trị" trên header để vào http://localhost:8080/admin: xử lý đơn (xác nhận, giao, hủy), thêm/sửa danh mục và sản phẩm, upload ảnh, điều chỉnh tồn kho. Ảnh upload được lưu ở thư mục `uploads/` (không commit); đặt biến môi trường `UPLOAD_DIR` để dùng thư mục khác.
 
 Dữ liệu mẫu gồm 5 danh mục và 22 sản phẩm, trong đó có 1 sản phẩm hết hàng và 1 sản phẩm bị ẩn, để thử các trường hợp đặc biệt. 19 sản phẩm có ảnh; 3 sản phẩm cố ý không có ảnh để kiểm tra ảnh thay thế.
 
@@ -117,7 +120,7 @@ mini-shop/
 - [x] GĐ3: Đăng ký, đăng nhập, phân quyền (`v0.3.0`)
 - [x] GĐ4: Giỏ hàng (`v0.4.0`)
 - [x] GĐ5: Đặt hàng và lịch sử đơn (`v0.5.0`)
-- [ ] GĐ6: Trang quản trị
+- [x] GĐ6: Trang quản trị
 - [ ] GĐ7: Hoàn thiện (validation, xử lý lỗi, giao diện, tài liệu)
 - [ ] GĐ8: Deploy online *(tùy chọn)*
 

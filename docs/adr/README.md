@@ -21,3 +21,4 @@ Mỗi quyết định kiến trúc quan trọng được ghi thành một file n
 | [0007](0007-session-form-login-current-user.md) | Đăng nhập bằng form trên session, principal riêng, email luôn chữ thường | Chấp nhận |
 | [0008](0008-cart-writes-serialized-per-user.md) | Ghi giỏ hàng DB tuần tự theo từng người dùng bằng khóa dòng `users` | Chấp nhận |
 | [0009](0009-order-placement-and-cancel-locking.md) | Đặt và hủy đơn: thứ tự khóa cố định, chuyển trạng thái đơn qua khóa dòng `orders` | Chấp nhận |
+| [0010](0010-product-images-and-admin-stock-adjustment.md) | Ảnh sản phẩm qua `StorageService` tại `/uploads/**`; admin điều chỉnh tồn kho bằng câu UPDATE có điều kiện; khóa `categories` trước `products` | Chấp nhận |

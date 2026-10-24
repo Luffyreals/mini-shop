@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<!--
+  Danh sách đơn hàng của mọi khách.
+  Model: orders (AdminOrderPage: orders[id, createdAt, customerName, customerEmail, receiverName, totalAmount, statusLabel, statusKey],
+         status (null = Tất cả), statusLabel, filters[value, label, selected], page, totalPages, totalElements, empty),
+         pageNav (common.PageNav, link do controller dựng, giữ status).
+  Bộ lọc là các link GET (?status=...), không có form.
+-->
+<head th:replace="~{fragments/admin :: head('Đơn hàng | Quản trị Mini Shop')}"></head>
+<body class="admin-body">
+<div class="admin-shell">
+  <aside th:replace="~{fragments/admin :: sidebar('orders')}"></aside>
+
+  <main class="admin-main">
+    <div class="admin-pagehead">
+      <h1 class="admin-title">Đơn hàng</h1>
+    </div>
+
+    <nav class="admin-filter" aria-label="Lọc theo trạng thái">
+      <a class="admin-filter__link" th:each="f : ${orders.filters}"
+         th:href="${f.value != null} ? @{/admin/orders(status=${f.value})} : @{/admin/orders}"
+         th:classappend="${f.selected} ? 'is-selected'"
+         th:aria-current="${f.selected} ? 'true'" th:text="${f.label}">Tất cả</a>
+    </nav>
+
+    <section class="admin-card" aria-labelledby="orders-title">
+      <h2 class="visually-hidden" id="orders-title">Danh sách đơn hàng</h2>
+
+      <p class="admin-empty" th:if="${orders.empty and orders.status == null}">Chưa có đơn hàng nào.</p>
+      <p class="admin-empty" th:if="${orders.empty and orders.status != null}"
+         th:text="|Không có đơn hàng nào ở trạng thái ${orders.statusLabel}.|">Không có đơn hàng nào ở trạng thái Đã giao.</p>
+
+      <div class="admin-table-wrap" th:unless="${orders.empty}"
+           role="region" aria-labelledby="orders-title" tabindex="0">
+        <table class="admin-table" aria-labelledby="orders-title">
+          <thead>
+            <tr>
+              <th scope="col">Mã đơn</th>
+              <th scope="col">Ngày đặt</th>
+              <th scope="col">Khách hàng</th>
+              <th scope="col">Người nhận</th>
+              <th scope="col" class="admin-num">Tổng tiền</th>
+              <th scope="col">Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="o : ${orders.orders}">
+              <td class="admin-id"><a th:href="@{/admin/orders/{id}(id=${o.id})}" th:text="|#${o.id}|">#1</a></td>
+              <td class="admin-nowrap" th:text="${#vnDateTime.format(o.createdAt)}">24/10/2026 09:30</td>
+              <td class="admin-person">
+                <span class="admin-person__name" th:text="${o.customerName}">Nguyễn Văn A</span>
+                <span class="admin-person__meta" th:text="${o.customerEmail}">email khách hàng</span>
+              </td>
+              <td th:text="${o.receiverName}">Người nhận</td>
+              <td class="admin-num admin-nowrap"><span class="price" th:text="${#vnd.format(o.totalAmount)}">1.250.000 ₫</span></td>
+              <td><span class="order-status" th:classappend="|order-status--${o.statusKey}|" th:text="${o.statusLabel}">Chờ xử lý</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="admin-pager" th:unless="${orders.empty}">
+      <div th:replace="~{fragments/pagination :: pagination(${pageNav})}"></div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

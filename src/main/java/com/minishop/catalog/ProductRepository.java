@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
@@ -45,4 +46,23 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Product p set p.stock = p.stock + :quantity where p.id = :id and :quantity > 0")
     int incrementStock(@Param("id") Long id, @Param("quantity") int quantity);
+
+    /**
+     * Admin điều chỉnh kho theo lượng ±, nguyên tử (ADR-0010), đối xứng với {@link #decrementStock}: điều kiện
+     * nằm trong {@code WHERE} nên không có bước "đọc rồi ghi". Không lọc {@code active}: sản phẩm đã ẩn vẫn
+     * điều chỉnh được. Chỉ {@code ProductAdminService} được gọi.
+     *
+     * @return 1 nếu đã đổi; 0 nếu {@code delta} bằng 0, kho mới nằm ngoài 0..100000, hoặc không có sản phẩm
+     *         (người gọi đọc lại để phân loại)
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Product p set p.stock = p.stock + :delta "
+            + "where p.id = :id and :delta <> 0 and p.stock + :delta between 0 and 100000")
+    int adjustStock(@Param("id") Long id, @Param("delta") int delta);
+
+    /** Số sản phẩm (cả đã ẩn) của một danh mục; xóa danh mục chỉ được khi bằng 0. */
+    long countByCategoryId(Long categoryId);
+
+    /** Sản phẩm đang bán sắp hết hàng, ít nhất trước, tối đa 10 dòng (một câu SQL có LIMIT). */
+    List<Product> findTop10ByActiveTrueAndStockLessThanEqualOrderByStockAscIdAsc(int maxStock);
 }

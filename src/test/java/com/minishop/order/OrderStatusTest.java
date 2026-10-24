@@ -5,7 +5,10 @@ import com.minishop.user.User;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.math.BigDecimal;
 import java.util.EnumSet;
@@ -91,5 +94,45 @@ class OrderStatusTest {
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
         assertThat(order.getPaymentMethod()).isEqualTo(PaymentMethod.COD);
+    }
+
+    /** AC-006-41 */
+    @Test
+    void actionLabel_isTheButtonTextOfTheStepIntoEachStatus() {
+        assertThat(OrderStatus.CONFIRMED.actionLabel()).isEqualTo("Xác nhận đơn");
+        assertThat(OrderStatus.SHIPPING.actionLabel()).isEqualTo("Bắt đầu giao hàng");
+        assertThat(OrderStatus.DELIVERED.actionLabel()).isEqualTo("Xác nhận đã giao");
+        assertThat(OrderStatus.CANCELLED.actionLabel()).isEqualTo("Hủy đơn");
+    }
+
+    @Test
+    void actionLabel_ofPending_throwsBecausePendingIsNeverATarget() {
+        assertThatThrownBy(OrderStatus.PENDING::actionLabel).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void actionLabel_existsForEveryStatusThatIsATransitionTarget() {
+        for (OrderStatus from : OrderStatus.values()) {
+            for (OrderStatus to : OrderStatus.values()) {
+                if (from.canTransitionTo(to)) {
+                    assertThat(to.actionLabel()).isNotBlank();
+                }
+            }
+        }
+    }
+
+    /** AC-006-45, AC-006-39: a status is its exact enum name; case, spaces inside and junk are rejected. */
+    @ParameterizedTest
+    @EnumSource(OrderStatus.class)
+    void orderInputStatus_acceptsTheExactNameWithSurroundingSpaces(OrderStatus status) {
+        assertThat(OrderInput.status(status.name())).contains(status);
+        assertThat(OrderInput.status("  " + status.name() + "	")).contains(status);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   ", "abc", "pending", "Pending", "PEN DING", "CONFIRMED,SHIPPING", "0", "Chờ xử lý"})
+    void orderInputStatus_rejectsEverythingElse(String raw) {
+        assertThat(OrderInput.status(raw)).isEmpty();
     }
 }
