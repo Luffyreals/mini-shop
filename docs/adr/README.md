@@ -22,3 +22,4 @@ Mỗi quyết định kiến trúc quan trọng được ghi thành một file n
 | [0008](0008-cart-writes-serialized-per-user.md) | Ghi giỏ hàng DB tuần tự theo từng người dùng bằng khóa dòng `users` | Chấp nhận |
 | [0009](0009-order-placement-and-cancel-locking.md) | Đặt và hủy đơn: thứ tự khóa cố định, chuyển trạng thái đơn qua khóa dòng `orders` | Chấp nhận |
 | [0010](0010-product-images-and-admin-stock-adjustment.md) | Ảnh sản phẩm qua `StorageService` tại `/uploads/**`; admin điều chỉnh tồn kho bằng câu UPDATE có điều kiện; khóa `categories` trước `products` | Chấp nhận |
+| [0011](0011-centralized-error-handling.md) | Xử lý lỗi tập trung: trang lỗi qua `BasicErrorController`, một cơ chế 404, log 500 bằng resolver cuối chuỗi | Chấp nhận |

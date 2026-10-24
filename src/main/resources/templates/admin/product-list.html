@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   Danh sách sản phẩm (cả sản phẩm đã ẩn).
   Model: products (AdminProductPage: products[id, name, categoryName, price, stock, active, imageUrl], q, page, totalPages, totalElements, empty),
          pageNav (common.PageNav, link do controller dựng, giữ q); flash tùy chọn: notice, noticeKind.
   GET tìm kiếm: field q. POST /admin/products/{id}/hide | /show: field from=list, q, page (để quay về đúng trang).
--->
+*/-->
 <head th:replace="~{fragments/admin :: head('Sản phẩm | Quản trị Mini Shop')}"></head>
 <body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <div class="admin-shell">
   <aside th:replace="~{fragments/admin :: sidebar('products')}"></aside>
 
-  <main class="admin-main">
+  <main id="main" tabindex="-1" class="admin-main">
     <div class="admin-pagehead">
       <h1 class="admin-title">Sản phẩm</h1>
       <a class="btn btn-primary" th:href="@{/admin/products/new}">Thêm sản phẩm</a>

@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!-- Tiêu đề tab nối chuỗi trong biểu thức: ký tự pipe trong chữ sẽ kết thúc literal substitution. -->
+<!--/* Tiêu đề tab nối chuỗi trong biểu thức: ký tự pipe trong chữ sẽ kết thúc literal substitution. */-->
 <head th:replace="~{fragments/layout :: head(${'Đơn hàng #' + order.id + ' | Mini Shop'})}"></head>
 <body class="site-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <header th:replace="~{fragments/layout :: header}"></header>
 
-<main class="ms-container site-main">
+<main id="main" tabindex="-1" class="ms-container site-main">
   <h1 class="page-title" th:text="|Đơn hàng #${order.id}|">Đơn hàng #1</h1>
 
   <th:block th:if="${notice != null}">

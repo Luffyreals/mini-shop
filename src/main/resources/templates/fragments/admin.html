@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
-<!--
+<!--/*
   Layout riêng của khu quản trị (fragment thuần, không dùng Layout Dialect). Khu khách hàng dùng fragments/layout.
   Mỗi trang admin gọi:
     head(title)       tiêu đề tab, Bootstrap (WebJars), app.css (font, token, .notice, .field-error) rồi admin.css
     sidebar(section)  section: dashboard | orders | products | categories (link đó có aria-current="page")
   Trang đặt <body class="admin-body">, rồi <div class="admin-shell"> chứa sidebar và <main class="admin-main"> có đúng một h1.
   Không có header/footer của storefront, không script, không style nội tuyến (CSP).
--->
+*/-->
 <head th:fragment="head(title)">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title th:text="${title}">Quản trị Mini Shop</title>
+  <link rel="icon" th:href="@{/favicon.ico}" sizes="any">
+  <link rel="icon" th:href="@{/images/favicon.svg}" type="image/svg+xml">
   <link rel="preload" as="font" type="font/woff2" crossorigin th:href="@{/fonts/BricolageGrotesque-latin-vi.woff2}">
   <link rel="stylesheet" th:href="@{/webjars/bootstrap/dist/css/bootstrap.min.css}">
   <link rel="stylesheet" th:href="@{/css/app.css}">

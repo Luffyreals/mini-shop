@@ -24,7 +24,9 @@ final class PriceInput {
         if (raw == null) {
             return Optional.empty();
         }
-        String s = raw.strip();
+        // No-break space, narrow no-break space and figure space (pasted from the web or Excel) count as a normal
+        // space (BR-007-8). This must come before strip(), which does not treat U+00A0 as whitespace.
+        String s = raw.replace(' ', ' ').replace(' ', ' ').replace(' ', ' ').strip();
         if (!(PLAIN.matcher(s).matches() || DOTS.matcher(s).matches() || SPACES.matcher(s).matches())) {
             return Optional.empty();
         }

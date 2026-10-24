@@ -2,9 +2,10 @@
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('Đơn hàng của tôi | Mini Shop')}"></head>
 <body class="site-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <header th:replace="~{fragments/layout :: header}"></header>
 
-<main class="ms-container site-main">
+<main id="main" tabindex="-1" class="ms-container site-main">
   <h1 class="page-title">Đơn hàng của tôi</h1>
 
   <th:block th:if="${notice != null}">

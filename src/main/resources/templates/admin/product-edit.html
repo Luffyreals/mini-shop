@@ -1,19 +1,20 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   Form sửa sản phẩm (multipart) + điều chỉnh tồn kho + ẩn/hiện.
   Model: product (ProductEditView: id, name, categoryId, price, description, stock, active, imageUrl),
          form (EditProductForm), categories (List<CategoryOption>); flash tùy chọn: notice, noticeKind.
   POST /admin/products/{id} (multipart). Field: name, categoryId, price, description, image (file). Không có tồn kho, không có active.
   POST /admin/products/{id}/stock. Field: delta.
   POST /admin/products/{id}/hide | /show. Field: from=edit.
--->
+*/-->
 <head th:replace="~{fragments/admin :: head('Sửa sản phẩm | Quản trị Mini Shop')}"></head>
 <body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <div class="admin-shell">
   <aside th:replace="~{fragments/admin :: sidebar('products')}"></aside>
 
-  <main class="admin-main">
+  <main id="main" tabindex="-1" class="admin-main">
     <div class="admin-pagehead">
       <h1 class="admin-title">Sửa sản phẩm</h1>
       <div class="admin-actions">

@@ -195,6 +195,22 @@ a { text-underline-offset: 0.18em; }
   --bs-btn-active-bg: var(--ms-ink);
 }
 
+/* Nút phụ nguy hiểm (admin: "Hủy đơn", "Xóa"): Bootstrap mặc định #dc3545 trên nền thẻ chỉ đạt 3,98:1.
+   Dùng màu cảnh báo của dự án (#b3261e: khoảng 5,7:1 trên nền thẻ #f4f0e6); khi rê chuột đặc lên, chữ trắng 6,5:1. */
+.btn-outline-danger {
+  --bs-btn-color: var(--ms-danger);
+  --bs-btn-border-color: var(--ms-danger);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--ms-danger);
+  --bs-btn-hover-border-color: var(--ms-danger);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #8f1e18;
+  --bs-btn-active-border-color: #8f1e18;
+  --bs-btn-focus-shadow-rgb: 26, 26, 26;
+  --bs-btn-disabled-color: var(--ms-muted);
+  --bs-btn-disabled-border-color: var(--ms-muted);
+}
+
 .btn:active { transform: translateY(1px); }
 
 /* Ô nhập: viền nhìn thấy được (độ tương phản ≥ 3:1 với nền), nền sáng hơn nền trang */
@@ -254,11 +270,50 @@ a { text-underline-offset: 0.18em; }
 .stock-badge--in { background: var(--ms-ink); color: var(--ms-bg); }
 .stock-badge--out { background: var(--ms-field-1); color: var(--ms-field-1-ink); }
 
-/* Focus nhìn thấy được cho mọi thứ bấm được */
+/* Focus nhìn thấy được cho mọi thứ bấm được (AC-007-22, WCAG 2.1 AA: 2.4.7 và 1.4.11).
+   Viền đặc 3px màu mực, cách mép 2px: mực trên nền xương #e6e0d2 đạt khoảng 13:1, trên ô nhập #f4f0e6 cao hơn nữa,
+   vượt xa ngưỡng 3:1 cho thành phần giao diện. Chỉ hiện khi dùng bàn phím (:focus-visible), bấm chuột không hiện. */
 :focus-visible {
   outline: 3px solid var(--ms-ink);
   outline-offset: 2px;
 }
+
+/* Bootstrap đặt outline: 0 cộng bóng mờ 50% cho các thành phần dưới đây (độ tương phản khoảng 3:1, chưa chắc đạt).
+   Các selector này cùng độ ưu tiên và đứng sau Bootstrap, nên thay bóng mờ bằng đúng viền đặc ở trên. */
+.btn:focus-visible,
+.page-link:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.form-check-input:focus-visible {
+  outline: 3px solid var(--ms-ink);
+  outline-offset: 2px;
+  box-shadow: none; /* taste-skill-ignore: tắt bóng focus mờ của Bootstrap, vòng focus là outline ở trên */
+}
+
+/* Link bỏ qua (AC-007-21): con đầu tiên của <body>, nằm ngoài luồng và ngoài màn hình (không dùng display:none
+   để vẫn focus được bằng Tab); hiện ở góc trên bên trái khi được focus. Mực đặc, chữ xương: khoảng 14:1. */
+.skip-link {
+  position: absolute;
+  top: 0.75rem;
+  left: var(--ms-margin);
+  z-index: 2000;
+  padding: 0.75rem 1.25rem;
+  background: var(--ms-ink);
+  color: var(--ms-bg);
+  font-weight: 500;
+  text-decoration: none;
+  transform: translateY(-250%);
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: none;
+  color: var(--ms-bg);
+}
+
+/* Đích của link bỏ qua: tabindex="-1" nhận focus bằng mã, không phải điểm dừng của Tab.
+   Bấm chuột thì không viền; bằng bàn phím thì viền nằm bên trong để không bị cắt ở mép trang. */
+main:focus:not(:focus-visible) { outline: none; }
+main:focus-visible { outline-offset: -3px; }
 
 ::selection { background: var(--ms-field-2); color: var(--ms-field-2-ink); }
 
@@ -489,6 +544,8 @@ a { text-underline-offset: 0.18em; }
   background-image: none;
   padding-right: 0.75rem;
 }
+/* Ô chọn (admin) khi lỗi: cùng màu viền cảnh báo của dự án (Bootstrap mặc định #dc3545 chỉ 3,98:1). Giữ mũi tên của select. */
+.form-select.is-invalid { border-color: var(--ms-danger); }
 .auth-switch { margin: 1.5rem 0 0; }
 .auth-switch a { color: var(--ms-ink); text-underline-offset: 0.25em; }
 

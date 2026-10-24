@@ -48,9 +48,20 @@ class PriceInputTest {
     @ParameterizedTest
     @ValueSource(strings = {"1.25.000", "12.50.000", "1250.000", "1.2500.000", "1.250.00", "1.250.0000", ".250",
             "1.250.", "1..250", "1.250 000", "1 250.000", "1.250 000.000", "1 25 000", "1  250", "1 250  000",
-            "1.250.000,", "1\u00A0250\u00A0000", "1_250_000", "1'250'000"})
+            "1.250.000,", "1.250\u00A0000", "1\u00A0250.000", "01\u00A0250", "1_250_000", "1'250'000"})
     void parse_badGroupingOrMixedSeparators_isEmpty(String raw) {
         assertThat(PriceInput.parse(raw)).isEmpty();
+    }
+
+    /** AC-007-17, BR-007-8: no-break, narrow no-break and figure spaces count as a normal space. */
+    @ParameterizedTest
+    @ValueSource(strings = {"1 250 000", "1 250 000", "1 250 000", " 1250000 ",
+            " 1.250.000 ", "1 250 000"})
+    void parse_specialSpaces_areTreatedAsNormalSpaces(String raw) {
+        BigDecimal price = parsed(raw);
+
+        assertThat(price).isEqualTo(new BigDecimal("1250000"));
+        assertThat(price.scale()).isZero();
     }
 
     @Test

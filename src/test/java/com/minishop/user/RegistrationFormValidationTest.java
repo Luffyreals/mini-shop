@@ -96,7 +96,73 @@ class RegistrationFormValidationTest {
         assertThat(withName("  Nguyễn An  ").fullName()).isEqualTo("Nguyễn An");
     }
 
+    // ---- invisible characters (AC-007-14, AC-007-15, BR-007-6) ----
+
+    /** AC-007-14: a full name made only of invisible characters is "missing", reported once. */
+    @ParameterizedTest
+    @ValueSource(strings = {"​", "‌", "‍", "⁠", "﻿", " ", "​  ﻿"})
+    void fullName_whenOnlyInvisibleCharacters_reportsRequiredMessageOnFullName(String name) {
+        assertThat(errors(withName(name))).containsExactly("fullName: Vui lòng nhập họ và tên.");
+    }
+
+    /** AC-007-15 */
+    @Test
+    void fullName_whenInvisibleCharacterInside_isDroppedAndStillValid() {
+        RegistrationForm form = withName("Nguyễn​ An ");
+
+        assertThat(form.fullName()).isEqualTo("Nguyễn An");
+        assertThat(errors(form)).isEmpty();
+    }
+
+    /** BR-007-6: the 100-character limit counts the cleaned name. */
+    @Test
+    void fullName_lengthIsCountedAfterInvisibleCharactersAreDropped() {
+        assertThat(errors(withName("a​".repeat(100)))).isEmpty();
+    }
+
+    /** BR-007-6: the password is the one text field that is NOT cleaned. */
+    @Test
+    void password_isNotCleaned_invisibleAndSpecialSpacesStayAsTyped() {
+        String password = " Abc12345​  ";
+
+        RegistrationForm form = form("An", "an@example.com", password, password);
+
+        assertThat(form.password()).isEqualTo(password);
+        assertThat(form.confirmPassword()).isEqualTo(password);
+        assertThat(errors(form)).isEmpty();
+    }
+
+    @Test
+    void password_withSurroundingSpaces_keepsThemExactly() {
+        RegistrationForm form = withPassword(" Abc12345 ");
+
+        assertThat(form.password()).isEqualTo(" Abc12345 ");
+        assertThat(errors(form)).isEmpty();
+    }
+
     // ---- email (AC-003-3, AC-003-6) ----
+
+    /** BR-007-6: a trailing no-break space (pasted from a web page) is cleaned, so the email is valid. */
+    @Test
+    void email_withTrailingNoBreakSpace_isCleanedAndValid() {
+        RegistrationForm form = withEmail("an@example.com ");
+
+        assertThat(form.email()).isEqualTo("an@example.com");
+        assertThat(errors(form)).isEmpty();
+    }
+
+    @Test
+    void email_withZeroWidthSpaceInside_isCleanedAndValid() {
+        RegistrationForm form = withEmail("an​@example.com");
+
+        assertThat(form.email()).isEqualTo("an@example.com");
+        assertThat(errors(form)).isEmpty();
+    }
+
+    @Test
+    void email_whenOnlyInvisibleCharacters_reportsRequiredMessageOnly() {
+        assertThat(errors(withEmail("​ "))).containsExactly("email: Vui lòng nhập email.");
+    }
 
     @Test
     void email_whenEmpty_reportsRequiredMessageOnly() {

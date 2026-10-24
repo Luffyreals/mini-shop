@@ -74,12 +74,33 @@ class CheckoutFormValidationTest {
 
     /** AC-005-9 */
     @ParameterizedTest
-    @ValueSource(strings = {"12345", "0abc456789", "09123456789", "1912345678", "+84912345678", "091234567"})
+    @ValueSource(strings = {"12345", "0abc456789", "09123456789", "1912345678", "091234567", "+840912345678",
+            "+1 212 555 0100", "+8491234567"})
     void phone_withInvalidFormat_hasExactlyOnePhoneError(String phone) {
         CheckoutForm form = withPhone(phone);
 
         assertThat(all(form)).hasSize(1);
         assertThat(messages(form, "phone")).containsExactly(PHONE_MSG);
+    }
+
+    /** AC-007-16, BR-007-7: the international forms are accepted, stored as 0xxxxxxxxx, and shown back as typed. */
+    @ParameterizedTest
+    @ValueSource(strings = {"+84912345678", "+84 912 345 678", "+84-912-345-678", "84912345678"})
+    void phone_withInternationalForm_isValidStoredWithLeadingZeroAndKeepsTypedText(String phone) {
+        CheckoutForm form = withPhone(phone);
+
+        assertThat(all(form)).isEmpty();
+        assertThat(form.normalizedPhone()).isEqualTo("0912345678");
+        assertThat(form.phone()).isEqualTo(phone);
+    }
+
+    /** AC-007-16: a no-break space typed inside the number is cleaned before the format check. */
+    @Test
+    void phone_withNoBreakSpaces_isValid() {
+        CheckoutForm form = withPhone("+84 912 345 678");
+
+        assertThat(all(form)).isEmpty();
+        assertThat(form.normalizedPhone()).isEqualTo("0912345678");
     }
 
     /** AC-005-9: only ASCII digits count. */
@@ -197,7 +218,7 @@ class CheckoutFormValidationTest {
 
         assertThat(form.receiverName()).isEqualTo("Anb");
         assertThat(form.phone()).isEqualTo("0912345678");
-        assertThat(form.shippingAddress()).isEqualTo("12 Lê Lợi\nQuận 1\r\n\tTP");
+        assertThat(form.shippingAddress()).isEqualTo("12 Lê Lợi\nQuận 1\n\tTP");
         assertThat(form.note()).isEqualTo("dòng 1\ndòng 2");
     }
 
@@ -205,6 +226,51 @@ class CheckoutFormValidationTest {
     void nameMadeOnlyOfControlCharacters_isRequiredError() {
         assertThat(messages(form("\u0000", "0912345678", "Addr", null), "receiverName"))
                 .containsExactly(NAME_REQUIRED);
+    }
+
+    // ---------- invisible characters (AC-007-14, 15, 19) ----------
+
+    /** AC-007-14: name and address made only of invisible characters give one required error each. */
+    @ParameterizedTest
+    @ValueSource(strings = {"​", "‌", "‍", "⁠", "﻿", " ", "​  ﻿"})
+    void nameAndAddress_whenOnlyInvisibleCharacters_haveOneRequiredErrorEach(String invisible) {
+        CheckoutForm form = form(invisible, "0912345678", invisible, null);
+
+        assertThat(all(form)).hasSize(2);
+        assertThat(messages(form, "receiverName")).containsExactly(NAME_REQUIRED);
+        assertThat(messages(form, "shippingAddress")).containsExactly(ADDRESS_REQUIRED);
+    }
+
+    /** AC-007-14: the optional note made only of invisible characters is "no note". */
+    @ParameterizedTest
+    @ValueSource(strings = {"​", "﻿", " ", "​\n  \t"})
+    void note_whenOnlyInvisibleCharacters_becomesNull(String invisible) {
+        CheckoutForm form = form("An", "0912345678", "Addr", invisible);
+
+        assertThat(form.note()).isNull();
+        assertThat(all(form)).isEmpty();
+    }
+
+    /** AC-007-15 */
+    @Test
+    void invisibleCharactersInTheMiddle_areDropped() {
+        CheckoutForm form = form("Nguyễn​ Văn An", "0912345678", "12 Lê⁠ Lợi\nQuận﻿ 1", "ghi‍chú");
+
+        assertThat(form.receiverName()).isEqualTo("Nguyễn Văn An");
+        assertThat(form.shippingAddress()).isEqualTo("12 Lê Lợi\nQuận 1");
+        assertThat(form.note()).isEqualTo("ghichú");
+    }
+
+    /** BR-007-6: the length limit counts the cleaned text, and a line break counts once. */
+    @Test
+    void shippingAddress_lengthCountsCrLfOnce() {
+        String address = "a".repeat(248) + "\r\n" + "a".repeat(248) + "\r\nb";
+        assertThat(address).hasSize(501);
+
+        CheckoutForm form = form("An", "0912345678", address, null);
+
+        assertThat(form.shippingAddress()).hasSize(499);
+        assertThat(messages(form, "shippingAddress")).isEmpty();
     }
 
     // ---------- helpers on the record ----------

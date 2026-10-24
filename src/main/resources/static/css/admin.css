@@ -292,12 +292,16 @@
 .admin-body .admin-table .admin-num { text-align: right; padding-right: 0.75rem; }
 .admin-body .admin-table .admin-nowrap { white-space: nowrap; }
 .admin-body .admin-table .admin-id { white-space: nowrap; font-weight: 500; }
-.admin-body .admin-table a { color: var(--ms-ink); }
+/* Link trong bảng dùng mực; không áp cho nút (.btn): nếu không, chữ nút "Sửa" khi rê chuột/focus thành mực trên nền mực (tỉ lệ 1:1). */
+.admin-body .admin-table a:not(.btn) { color: var(--ms-ink); }
 .admin-body .admin-person { display: table-cell; min-width: 11rem; }
 .admin-body .admin-person__name { display: block; font-weight: 500; }
 .admin-body .admin-person__meta { display: block; font-size: var(--admin-small); color: var(--ms-muted); }
 .admin-body .order-status { white-space: nowrap; flex: none; }
 .admin-body .admin-table-wrap:focus-visible { outline-offset: -3px; }
+/* Khung cuộn ngang cắt viền focus ở mép trái: chừa 6px ở cột đầu (viền 3px + cách 2px = 5px). Cạnh trên, dưới, phải đã có đệm lớn hơn. */
+.admin-body .admin-table th:first-child,
+.admin-body .admin-table td:first-child { padding-left: 0.375rem; }
 
 /* 8. Form, thanh công cụ, danh sách lọc: nền chung cho các trang danh mục, sản phẩm, đơn (F2 mở rộng) */
 .admin-body .admin-form { max-width: 40rem; }

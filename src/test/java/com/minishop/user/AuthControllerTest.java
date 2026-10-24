@@ -3,12 +3,17 @@ package com.minishop.user;
 import com.minishop.cart.CartHeaderTestConfig;
 import com.minishop.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -56,6 +61,52 @@ class AuthControllerTest {
                 .andExpect(content().string(containsString(">Đăng ký</button>")))
                 .andExpect(content().string(containsString("Ít nhất 8 ký tự, gồm chữ và số.")))
                 .andExpect(content().string(containsString("href=\"/login\">Đã có tài khoản? Đăng nhập</a>")));
+    }
+
+    /** AC-007-18: every text box of the register form carries the server's limit as maxlength. */
+    @ParameterizedTest(name = "{0} has maxlength {1}")
+    @CsvSource({"fullName,100", "email,255", "password,64", "confirmPassword,64"})
+    void registerForm_inputs_carryMaxlengthEqualToServerLimit(String field, String maxlength) throws Exception {
+        String html = mockMvc.perform(get("/register"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Matcher input = Pattern.compile("<input[^>]*\\bname=\"" + field + "\"[^>]*>").matcher(html);
+        assertThat(input.find()).as("input %s in the register form", field).isTrue();
+        assertThat(input.group()).contains("maxlength=\"" + maxlength + "\"");
+    }
+
+    /** AC-007-18: the server still validates when a request skips maxlength (101-character name). */
+    @Test
+    void register_withNameOf101Characters_showsSameErrorAsBefore() throws Exception {
+        String html = mockMvc.perform(post("/register").with(csrf())
+                        .param("fullName", "a".repeat(101))
+                        .param("email", "an@example.vn")
+                        .param("password", "matkhau123")
+                        .param("confirmPassword", "matkhau123"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("user/register"))
+                .andExpect(model().attributeHasFieldErrors("form", "fullName"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("Họ và tên tối đa 100 ký tự.");
+        verify(userService, never()).register(any());
+    }
+
+    /** AC-007-18: a 256-character email is refused by the server even though the browser would stop at 255. */
+    @Test
+    void register_withEmailOf256Characters_showsLengthError() throws Exception {
+        String longEmail = "a".repeat(256 - "@example.vn".length()) + "@example.vn";
+
+        mockMvc.perform(post("/register").with(csrf())
+                        .param("fullName", "Nguyễn Văn An")
+                        .param("email", longEmail)
+                        .param("password", "matkhau123")
+                        .param("confirmPassword", "matkhau123"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeHasFieldErrors("form", "email"));
+
+        verify(userService, never()).register(any());
     }
 
     /** AC-003-8 */

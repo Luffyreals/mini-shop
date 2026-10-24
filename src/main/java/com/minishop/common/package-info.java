@@ -1,4 +1,6 @@
 /**
- * Thành phần dùng chung: exception nghiệp vụ, xử lý lỗi tập trung (trang 403 dùng chung), tiện ích cho tầng web.
+ * Thành phần dùng chung: exception nghiệp vụ, tiện ích cho tầng web, và xử lý lỗi tập trung
+ * ({@code ErrorPage}, {@code ErrorPageResolver}, {@code UnhandledExceptionResolver}, {@code NotFoundPage} +
+ * {@code NotFoundPageAdvice}, {@code AccessDeniedController}). Chỉ phụ thuộc Spring, không phụ thuộc tính năng nào.
  */
 package com.minishop.common;

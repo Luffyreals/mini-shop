@@ -5,6 +5,24 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+GĐ7: hoàn thiện ([spec 007](docs/specs/007-polish.md)).
+
+### Thêm
+- Trang lỗi tiếng Việt đúng mã HTTP: `Không tìm thấy trang` (404), `Yêu cầu không hợp lệ` (400/405), `Phiên làm việc đã hết hạn` (403 do CSRF), `Tệp tải lên quá lớn` (413), `Đã có lỗi xảy ra` (500); lỗi trong `/admin/**` dùng layout quản trị. Không còn trang "Whitelabel Error Page".
+- Favicon (SVG và `favicon.ico`), link `Bỏ qua đến nội dung chính` trên mọi trang, viền focus rõ ràng cho nút và ô nhập.
+- README: badge CI, ảnh chụp, sơ đồ package và sơ đồ bảng (Mermaid), mục "Quyết định thiết kế", "Xử lý sự cố", "Hướng phát triển".
+- ADR-0011: xử lý lỗi tập trung.
+
+### Thay đổi
+- Gom ba advice 404 của `catalog`, `cart`, `order` và ba handler 404 của admin thành một cơ chế chung (`@NotFoundPage` + `NotFoundPageAdvice`); chữ trên các trang 404 riêng không đổi.
+- Mọi ô chữ được làm sạch chung (`FormText`): bỏ ký tự vô hình, đổi dấu cách đặc biệt thành dấu cách thường, đổi `\r\n` thành `\n`; tên chỉ gồm ký tự vô hình bị coi là trống.
+- Số điện thoại nhận thêm dạng `+84…` / `84…` (lưu thành `0…`); ô giá nhận dấu cách không ngắt dòng; form đăng ký và thanh toán có `maxlength` khớp giới hạn của server.
+
+### Bảo mật
+- Trang lỗi và phản hồi JSON không bao giờ chứa stack trace, thông điệp exception hay câu SQL, ở mọi profile (`spring.web.error.*`).
+- Mỗi lỗi 500 ghi đúng một dòng log, không có tham số, nội dung form hay dữ liệu cá nhân; lỗi DB không còn đưa giá trị dòng vào log.
+- Tomcat chỉ đọc bỏ tối đa 50 MB phần thân của request vượt trần upload.
+
 ## [0.6.0] - 2026-10-24
 
 GĐ6: trang quản trị ([spec 006](docs/specs/006-admin.md)).

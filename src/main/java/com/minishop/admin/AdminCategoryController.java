@@ -4,23 +4,18 @@ import com.minishop.catalog.CategoryAdminService;
 import com.minishop.catalog.CategoryDeleteResult;
 import com.minishop.catalog.CategoryNameTakenException;
 import com.minishop.common.NotFoundException;
+import com.minishop.common.NotFoundPage;
 import com.minishop.user.CurrentUser;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -29,10 +24,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * transaction has ended, and becomes an error under the name field. Redirects are built from the parsed id only.
  */
 @Controller
+@NotFoundPage(view = "admin/not-found", title = "Không tìm thấy danh mục", backUrl = "/admin/categories",
+        backLabel = "Quay lại danh sách danh mục", section = "categories")
 @RequestMapping("/admin/categories")
 class AdminCategoryController {
-
-    private static final Logger log = LoggerFactory.getLogger(AdminCategoryController.class);
 
     private static final String SUCCESS = "success";
     private static final String ERROR = "error";
@@ -118,17 +113,6 @@ class AdminCategoryController {
                     + u.productCount() + " sản phẩm (kể cả sản phẩm đã ẩn).");
         }
         return REDIRECT_LIST;
-    }
-
-    @ExceptionHandler({NotFoundException.class, MethodArgumentTypeMismatchException.class})
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    String notFound(Exception e, Model model) {
-        log.debug("Admin category not found: {}", e.getMessage());
-        model.addAttribute("notFoundTitle", "Không tìm thấy danh mục");
-        model.addAttribute("backUrl", "/admin/categories");
-        model.addAttribute("backLabel", "Quay lại danh sách danh mục");
-        model.addAttribute("section", "categories");
-        return "admin/not-found";
     }
 
     private static String newFormView(Model model, CategoryForm form) {

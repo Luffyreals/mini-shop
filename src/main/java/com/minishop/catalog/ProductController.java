@@ -1,5 +1,6 @@
 package com.minishop.catalog;
 
+import com.minishop.common.NotFoundPage;
 import com.minishop.common.PageNav;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -12,6 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Controller
+@NotFoundPage(view = "product/not-found")
 class ProductController {
 
     private final ProductService productService;

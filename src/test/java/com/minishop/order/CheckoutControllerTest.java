@@ -6,7 +6,9 @@ import com.minishop.user.TestUsers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -101,6 +103,16 @@ class CheckoutControllerTest {
                 .param("shippingAddress", "12 Lê Lợi\nQuận 1")
                 .param("note", "Giao giờ hành chính")
                 .param("expectedTotal", expectedTotal);
+    }
+
+    /** Like {@link #validPost} with total 450000 but with the given receiver name and phone (one value each). */
+    private static MockHttpServletRequestBuilder validPostWith(String receiverName, String phone) {
+        return post("/checkout").with(loggedInUser()).with(csrf())
+                .param("receiverName", receiverName)
+                .param("phone", phone)
+                .param("shippingAddress", "12 Lê Lợi\nQuận 1")
+                .param("note", "Giao giờ hành chính")
+                .param("expectedTotal", "450000");
     }
 
     private static String firstGroup(String regex, String html) {
@@ -216,6 +228,16 @@ class CheckoutControllerTest {
         assertThat(field(getCheckout(loggedInUser()), "expectedTotal")).contains("value=\"4500000\"");
     }
 
+    /** AC-007-18: every text box of the checkout form carries the server's limit as maxlength. */
+    @ParameterizedTest(name = "{0} has maxlength {1}")
+    @CsvSource({"receiverName,100", "phone,20", "shippingAddress,500", "note,500"})
+    void show_inputs_carryMaxlengthEqualToServerLimit(String name, String maxlength) throws Exception {
+        when(orderService.prepareCheckout(2L)).thenReturn(standardView());
+        when(orderService.prefilledForm(2L)).thenReturn(CheckoutForm.prefill("Khách hàng mẫu", ""));
+
+        assertThat(field(getCheckout(loggedInUser()), name)).contains("maxlength=\"" + maxlength + "\"");
+    }
+
     // ---------- AC-005-4, 5: giỏ trống / không đặt được ----------
 
     @Test
@@ -261,6 +283,54 @@ class CheckoutControllerTest {
         assertThat(form.getValue().normalizedPhone()).isEqualTo("0912345678");
         assertThat(form.getValue().shippingAddress()).isEqualTo("12 Lê Lợi\nQuận 1");
         assertThat(form.getValue().note()).isEqualTo("Giao giờ hành chính");
+    }
+
+    /** AC-007-16: +84 / 84 forms are accepted and reach the service as the one stored form, 0912345678. */
+    @ParameterizedTest(name = "[{0}] is stored as 0912345678")
+    @ValueSource(strings = {"+84912345678", "+84 912 345 678", "+84-912-345-678", "84912345678"})
+    void place_withInternationalPhone_passesNormalizedZeroPhoneToService(String typed) throws Exception {
+        when(orderService.placeOrder(eq(2L), any(), any())).thenReturn(42L);
+
+        mockMvc.perform(validPostWith("Nguyễn Văn A", typed))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/orders/42"));
+
+        ArgumentCaptor<CheckoutForm> form = ArgumentCaptor.forClass(CheckoutForm.class);
+        verify(orderService).placeOrder(eq(2L), form.capture(), any());
+        assertThat(form.getValue().phone()).isEqualTo(typed);
+        assertThat(form.getValue().normalizedPhone()).isEqualTo("0912345678");
+    }
+
+    /** AC-007-16: wrong country code, a 0 after 84, or a missing digit keep the old phone error. */
+    @ParameterizedTest(name = "[{0}] is rejected")
+    @ValueSource(strings = {"+840912345678", "+1 212 555 0100", "+8491234567"})
+    void place_withInvalidInternationalPhone_showsPhoneErrorAndKeepsTypedText(String typed) throws Exception {
+        when(orderService.prepareCheckout(2L)).thenReturn(standardView());
+
+        String html = mockMvc.perform(validPostWith("Nguyễn Văn A", typed))
+                .andExpect(status().isOk())
+                .andExpect(view().name("order/checkout"))
+                .andExpect(model().attributeHasFieldErrors("form", "phone"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains(PHONE_ERROR);
+        assertThat(field(html, "phone")).contains("value=\"" + typed + "\"");
+        verify(orderService, never()).placeOrder(anyLong(), any(), any());
+    }
+
+    /** AC-007-16: when the page is shown again for another error, the +84 text is what the customer typed. */
+    @Test
+    void place_withPlus84PhoneAndAnotherFieldInvalid_keepsPlus84TextAsTyped() throws Exception {
+        when(orderService.prepareCheckout(2L)).thenReturn(standardView());
+
+        String html = mockMvc.perform(validPostWith("", "+84 912 345 678"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeHasFieldErrors("form", "receiverName"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(field(html, "phone")).contains("value=\"+84 912 345 678\"");
+        assertThat(html).doesNotContain(PHONE_ERROR);
+        verify(orderService, never()).placeOrder(anyLong(), any(), any());
     }
 
     @Test

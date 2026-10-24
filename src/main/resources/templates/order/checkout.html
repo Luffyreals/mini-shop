@@ -2,9 +2,10 @@
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('Thanh toán | Mini Shop')}"></head>
 <body class="site-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <header th:replace="~{fragments/layout :: header}"></header>
 
-<main class="ms-container site-main">
+<main id="main" tabindex="-1" class="ms-container site-main">
   <h1 class="page-title">Thanh toán</h1>
 
   <th:block th:if="${notice != null}">
@@ -13,7 +14,7 @@
 
   <div class="row g-4 g-lg-5">
     <div class="col-12 col-lg-5 order-2 order-lg-1">
-      <!-- expectedTotal chỉ để so sánh giá ở server, không bao giờ được lưu (BR-005-5). -->
+      <!--/* expectedTotal chỉ để so sánh giá ở server, không bao giờ được lưu (BR-005-5). */-->
       <form class="checkout-form" method="post" th:action="@{/checkout}" th:object="${form}" novalidate>
         <div class="auth-field">
           <label class="form-label" for="receiverName">Họ tên người nhận</label>
@@ -26,7 +27,7 @@
 
         <div class="auth-field">
           <label class="form-label" for="phone">Số điện thoại</label>
-          <input class="form-control" type="tel" th:field="*{phone}" autocomplete="tel" inputmode="tel"
+          <input class="form-control" type="tel" th:field="*{phone}" autocomplete="tel" inputmode="tel" maxlength="20"
                  th:classappend="${#fields.hasErrors('phone')} ? 'is-invalid'"
                  th:aria-invalid="${#fields.hasErrors('phone')} ? 'true'"
                  th:aria-describedby="${#fields.hasErrors('phone')} ? 'phone-error'">

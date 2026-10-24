@@ -1,5 +1,6 @@
 package com.minishop.user;
 
+import com.minishop.common.FormText;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -7,8 +8,9 @@ import jakarta.validation.constraints.Size;
 
 /**
  * Registration input. It deliberately has no {@code role} or {@code id} component, so request
- * parameters cannot set them (AC-003-7). Names and email are stripped before validation; passwords
- * are never stripped because whitespace is part of a password.
+ * parameters cannot set them (AC-003-7). Name and email are cleaned by {@link FormText} before validation
+ * (invisible characters, control characters, special spaces, NFC, strip; BR-007-6); passwords never go through
+ * it because whitespace is part of a password.
  */
 @PasswordsMatch
 record RegistrationForm(
@@ -28,8 +30,8 @@ record RegistrationForm(
         String confirmPassword) {
 
     RegistrationForm {
-        fullName = fullName == null ? null : fullName.strip();
-        email = email == null ? null : email.strip();
+        fullName = FormText.clean(fullName, false);
+        email = FormText.clean(email, false);
     }
 
     static RegistrationForm empty() {

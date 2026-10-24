@@ -14,7 +14,11 @@ import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.ElementType.RECORD_COMPONENT;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-/** A Vietnamese phone number: 10 ASCII digits starting with 0, after removing spaces, dots and hyphens. */
+/**
+ * A Vietnamese phone number, after removing spaces, dots and hyphens: 10 ASCII digits starting with 0, or
+ * {@code +84}/{@code 84} followed by 9 digits whose first digit is not 0 (stored as {@code 0} plus those 9 digits).
+ * Foreign numbers are rejected.
+ */
 @Documented
 @Constraint(validatedBy = PhoneNumberValidator.class)
 @Target({FIELD, METHOD, PARAMETER, RECORD_COMPONENT, ANNOTATION_TYPE})

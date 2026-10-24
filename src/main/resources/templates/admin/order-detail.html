@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   Chi tiết một đơn hàng cho admin.
   Model: order (AdminOrderDetail: id, createdAt, updatedAt, statusLabel, statusKey, paymentMethodLabel, customerName, customerEmail,
          receiverName, phone, shippingAddress, note, lines[productName, unitPrice, quantity, lineTotal], totalAmount,
@@ -8,13 +8,14 @@
   Nút trạng thái chỉ lặp danh sách order.actions (backend quyết định bước nào được phép).
   POST /admin/orders/{id}/status. Field: status (= action.targetStatus).
   Tiêu đề tab nối chuỗi trong biểu thức (ký tự pipe trong chữ sẽ kết thúc literal substitution).
--->
+*/-->
 <head th:replace="~{fragments/admin :: head(${'Đơn hàng #' + order.id + ' | Quản trị Mini Shop'})}"></head>
 <body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <div class="admin-shell">
   <aside th:replace="~{fragments/admin :: sidebar('orders')}"></aside>
 
-  <main class="admin-main">
+  <main id="main" tabindex="-1" class="admin-main">
     <div class="admin-pagehead">
       <h1 class="admin-title" th:text="|Đơn hàng #${order.id}|">Đơn hàng #1</h1>
       <div class="admin-actions">

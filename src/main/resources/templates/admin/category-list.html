@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   Danh sách danh mục. Model: categories (List<CategoryRow>: id, name, description, productCount); flash tùy chọn: notice, noticeKind.
   POST /admin/categories/{id}/delete không có field. Hộp xác nhận qua data-confirm (static/js/confirm.js).
--->
+*/-->
 <head th:replace="~{fragments/admin :: head('Danh mục | Quản trị Mini Shop')}"></head>
 <body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <div class="admin-shell">
   <aside th:replace="~{fragments/admin :: sidebar('categories')}"></aside>
 
-  <main class="admin-main">
+  <main id="main" tabindex="-1" class="admin-main">
     <div class="admin-pagehead">
       <h1 class="admin-title">Danh mục</h1>
       <a class="btn btn-primary" th:href="@{/admin/categories/new}">Thêm danh mục</a>

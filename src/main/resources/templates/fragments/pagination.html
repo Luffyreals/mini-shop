@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--
+<!--/*
   nav là PageNav. Link do controller dựng (giữ q, category, sort); template không tự ghép URL.
   Trang hiện tại và "trước/sau" không có đích thì là span, không có href.
--->
+*/-->
 <nav th:fragment="pagination(nav)" aria-label="Phân trang" th:if="${nav.totalPages > 1}">
   <ul class="pagination flex-wrap mb-0">
     <li class="page-item" th:classappend="${nav.previousUrl == null} ? 'disabled'">

@@ -2,14 +2,15 @@
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('Sản phẩm | Mini Shop')}"></head>
 <body class="site-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <header th:replace="~{fragments/layout :: header}"></header>
 
-<main class="ms-container site-main">
+<main id="main" tabindex="-1" class="ms-container site-main">
   <h1 class="page-title page-title--masthead">Sản phẩm</h1>
 
   <th:block th:if="${param.logout != null}"><div th:replace="~{fragments/notice :: notice('info', 'Bạn đã đăng xuất.')}"></div></th:block>
 
-  <!-- Form GET: không gửi page, nên đổi bộ lọc thì về trang 1; không cần CSRF -->
+  <!--/* Form GET: không gửi page, nên đổi bộ lọc thì về trang 1; không cần CSRF */-->
   <form class="filter-panel" method="get" th:action="@{/products}">
     <div class="row g-3 align-items-end">
       <div class="col-12 col-md-6 col-lg-4">

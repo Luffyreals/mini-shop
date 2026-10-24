@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   Danh sách đơn hàng của mọi khách.
   Model: orders (AdminOrderPage: orders[id, createdAt, customerName, customerEmail, receiverName, totalAmount, statusLabel, statusKey],
          status (null = Tất cả), statusLabel, filters[value, label, selected], page, totalPages, totalElements, empty),
          pageNav (common.PageNav, link do controller dựng, giữ status).
   Bộ lọc là các link GET (?status=...), không có form.
--->
+*/-->
 <head th:replace="~{fragments/admin :: head('Đơn hàng | Quản trị Mini Shop')}"></head>
 <body class="admin-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
 <div class="admin-shell">
   <aside th:replace="~{fragments/admin :: sidebar('orders')}"></aside>
 
-  <main class="admin-main">
+  <main id="main" tabindex="-1" class="admin-main">
     <div class="admin-pagehead">
       <h1 class="admin-title">Đơn hàng</h1>
     </div>

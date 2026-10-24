@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<!--/*
+  Trang lỗi chung của cửa hàng (404, 400/405, 403 phiên hết hạn, 500...). Controller/resolver trả đúng mã HTTP.
+  Model: errorTitle (tiêu đề tab), errorHeading, errorMessage, backUrl, backLabel. Không in thuộc tính nào khác
+  (không status, error, path, message): chữ nằm trong common.ErrorPage, template chỉ in lại.
+  Bố cục dùng lại khung của product/not-found.html; ảnh giữ chỗ chỉ để trang trí (alt rỗng).
+*/-->
+<head th:replace="~{fragments/layout :: head(${errorTitle})}"></head>
+<body class="site-body">
+<a th:replace="~{fragments/layout :: skipLink}"></a>
+<header th:replace="~{fragments/layout :: header}"></header>
+
+<main id="main" tabindex="-1" class="ms-container site-main">
+  <div class="row g-4 g-lg-5 align-items-center">
+    <div class="col-12 col-md-7">
+      <h1 class="page-title" th:text="${errorHeading}">Không tìm thấy trang</h1>
+      <p class="lead-text" th:text="${errorMessage}">Trang bạn tìm không tồn tại hoặc đã bị di chuyển.</p>
+      <a class="btn btn-primary" th:href="@{${backUrl}}" th:text="${backLabel}">Về trang chủ</a>
+    </div>
+    <div class="col-12 col-md-5 col-lg-4 offset-lg-1">
+      <div class="product-tile tile-field-2">
+        <img class="product-tile__img" width="800" height="1000" alt="" th:src="@{/images/placeholder-product.svg}">
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
