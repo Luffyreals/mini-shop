@@ -33,9 +33,13 @@ data/
 # Thư mục ảnh upload của phiên bản cũ (trước khi chuyển vào data/)
 uploads/
 
-# Công cụ AI dùng trong lúc phát triển (Claude Code: agents, skills, hướng dẫn); app chạy không cần
+# Công cụ AI dùng trong lúc phát triển (Claude Code: agents, skills, hướng dẫn) và tài liệu quy trình của nó
+# (brief, đặc tả, kế hoạch từng giai đoạn; bản đến v0.8.0 xem ở tag v0.8.0). App chạy không cần.
 .claude/
 CLAUDE.md
+docs/specs/
+docs/plans/
+docs/project-brief.md
 
 # Biến môi trường / secret
 .env

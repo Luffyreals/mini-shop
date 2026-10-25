@@ -10,7 +10,7 @@ Brief §9 dự định GĐ8 đóng gói Docker image, deploy lên một PaaS mi�
 - Postgres miễn phí của Render tự xóa sau 30 ngày;
 - ổ đĩa của PaaS bị xóa mỗi lần khởi động lại, nên ảnh upload sẽ mất.
 
-Người dùng quyết định ([spec 008](../specs/008-deploy.md)): đây là dự án học tập, chỉ cần app truy cập được từ internet **trong lúc chủ repo đang chạy nó trên máy mình**, và muốn chạy được với PostgreSQL cài trên Windows, không cần Docker.
+Người dùng quyết định ([spec 008](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/008-deploy.md)): đây là dự án học tập, chỉ cần app truy cập được từ internet **trong lúc chủ repo đang chạy nó trên máy mình**, và muốn chạy được với PostgreSQL cài trên Windows, không cần Docker.
 
 Mở một app ra internet, dù chỉ tạm thời, phải xử lý các rủi ro đã ghi từ trước:
 - `CLAUDE.md`: seed tạo `admin@minishop.local` với mật khẩu dev đã biết;

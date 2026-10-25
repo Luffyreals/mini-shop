@@ -11,7 +11,7 @@ Tới GĐ6, lỗi được xử lý rời rạc:
 - CSRF token hết hạn dùng chung trang 403 "Bạn không có quyền truy cập trang này.", làm khách hiểu nhầm;
 - tệp lớn hơn trần upload 10 MB làm Tomcat đóng kết nối (ADR-0010, "giới hạn đã biết").
 
-[Spec 007](../specs/007-polish.md) đòi trang tiếng Việt đúng mã HTTP cho mọi lỗi, không lộ chi tiết (BR-007-2), giữ nguyên các trang 404 riêng (BR-007-3), phân biệt hai nghĩa của 403 (BR-007-4), và log mỗi lỗi 500 đúng một lần, không có dữ liệu cá nhân (BR-007-5). Brief §10 ghi "`@ControllerAdvice` ghi log lỗi 500".
+[Spec 007](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/007-polish.md) đòi trang tiếng Việt đúng mã HTTP cho mọi lỗi, không lộ chi tiết (BR-007-2), giữ nguyên các trang 404 riêng (BR-007-3), phân biệt hai nghĩa của 403 (BR-007-4), và log mỗi lỗi 500 đúng một lần, không có dữ liệu cá nhân (BR-007-5). Brief §10 ghi "`@ControllerAdvice` ghi log lỗi 500".
 
 ## Quyết định
 
