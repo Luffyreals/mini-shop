@@ -1,0 +1,21 @@
+# PostgreSQL cài trên máy này, không dùng Docker (xem ADR-0012 và README, mục "Chạy với PostgreSQL cài trên máy (không Docker)").
+# Bắt buộc đặt DB_URL (jdbc:postgresql://...), DB_USERNAME, DB_PASSWORD; thiếu thì app không khởi động.
+#
+# Git Bash:
+#   export DB_URL='jdbc:postgresql://localhost:5432/minishop' DB_USERNAME='minishop' DB_PASSWORD='...'
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+# PowerShell:
+#   $env:DB_URL='jdbc:postgresql://localhost:5432/minishop'; $env:DB_USERNAME='minishop'; $env:DB_PASSWORD='...'
+#   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
+#
+# Kết hợp được với public: -Dspring-boot.run.profiles=local,public. Không kết hợp với h2.
+spring:
+  docker:
+    compose:
+      # Không bao giờ âm thầm bật container khi đã chọn PostgreSQL cài sẵn, xem ADR-0012
+      enabled: false
+  datasource:
+    # Không có giá trị mặc định: thiếu biến thì Boot sẽ tự dùng H2 nhúng, nên StartupRequirements chặn trước, xem ADR-0012
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}

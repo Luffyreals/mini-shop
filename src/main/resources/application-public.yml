@@ -1,0 +1,45 @@
+# Chế độ công khai: chia sẻ app đang chạy trên máy này qua tunnel (xem ADR-0012 và README, mục "Chia sẻ app đang chạy trên máy").
+# Bắt buộc đặt SEED_ADMIN_PASSWORD và SEED_USER_PASSWORD (>= 12 ký tự, khác mật khẩu dev); thiếu thì app không khởi động.
+#
+# Git Bash:
+#   export SEED_ADMIN_PASSWORD='...' SEED_USER_PASSWORD='...'
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=public        # PostgreSQL bằng Docker
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local,public  # PostgreSQL cài trên máy
+# PowerShell:
+#   $env:SEED_ADMIN_PASSWORD='...'; $env:SEED_USER_PASSWORD='...'
+#   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=public"
+#
+# Không kết hợp với profile h2 (StartupRequirements từ chối khi khởi động).
+server:
+  # Tomcat chỉ nghe trên loopback: cloudflared và trình duyệt trên máy vẫn vào được, máy khác trong cùng mạng thì không, xem ADR-0012
+  address: 127.0.0.1
+  servlet:
+    session:
+      # Tắt app là mọi phiên mất; DevTools mặc định ghi phiên ra đĩa, xem ADR-0012
+      persistent: false
+      cookie:
+        # Cookie phiên chỉ đi qua HTTPS; đặt tường minh để người gõ http:// qua tunnel không làm lộ cookie, xem ADR-0012
+        secure: true
+spring:
+  devtools:
+    livereload:
+      # Không mở cổng 35729 khi đang ra internet, xem ADR-0012
+      enabled: false
+    restart:
+      # Không tự khởi động lại giữa lúc có người dùng thử, xem ADR-0012
+      enabled: false
+  h2:
+    console:
+      # Nhắc lại cho chắc: H2 console không bao giờ ra internet, xem ADR-0012
+      enabled: false
+management:
+  endpoint:
+    health:
+      # Người ngoài không cần thấy chi tiết thành phần của /actuator/health, xem ADR-0012
+      show-details: never
+      show-components: never
+app:
+  seed:
+    # Không có giá trị mặc định: StartupRequirements đã kiểm trước khi tạo bean, nên giá trị được bind đúng là giá trị đã kiểm (BR-008-1), xem ADR-0012
+    admin-password: ${SEED_ADMIN_PASSWORD}
+    user-password: ${SEED_USER_PASSWORD}

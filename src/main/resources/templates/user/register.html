@@ -8,6 +8,7 @@
 <main id="main" tabindex="-1" class="ms-container site-main">
   <div class="auth-panel">
     <h1 class="page-title">Đăng ký</h1>
+    <p th:replace="~{fragments/layout :: demoNotice}"></p>
 
     <!--/* Hai ô mật khẩu cố ý không dùng th:field/th:value: không bao giờ điền lại mật khẩu (BR-003-4). */-->
     <form method="post" th:action="@{/register}" th:object="${form}" novalidate>

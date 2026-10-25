@@ -3,8 +3,11 @@ package com.minishop.user;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
-/** The single definition of the password rule; returns the first violation only. */
-final class PasswordPolicy {
+/**
+ * The single definition of the password rule; returns the first violation only.
+ * Public so that {@code config.StartupRequirements} can apply the same rule to the demo passwords.
+ */
+public final class PasswordPolicy {
 
     private static final int MIN_LENGTH = 8;
     private static final int MAX_LENGTH = 64;
@@ -12,6 +15,11 @@ final class PasswordPolicy {
     private static final int MAX_BYTES = 72;
 
     private PasswordPolicy() {
+    }
+
+    /** True when the password satisfies every rule. */
+    public static boolean isValid(String password) {
+        return violation(password).isEmpty();
     }
 
     static Optional<String> violation(String password) {

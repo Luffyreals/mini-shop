@@ -7,6 +7,7 @@
 
 <main id="main" tabindex="-1" class="ms-container site-main">
   <h1 class="page-title">Thanh toán</h1>
+  <p th:replace="~{fragments/layout :: demoNotice}"></p>
 
   <th:block th:if="${notice != null}">
     <div th:replace="~{fragments/notice :: notice(${noticeKind}, ${notice})}"></div>

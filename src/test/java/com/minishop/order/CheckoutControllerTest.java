@@ -584,6 +584,61 @@ class CheckoutControllerTest {
         verify(orderService, never()).prepareCheckout(anyLong());
     }
 
+    // ---------- AC-008-19: dòng nhắc bản demo ----------
+
+    private static final String DEMO_NOTICE = "Đây là bản demo: vui lòng không nhập thông tin cá nhân thật.";
+
+    private static int occurrences(String html, String text) {
+        int count = 0;
+        for (int at = html.indexOf(text); at >= 0; at = html.indexOf(text, at + text.length())) {
+            count++;
+        }
+        return count;
+    }
+
+    @Test
+    void show_showsTheDemoNoticeExactlyOnceUnderTheHeading() throws Exception {
+        when(orderService.prepareCheckout(2L)).thenReturn(standardView());
+        when(orderService.prefilledForm(2L)).thenReturn(CheckoutForm.prefill("Khách hàng mẫu", "0987654321"));
+
+        String html = getCheckout(loggedInUser());
+
+        assertThat(occurrences(html, DEMO_NOTICE)).isEqualTo(1);
+        assertThat(html).contains("<p class=\"demo-notice\">" + DEMO_NOTICE + "</p>");
+        assertThat(html.indexOf("<h1")).isLessThan(html.indexOf(DEMO_NOTICE));
+        assertThat(html.indexOf(DEMO_NOTICE)).isLessThan(html.indexOf("<form class=\"checkout-form\""));
+    }
+
+    @Test
+    void place_whenFormInvalid_stillShowsTheDemoNoticeExactlyOnce() throws Exception {
+        when(orderService.prepareCheckout(2L)).thenReturn(standardView());
+
+        String html = mockMvc.perform(post("/checkout").with(loggedInUser()).with(csrf())
+                        .param("receiverName", "").param("phone", "abc").param("shippingAddress", "")
+                        .param("expectedTotal", "450000"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("order/checkout"))
+                .andExpect(model().hasErrors())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(occurrences(html, DEMO_NOTICE)).isEqualTo(1);
+        verify(orderService, never()).placeOrder(anyLong(), any(), any());
+    }
+
+    @Test
+    void place_whenPriceChanged_stillShowsTheDemoNoticeExactlyOnce() throws Exception {
+        CheckoutView fresh = checkoutOf("460000", lineView("Áo thun", "105000", 2), lineView("Quần jean", "250000", 1));
+        when(orderService.placeOrder(anyLong(), any(), any())).thenThrow(new PlaceOrderException.PriceChanged(fresh));
+
+        String html = mockMvc.perform(validPost("450000"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("order/checkout"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains(MSG_PRICE_CHANGED);
+        assertThat(occurrences(html, DEMO_NOTICE)).isEqualTo(1);
+    }
+
     // ---------- AC-005-33: escape ----------
 
     @Test

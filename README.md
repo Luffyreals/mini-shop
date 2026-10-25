@@ -177,6 +177,8 @@ Mở http://localhost:8080. PostgreSQL được Spring Boot tự bật từ `com
 | Việc cần làm | Lệnh |
 |---|---|
 | Chạy khi **không có Docker** (H2 trong bộ nhớ, có `/h2-console`) | `./mvnw spring-boot:run -Dspring-boot.run.profiles=h2` |
+| Chạy với **PostgreSQL cài trên máy**, không Docker | xem mục [Chạy với PostgreSQL cài trên máy (không Docker)](#chạy-với-postgresql-cài-trên-máy-không-docker) |
+| Mở app đang chạy ra internet cho người khác thử | xem mục [Chia sẻ app đang chạy trên máy](#chia-sẻ-app-đang-chạy-trên-máy) |
 | Build và chạy toàn bộ test | `./mvnw verify` |
 | Chạy một lớp test | `./mvnw test -Dtest=ProductControllerTest` |
 | Kiểm tra không có test nào bị bỏ qua (CI cũng chạy bước này) | `bash .github/scripts/check-no-skipped-tests.sh` |
@@ -213,6 +215,75 @@ Dữ liệu mẫu gồm 5 danh mục và 22 sản phẩm, trong đó có 1 sản
 
 Ảnh sản phẩm là ảnh minh họa có giấy phép mở (CC0, public domain, CC BY, CC BY-SA), **không phải ảnh của sản phẩm thật**. Danh sách đầy đủ (tác giả, giấy phép, link gốc) nằm ở trang `/credits.html` của ứng dụng, có link "Nguồn ảnh" ở footer mọi trang. Font **Bricolage Grotesque** dùng giấy phép SIL OFL 1.1 (`static/fonts/OFL.txt`). Muốn thêm hoặc đổi ảnh, cập nhật cả `static/credits.html`.
 
+## Chạy với PostgreSQL cài trên máy (không Docker)
+
+Dùng khi không muốn bật Docker Desktop. Dữ liệu nằm trong PostgreSQL trên máy bạn và còn nguyên sau khi tắt app.
+
+1. **Cài PostgreSQL 17** (cùng bản với `compose.yaml` và test): `winget install -e --id PostgreSQL.PostgreSQL.17`, hoặc bộ cài của EDB. Bản 18 cũng dùng được (schema chỉ dùng SQL cơ bản). Giữ `pg_hba.conf` chỉ cho phép `127.0.0.1/32` và `::1/128`, để DB không mở ra mạng.
+2. **Tạo user và DB** bằng `psql` (bộ cài không thêm `psql` vào `PATH`, nên gọi bằng đường dẫn đầy đủ; đổi `17` thành bản bạn cài):
+
+   ```powershell
+   & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -c "CREATE USER minishop WITH PASSWORD 'doi-mat-khau-nay';" -c "CREATE DATABASE minishop OWNER minishop;"
+   ```
+3. **Đặt biến môi trường và chạy** với profile `local`:
+
+   Git Bash:
+   ```bash
+   export DB_URL=jdbc:postgresql://localhost:5432/minishop DB_USERNAME=minishop DB_PASSWORD='doi-mat-khau-nay'
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+   ```
+
+   PowerShell:
+   ```powershell
+   $env:DB_URL = "jdbc:postgresql://localhost:5432/minishop"; $env:DB_USERNAME = "minishop"; $env:DB_PASSWORD = "doi-mat-khau-nay"
+   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
+   ```
+
+Thiếu một biến, hoặc `DB_URL` không bắt đầu bằng `jdbc:postgresql:`, thì app dừng ngay và báo tên biến. Lần chạy đầu Flyway tạo bảng và dữ liệu mẫu được tạo như khi dùng Docker. Không có Docker thì các test Testcontainers bị bỏ qua khi chạy `./mvnw verify`; CI trên GitHub vẫn chạy đủ.
+
+## Chia sẻ app đang chạy trên máy
+
+Dùng khi muốn gửi link cho người khác (mentor, nhà tuyển dụng) thử app **trong lúc app đang chạy trên máy bạn**. Link là một địa chỉ HTTPS của [Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/): không cần tài khoản, không mở cổng router, không tốn tiền. Lý do chọn cách này: [ADR-0012](docs/adr/0012-share-from-personal-machine-public-mode.md).
+
+> **Đọc trước khi bật:**
+> - Ai có link đều vào được, nên chỉ gửi cho người bạn tin. Dữ liệu họ nhập (tài khoản, đơn hàng) nằm trong DB trên máy bạn.
+> - Máy phải bật và app phải chạy; tắt app hoặc tunnel là link ngừng hoạt động. Link đổi sau mỗi lần chạy tunnel.
+> - Chế độ công khai **đặt lại mật khẩu** của `admin@minishop.local` và `user@minishop.local` theo hai biến bên dưới. Sau đó, kể cả khi chạy lại chế độ dev, hai tài khoản này dùng mật khẩu mới (không còn `Admin@123`, `User@123`).
+> - Cloudflare ghi rõ Quick Tunnel dành cho thử nghiệm, không cam kết luôn chạy.
+
+1. **Cài `cloudflared`** (một lần): `winget install --id Cloudflare.cloudflared`.
+2. **Đặt hai mật khẩu demo**: mỗi mật khẩu dài ít nhất 12 ký tự, có cả chữ và số, khác mật khẩu dev, và **hai mật khẩu phải khác nhau** (mật khẩu `USER` sẽ gửi cho người khác, mật khẩu `ADMIN` giữ riêng). Thiếu hoặc không đạt thì app dừng ngay và báo tên biến.
+3. **Chạy app ở chế độ công khai** (profile `public`, dùng DB Docker như dev; dùng `local,public` nếu chạy PostgreSQL cài trên máy như mục trên):
+
+   Git Bash:
+   ```bash
+   export SEED_ADMIN_PASSWORD='Doi-mat-khau-admin-1' SEED_USER_PASSWORD='Doi-mat-khau-user-2'
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=public
+   ```
+
+   PowerShell:
+   ```powershell
+   $env:SEED_ADMIN_PASSWORD = "Doi-mat-khau-admin-1"; $env:SEED_USER_PASSWORD = "Doi-mat-khau-user-2"
+   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=public"
+   ```
+4. **Mở tunnel** ở một cửa sổ terminal khác:
+
+   ```bash
+   cloudflared tunnel --url http://127.0.0.1:8080
+   ```
+
+   Sau vài giây, `cloudflared` in ra một dòng có địa chỉ dạng `https://<chuỗi-ngẫu-nhiên>.trycloudflare.com`. Gửi địa chỉ đó (luôn là `https://`) cùng tài khoản `user@minishop.local` và mật khẩu `SEED_USER_PASSWORD`. Không gửi tài khoản admin; muốn cho người khác xem trang quản trị thì chia sẻ màn hình hoặc dùng [ảnh chụp](#ảnh-chụp).
+5. **Dừng**: `Ctrl+C` ở cửa sổ tunnel, rồi `Ctrl+C` ở cửa sổ app.
+
+Ở chế độ công khai:
+- app chỉ nhận kết nối từ chính máy (`127.0.0.1`), nên máy khác trong cùng Wi-Fi không mở được `http://<IP-máy>:8080`; mọi người, kể cả bạn trên điện thoại, dùng link tunnel. Trên máy bạn vẫn mở được http://localhost:8080;
+- không có H2 console, DevTools không tự khởi động lại app;
+- cookie phiên chỉ gửi qua HTTPS.
+
+Ở mọi chế độ, đăng nhập sai 5 lần với cùng một email (hoặc 20 lần từ cùng một địa chỉ IP) trong 15 phút thì bị chặn đăng nhập 15 phút, kể cả khi gõ đúng mật khẩu. Tắt app là bộ đếm về 0. Vì giới hạn tính theo email, người có link có thể cố ý gõ sai để khóa tạm `admin@minishop.local`; khi đó bạn đợi hết 15 phút hoặc khởi động lại app.
+
+**Xóa dữ liệu người khác đã nhập**: dừng app rồi xóa DB và để seed tạo lại (`docker compose down -v` với DB Docker; với PostgreSQL cài trên máy thì xóa rồi tạo lại database `minishop`).
+
 ## Xử lý sự cố
 
 | Triệu chứng | Cách xử lý |
@@ -223,6 +294,8 @@ Dữ liệu mẫu gồm 5 danh mục và 22 sản phẩm, trong đó có 1 sản
 | `./mvnw verify` báo nhiều test bị bỏ qua (`Skipped`) | Các test Testcontainers chỉ chạy khi Docker đang bật. Bật Docker Desktop rồi chạy lại; kiểm bằng `bash .github/scripts/check-no-skipped-tests.sh`. |
 | Trên Windows PowerShell lệnh `./mvnw` không chạy, hoặc tham số `-D…` bị hiểu sai | Dùng `.\mvnw.cmd` và đặt tham số `-D` trong nháy kép: `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=h2"`. Git Bash dùng `./mvnw` như bình thường. |
 | Ảnh upload nằm ở đâu, muốn đổi thư mục | Mặc định `uploads/` ở thư mục gốc (không commit). Đổi bằng biến môi trường `UPLOAD_DIR`: Git Bash `UPLOAD_DIR=/tmp/minishop-uploads ./mvnw spring-boot:run`; PowerShell `$env:UPLOAD_DIR = "C:\minishop-uploads"; .\mvnw.cmd spring-boot:run`. |
+| App dừng ngay khi chạy với profile `public` hoặc `local`, log có `APPLICATION FAILED TO START` và tên một biến môi trường | Đọc phần `Description` và `Action` trong log: thiếu biến (`SEED_ADMIN_PASSWORD`, `SEED_USER_PASSWORD`, `DB_URL`…), mật khẩu demo yếu, trùng mật khẩu dev hoặc hai mật khẩu giống nhau, hoặc `DB_URL` không bắt đầu bằng `jdbc:postgresql:`. Sửa biến rồi chạy lại. Lưu ý: lệnh `./mvnw spring-boot:run` vẫn kết thúc với mã 0 dù app dừng vì lỗi khởi động. |
+| Đăng nhập báo "Bạn đã đăng nhập sai quá nhiều lần" | Email đó (hoặc địa chỉ IP) đã sai 5 lần (20 lần với IP) trong 15 phút. Đợi hết 15 phút, hoặc khởi động lại app để xóa bộ đếm. |
 
 ## Cấu trúc repo
 
@@ -255,14 +328,14 @@ mini-shop/
 - [x] GĐ5: Đặt hàng và lịch sử đơn (`v0.5.0`)
 - [x] GĐ6: Trang quản trị (`v0.6.0`)
 - [x] GĐ7: Hoàn thiện: validation, xử lý lỗi, giao diện, tài liệu (`v0.7.0`)
-- [ ] GĐ8: Deploy online *(tùy chọn)*
+- [ ] GĐ8: Chia sẻ app đang chạy trên máy cá nhân qua tunnel *(tùy chọn)*
 
 ## Hướng phát triển
 
 Ngoài phạm vi MVP, có thể làm sau:
 - Quên mật khẩu (cần gửi email)
 - Tìm đơn theo email, số điện thoại, mã đơn trong trang quản trị; lọc sản phẩm quản trị theo danh mục
-- Deploy online (GĐ8): Docker image, PostgreSQL được quản lý, lưu ảnh trên dịch vụ đám mây, giới hạn số lần đăng nhập sai
+- Deploy lên một PaaS để chạy 24/7 (GĐ8 chọn chia sẻ từ máy cá nhân thay vì việc này, xem [ADR-0012](docs/adr/0012-share-from-personal-machine-public-mode.md)): cần Docker image; PaaS miễn phí cho app ngủ khi không có truy cập và xóa ổ đĩa mỗi lần khởi động lại, nên phải lưu ảnh ở nơi khác (đổi bản cài đặt `StorageService`); Postgres miễn phí của Render tự xóa sau 30 ngày, nên dùng dịch vụ như Neon (tra cứu ngày 2026-10-25)
 
 ## Đóng góp
 

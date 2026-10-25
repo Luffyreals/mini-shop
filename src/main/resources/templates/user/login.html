@@ -11,6 +11,7 @@
 
     <th:block th:if="${registered != null}"><div th:replace="~{fragments/notice :: notice('success', 'Đăng ký thành công. Vui lòng đăng nhập.')}"></div></th:block>
     <th:block th:if="${param.error != null}"><div th:replace="~{fragments/notice :: notice('error', 'Email hoặc mật khẩu không đúng.')}"></div></th:block>
+    <th:block th:if="${param.blocked != null}"><div th:replace="~{fragments/notice :: notice('error', 'Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.')}"></div></th:block>
 
     <form method="post" th:action="@{/login}" novalidate>
       <div class="auth-field">

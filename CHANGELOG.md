@@ -5,6 +5,25 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+GĐ8: chia sẻ app đang chạy trên máy cá nhân lên internet ([spec 008](docs/specs/008-deploy.md)).
+
+### Thêm
+- Chế độ công khai (profile `public`): mở app ra internet qua Cloudflare Quick Tunnel (`cloudflared tunnel --url http://127.0.0.1:8080`), README có hướng dẫn và cảnh báo.
+- Profile `local`: chạy với PostgreSQL cài trên máy, không cần Docker (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`).
+- Dòng nhắc `Đây là bản demo: vui lòng không nhập thông tin cá nhân thật.` trên form đăng ký và trang thanh toán.
+- ADR-0012: chia sẻ từ máy cá nhân thay vì deploy PaaS.
+
+### Thay đổi
+- Brief §9, §11: GĐ8 là chia sẻ từ máy cá nhân qua tunnel; deploy PaaS chuyển sang "Hướng phát triển".
+- H2 console chỉ còn ở profile `h2` (DevTools trước đây bật nó ở mọi profile).
+
+### Bảo mật
+- Chế độ công khai không khởi động nếu thiếu mật khẩu demo, mật khẩu yếu, trùng mật khẩu dev hoặc hai mật khẩu trùng nhau; mật khẩu hai tài khoản demo được đặt lại theo biến môi trường trước khi app nhận request.
+- Giới hạn đăng nhập sai ở mọi chế độ: 5 lần/email và 20 lần/IP trong 15 phút, bị chặn thì không kiểm mật khẩu.
+- Chỉ tin header `X-Forwarded-*` từ chính máy (tunnel chạy local); cookie phiên `SameSite=Lax`, thêm `Secure` ở chế độ công khai; ở chế độ công khai app chỉ nghe trên `127.0.0.1`.
+- `lock_timeout` 5 giây cho mọi câu khóa dòng và câu trừ/cộng kho.
+- Cổng PostgreSQL của `compose.yaml` chỉ mở trên `127.0.0.1`.
+
 ## [0.7.0] - 2026-10-25
 
 GĐ7: hoàn thiện ([spec 007](docs/specs/007-polish.md)).

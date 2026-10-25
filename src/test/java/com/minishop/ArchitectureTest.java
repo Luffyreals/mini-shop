@@ -13,7 +13,9 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.persistence.Entity;
+import jakarta.servlet.Filter;
 import org.springframework.data.repository.Repository;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -169,6 +171,20 @@ class ArchitectureTest {
     static final ArchRule controllers_doNotCatchGenericExceptions = codeUnits()
             .that().areDeclaredInClassesThat().areMetaAnnotatedWith(Controller.class)
             .should(notCatchGenericExceptions());
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // GĐ8, ADR-0012 và plan QĐ4: cổng đăng nhập sai nằm trong chuỗi filter của Spring Security.
+
+    /**
+     * QĐ4: một {@code jakarta.servlet.Filter} là bean Spring thì Boot đăng ký nó thêm một lần nữa như servlet filter
+     * thường, chạy ngoài Spring Security (ở đây: {@code LoginThrottleFilter} sẽ chạy trước cả CsrfFilter và chạy hai
+     * lần). Filter phải được tạo bằng {@code new} trong {@code SecurityConfig}. Dùng "meta-annotated" để bắt luôn
+     * {@code @Service}, {@code @Configuration}... (đều mang {@code @Component}).
+     */
+    @ArchTest
+    static final ArchRule servletFilters_areNotSpringComponents = noClasses()
+            .that().areAssignableTo(Filter.class)
+            .should().beMetaAnnotatedWith(Component.class);
 
     private static final Set<String> GENERIC_EXCEPTIONS = Set.of(
             Exception.class.getName(), RuntimeException.class.getName(), Throwable.class.getName());
