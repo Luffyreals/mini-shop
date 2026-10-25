@@ -14,16 +14,20 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - README viết lại cho người mới clone: chạy thử, gợi ý dạo một vòng, phần giao diện (UI/UX), dữ liệu lưu ở đâu.
 - Chia sẻ qua Cloudflare Tunnel chuyển sang "sau MVP": hướng dẫn tạm ở `docs/deploy-cloudflare.md`, code profile `public` giữ nguyên.
 - `.claude/` và `CLAUDE.md` (công cụ AI lúc phát triển) không còn nằm trong git.
+- README rút gọn; kiến trúc, sơ đồ bảng, bảng ADR và cấu trúc repo chuyển sang `docs/architecture.md`; quy ước đóng góp gộp vào README.
+- Link tới đặc tả giai đoạn trong ADR và CHANGELOG trỏ tới tag `v0.8.0`.
 
 ### Bỏ
 - PostgreSQL, Docker Compose (`compose.yaml`), Testcontainers, profile `local` và `h2`.
+- Tài liệu quy trình theo giai đoạn (`docs/project-brief.md`, `docs/specs/`, `docs/plans/`), vẫn xem được ở tag `v0.8.0`.
+- `CONTRIBUTING.md`, template issue và PR, Dependabot.
 
 ### Bảo mật
 - Lỗi database ghi vào log 500 chỉ còn tên lớp và stack frame, không còn message: H2 đưa nguyên dòng dữ liệu (email, hash mật khẩu) vào thông báo lỗi. Tắt thêm logger `org.hibernate.orm.jdbc.error`.
 
 ## [0.8.0] - 2026-10-25
 
-GĐ8: chia sẻ app đang chạy trên máy cá nhân lên internet ([spec 008](docs/specs/008-deploy.md)).
+GĐ8: chia sẻ app đang chạy trên máy cá nhân lên internet ([spec 008](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/008-deploy.md)).
 
 ### Thêm
 - Chế độ công khai (profile `public`): mở app ra internet qua Cloudflare Quick Tunnel (`cloudflared tunnel --url http://127.0.0.1:8080`), README có hướng dẫn và cảnh báo.
@@ -44,7 +48,7 @@ GĐ8: chia sẻ app đang chạy trên máy cá nhân lên internet ([spec 008](
 
 ## [0.7.0] - 2026-10-25
 
-GĐ7: hoàn thiện ([spec 007](docs/specs/007-polish.md)).
+GĐ7: hoàn thiện ([spec 007](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/007-polish.md)).
 
 ### Thêm
 - Trang lỗi tiếng Việt đúng mã HTTP: `Không tìm thấy trang` (404), `Yêu cầu không hợp lệ` (400/405), `Phiên làm việc đã hết hạn` (403 do CSRF), `Tệp tải lên quá lớn` (413), `Đã có lỗi xảy ra` (500); lỗi trong `/admin/**` dùng layout quản trị. Không còn trang "Whitelabel Error Page".
@@ -64,7 +68,7 @@ GĐ7: hoàn thiện ([spec 007](docs/specs/007-polish.md)).
 
 ## [0.6.0] - 2026-10-24
 
-GĐ6: trang quản trị ([spec 006](docs/specs/006-admin.md)).
+GĐ6: trang quản trị ([spec 006](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/006-admin.md)).
 
 ### Thêm
 - Layout quản trị riêng có sidebar (`Tổng quan`, `Đơn hàng`, `Sản phẩm`, `Danh mục`, `Về cửa hàng`) cho mọi trang `/admin/**`; trang 404 trong layout quản trị.
@@ -87,7 +91,7 @@ GĐ6: trang quản trị ([spec 006](docs/specs/006-admin.md)).
 
 ## [0.5.0] - 2026-10-24
 
-GĐ5: đặt hàng (COD), lịch sử đơn và tự hủy đơn ([spec 005](docs/specs/005-checkout-and-orders.md)).
+GĐ5: đặt hàng (COD), lịch sử đơn và tự hủy đơn ([spec 005](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/005-checkout-and-orders.md)).
 
 ### Thêm
 - Nút "Đặt hàng" ở trang giỏ (chỉ khi mọi dòng đều đặt được) và trang thanh toán `/checkout`: thông tin nhận hàng (điền sẵn họ tên, số điện thoại của tài khoản), tóm tắt đơn, thanh toán khi nhận hàng (COD). Khách chưa đăng nhập được đưa qua bước đăng nhập rồi quay lại thanh toán với giỏ đã gộp.
@@ -103,7 +107,7 @@ GĐ5: đặt hàng (COD), lịch sử đơn và tự hủy đơn ([spec 005](doc
 
 ## [0.4.0] - 2026-10-24
 
-GĐ4: giỏ hàng ([spec 004](docs/specs/004-shopping-cart.md)).
+GĐ4: giỏ hàng ([spec 004](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/004-shopping-cart.md)).
 
 ### Thêm
 - Nút "Thêm vào giỏ" kèm ô số lượng ở trang chi tiết sản phẩm (chỉ khi còn hàng).
@@ -119,7 +123,7 @@ GĐ4: giỏ hàng ([spec 004](docs/specs/004-shopping-cart.md)).
 
 ## [0.3.0] - 2026-10-24
 
-GĐ3: đăng ký, đăng nhập và phân quyền ([spec 003](docs/specs/003-authentication.md)).
+GĐ3: đăng ký, đăng nhập và phân quyền ([spec 003](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/003-authentication.md)).
 
 ### Thêm
 - Trang đăng ký `/register`: họ tên, email, mật khẩu (8–64 ký tự, có chữ và số, tối đa 72 byte), nhập lại mật khẩu; tài khoản mới luôn là `USER`; báo lỗi theo từng ô, không điền lại mật khẩu.
@@ -138,7 +142,7 @@ GĐ3: đăng ký, đăng nhập và phân quyền ([spec 003](docs/specs/003-aut
 
 ## [0.2.0] - 2026-10-23
 
-GĐ2: danh sách và chi tiết sản phẩm ([spec 002](docs/specs/002-product-catalog.md)).
+GĐ2: danh sách và chi tiết sản phẩm ([spec 002](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/002-product-catalog.md)).
 
 ### Thêm
 - Trang danh sách sản phẩm (`/`, `/products`): tìm theo tên (không phân biệt hoa thường), lọc theo danh mục, sắp xếp mới nhất / giá tăng / giá giảm, phân trang 12 sản phẩm; tham số sai tự quay về mặc định.
@@ -154,7 +158,7 @@ GĐ2: danh sách và chi tiết sản phẩm ([spec 002](docs/specs/002-product-
 
 ## [0.1.0] - 2026-10-23
 
-GĐ1: nền móng dự án ([spec 001](docs/specs/001-project-foundation.md)).
+GĐ1: nền móng dự án ([spec 001](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/001-project-foundation.md)).
 
 ### Thêm
 - Quy trình đặc tả: `docs/specs/` (template, spec 001) và skill `/write-spec`.
