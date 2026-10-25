@@ -69,7 +69,7 @@ App dùng **H2**, một database viết bằng Java chạy bên trong app, lưu 
 | Việc cần làm | Cách làm |
 |---|---|
 | Làm lại dữ liệu mẫu từ đầu | Dừng app, xóa thư mục `data/`, chạy lại |
-| Đặt dữ liệu ở thư mục khác | Biến môi trường `DATA_DIR`, ví dụ `DATA_DIR=/d/minishop-data ./mvnw spring-boot:run` |
+| Đặt dữ liệu ở thư mục khác | Biến môi trường `DATA_DIR`, đường dẫn tương đối hoặc tuyệt đối, ví dụ `DATA_DIR=data2 ./mvnw spring-boot:run` hoặc `DATA_DIR=/d/minishop-data …` |
 | Xem bảng trực tiếp | http://localhost:8080/h2-console, JDBC URL `jdbc:h2:file:./data/minishop;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH`, user `sa`, mật khẩu trống (chỉ mở được từ máy chạy app) |
 | Chạy ở cổng khác | `./mvnw spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"` |
 | Build và chạy toàn bộ test | `./mvnw verify` (test dùng H2 trong bộ nhớ, không đụng `data/`) |

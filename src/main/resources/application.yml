@@ -29,7 +29,7 @@ spring:
   datasource:
     # H2 nhúng, lưu ra file data/minishop.mv.db (tương đối với thư mục chạy app, đã nằm trong .gitignore); tắt app mở lại vẫn còn dữ liệu.
     # Chế độ tương thích PostgreSQL để V1/V2 và các truy vấn chạy y như trước, xem ADR-0013
-    url: jdbc:h2:file:${DATA_DIR:./data}/minishop;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    url: jdbc:h2:file:${app.data-dir}/minishop;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     username: sa
     password: ''
     hikari:
@@ -76,6 +76,9 @@ management:
         enabled: false
 
 app:
+  # Thư mục dữ liệu (database H2 và ảnh upload). Đường dẫn tương đối như data2 được DataDirectory đổi thành ./data2
+  # vì H2 không nhận đường dẫn tương đối ngầm, xem ADR-0013
+  data-dir: ${DATA_DIR:./data}
   seed:
     # Mật khẩu demo chỉ dùng cho dev (BR-001-2); môi trường thật phải đặt biến môi trường
     admin-password: ${SEED_ADMIN_PASSWORD:Admin@123}
@@ -83,4 +86,4 @@ app:
   storage:
     local:
       # Cạnh file database trong data/ (đã nằm trong .gitignore): xóa một thư mục là làm lại từ đầu, xem ADR-0013
-      upload-dir: ${UPLOAD_DIR:${DATA_DIR:./data}/uploads}
+      upload-dir: ${UPLOAD_DIR:${app.data-dir}/uploads}

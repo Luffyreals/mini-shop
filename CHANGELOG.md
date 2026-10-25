@@ -22,6 +22,10 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - Tài liệu quy trình theo giai đoạn (`docs/project-brief.md`, `docs/specs/`, `docs/plans/`), vẫn xem được ở tag `v0.8.0`.
 - `CONTRIBUTING.md`, template issue và PR, Dependabot.
 
+### Sửa
+- `DATA_DIR` là đường dẫn tương đối không có `./` (ví dụ `data2`, `target/x`) làm app không khởi động vì H2 từ chối đường dẫn tương đối ngầm; `config.DataDirectory` tự thêm `./`.
+- Test chống session fixation chạy trên Tomcat thật (`SessionFixationTest`) thay cho bản MockMvc phụ thuộc thứ tự chạy test.
+
 ### Bảo mật
 - Lỗi database ghi vào log 500 chỉ còn tên lớp và stack frame, không còn message: H2 đưa nguyên dòng dữ liệu (email, hash mật khẩu) vào thông báo lỗi. Tắt thêm logger `org.hibernate.orm.jdbc.error`.
 
