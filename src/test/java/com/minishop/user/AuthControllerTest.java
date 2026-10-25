@@ -11,6 +11,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -248,6 +249,102 @@ class AuthControllerTest {
         mockMvc.perform(get("/register").with(user(TestUsers.user())))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"));
+    }
+
+    // ---------- GĐ8: dòng nhắc bản demo và thông báo bị chặn (AC-008-7, 19) ----------
+
+    private static final String DEMO_NOTICE = "Đây là bản demo: vui lòng không nhập thông tin cá nhân thật.";
+    private static final String BLOCKED_NOTICE = "Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.";
+    private static final String WRONG_NOTICE = "Email hoặc mật khẩu không đúng.";
+
+    private static int occurrences(String html, String text) {
+        int count = 0;
+        for (int at = html.indexOf(text); at >= 0; at = html.indexOf(text, at + text.length())) {
+            count++;
+        }
+        return count;
+    }
+
+    private String page(MockHttpServletRequestBuilder request)
+            throws Exception {
+        return mockMvc.perform(request).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    }
+
+    /** AC-008-19 */
+    @Test
+    void registerForm_showsTheDemoNoticeExactlyOnce() throws Exception {
+        String html = page(get("/register"));
+
+        assertThat(occurrences(html, DEMO_NOTICE)).isEqualTo(1);
+        assertThat(html).contains("<p class=\"demo-notice\">" + DEMO_NOTICE + "</p>");
+        // right under the heading, before the form
+        assertThat(html.indexOf("<h1")).isLessThan(html.indexOf(DEMO_NOTICE));
+        assertThat(html.indexOf(DEMO_NOTICE)).isLessThan(html.indexOf("<form method=\"post\" action=\"/register\""));
+    }
+
+    /** AC-008-19: the notice stays when the form is shown again with errors. */
+    @Test
+    void register_withInvalidForm_stillShowsTheDemoNoticeExactlyOnce() throws Exception {
+        String html = mockMvc.perform(post("/register").with(csrf())
+                        .param("fullName", "").param("email", "khong-hop-le").param("password", "1")
+                        .param("confirmPassword", "2"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("user/register"))
+                .andExpect(model().hasErrors())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(occurrences(html, DEMO_NOTICE)).isEqualTo(1);
+    }
+
+    /** AC-008-19: also on the other way the form is shown again (a taken email). */
+    @Test
+    void register_whenEmailAlreadyRegistered_stillShowsTheDemoNoticeExactlyOnce() throws Exception {
+        when(userService.register(any())).thenThrow(new EmailAlreadyRegisteredException());
+
+        String html = mockMvc.perform(post("/register").with(csrf())
+                        .param("fullName", "Nguyễn Văn An").param("email", "an@example.vn")
+                        .param("password", "matkhau123").param("confirmPassword", "matkhau123"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("user/register"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("Email này đã được đăng ký.");
+        assertThat(occurrences(html, DEMO_NOTICE)).isEqualTo(1);
+    }
+
+    /** AC-008-19: the notice belongs to the register form and checkout only, never to the login page. */
+    @Test
+    void loginPages_neverShowTheDemoNotice() throws Exception {
+        assertThat(page(get("/login"))).doesNotContain(DEMO_NOTICE).doesNotContain("demo-notice");
+        assertThat(page(get("/login?error"))).doesNotContain(DEMO_NOTICE);
+        assertThat(page(get("/login?blocked"))).doesNotContain(DEMO_NOTICE);
+    }
+
+    /** AC-008-7 */
+    @Test
+    void loginPage_withBlocked_showsTheBlockedNoticeAsAnAlertAndNotTheWrongPasswordOne() throws Exception {
+        String html = page(get("/login?blocked"));
+
+        assertThat(occurrences(html, BLOCKED_NOTICE)).isEqualTo(1);
+        assertThat(html).doesNotContain(WRONG_NOTICE).doesNotContain("Đăng ký thành công");
+        assertThat(Pattern.compile("<div[^>]*role=\"alert\"[^>]*>\\s*" + Pattern.quote(BLOCKED_NOTICE) + "\\s*</div>")
+                .matcher(html).find()).as("an error notice with role=alert").isTrue();
+    }
+
+    /** AC-008-7: the typed email survives the blocked redirect, like it does after a wrong password. */
+    @Test
+    void loginPage_withBlockedAndFlashEmail_keepsTheTypedEmail() throws Exception {
+        String html = page(get("/login?blocked").flashAttr("email", "a@b.vn"));
+
+        assertThat(html).contains(BLOCKED_NOTICE).contains("value=\"a@b.vn\"");
+    }
+
+    /** AC-008-7: the two notices never show together, and the plain error page has no blocked text. */
+    @Test
+    void loginPage_withError_doesNotShowTheBlockedNotice() throws Exception {
+        String html = page(get("/login?error"));
+
+        assertThat(html).contains(WRONG_NOTICE).doesNotContain(BLOCKED_NOTICE);
     }
 
     /** AC-003-17 */

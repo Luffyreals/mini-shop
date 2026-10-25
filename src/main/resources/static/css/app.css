@@ -538,6 +538,8 @@ main:focus-visible { outline-offset: -3px; }
 .auth-field { margin-bottom: 1.25rem; }
 .field-hint { margin: 0.35rem 0 0; font-size: var(--ms-step-small); color: var(--ms-muted); }
 .field-error { margin: 0.35rem 0 0; font-size: var(--ms-step-small); font-weight: 500; color: var(--ms-danger); }
+/* Dòng nhắc "bản demo" dưới h1 của đăng ký và thanh toán: chú thích tĩnh, chữ mờ, xuống dòng được ở màn hẹp */
+.demo-notice { margin: -0.5rem 0 1.25rem; max-width: 36rem; font-size: var(--ms-step-small); color: var(--ms-muted); }
 .form-control.is-invalid {
   border-color: var(--ms-danger);
   border-width: 2px;

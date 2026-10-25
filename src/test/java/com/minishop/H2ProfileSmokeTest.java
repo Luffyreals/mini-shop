@@ -122,6 +122,25 @@ class H2ProfileSmokeTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    /**
+     * AC-008-6, 13 (ADR-0012): the H2 profile replaces the PostgreSQL {@code SET lock_timeout} with H2's own syntax
+     * ({@code SET LOCK_TIMEOUT 5000}, milliseconds). If it were wrong, Hikari could not create a single connection and
+     * the context would not start; this pins the value too. H2's {@code LOCK_TIMEOUT()} function reports the setting of
+     * the current session, and the pool runs the init SQL on every physical connection.
+     */
+    @Test
+    void connections_haveFiveSecondLockTimeoutOnH2() {
+        assertThat(jdbc.queryForObject("select lock_timeout()", Integer.class)).isEqualTo(5000);
+    }
+
+    /** AC-008-5, 6: only the h2 profile turns the H2 console on (application.yml turns it off for every other profile). */
+    @Test
+    void h2ConsoleProperty_isEnabledInH2Profile() {
+        assertThat(context.getEnvironment().getProperty("spring.h2.console.enabled", Boolean.class)).isTrue();
+        assertThat(context.getEnvironment().getProperty("spring.datasource.hikari.connection-init-sql"))
+                .isEqualTo("SET LOCK_TIMEOUT 5000");
+    }
+
     @Test
     void loginPage_isPublicOnH2() throws Exception {
         mockMvc.perform(get("/login")).andExpect(status().isOk());

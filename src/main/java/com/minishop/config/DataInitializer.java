@@ -4,6 +4,7 @@ import com.minishop.catalog.Category;
 import com.minishop.catalog.CategoryRepository;
 import com.minishop.catalog.Product;
 import com.minishop.catalog.ProductRepository;
+import com.minishop.user.DemoAccountService;
 import com.minishop.user.Role;
 import com.minishop.user.User;
 import com.minishop.user.UserRepository;
@@ -55,9 +56,9 @@ class DataInitializer implements ApplicationRunner {
             log.info("Seed skipped for users: table is not empty");
             return;
         }
-        users.save(new User("admin@minishop.local", passwordEncoder.encode(seed.adminPassword()),
+        users.save(new User(DemoAccountService.ADMIN_EMAIL, passwordEncoder.encode(seed.adminPassword()),
                 "Quản trị viên", Role.ADMIN));
-        users.save(new User("user@minishop.local", passwordEncoder.encode(seed.userPassword()),
+        users.save(new User(DemoAccountService.USER_EMAIL, passwordEncoder.encode(seed.userPassword()),
                 "Khách hàng mẫu", Role.USER));
         log.info("Seeded {} users", 2);
     }

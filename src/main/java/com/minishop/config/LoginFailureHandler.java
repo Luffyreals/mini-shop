@@ -11,7 +11,7 @@ import org.springframework.web.servlet.FlashMapManager;
 import java.io.IOException;
 
 /**
- * Redirects to {@code /login?error} and carries the typed email to the next GET /login as a flash attribute,
+ * Redirects to {@code /login?error} (or {@code /login?blocked} for a {@link LoginBlockedException}) and carries the typed email to the next GET /login as a flash attribute,
  * so the user does not retype it. Runs inside the security filter chain (outside Spring MVC), hence the direct
  * {@link FlashMapManager} call. It never reads the password and never exposes the exception message,
  * so the page cannot reveal whether an email exists (BR-003-5).
@@ -19,6 +19,7 @@ import java.io.IOException;
 final class LoginFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
     private static final int MAX_EMAIL_LENGTH = 255;
+    private static final String BLOCKED_URL = "/login?blocked";
 
     private final FlashMapManager flashMapManager;
 
@@ -43,6 +44,12 @@ final class LoginFailureHandler extends SimpleUrlAuthenticationFailureHandler {
                 flashMap.setTargetRequestPath("/login");
                 flashMapManager.saveOutputFlashMap(flashMap, request, response);
             }
+        }
+        if (exception instanceof LoginBlockedException) {
+            // The throttle refused the attempt before the password was checked: no exception is stored in the
+            // session, and the page differs from /login?error only by this query parameter.
+            getRedirectStrategy().sendRedirect(request, response, BLOCKED_URL);
+            return;
         }
         super.onAuthenticationFailure(request, response, exception);
     }

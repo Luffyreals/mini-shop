@@ -34,3 +34,4 @@ brief (phạm vi) ─▶ spec (cái gì, điều kiện "xong") ─▶ plan (tas
 | [005 Đặt hàng, lịch sử đơn và tự hủy đơn](005-checkout-and-orders.md) | GĐ5 | Hoàn thành |
 | [006 Trang quản trị](006-admin.md) | GĐ6 | Hoàn thành |
 | [007 Hoàn thiện](007-polish.md) | GĐ7 | Hoàn thành |
+| [008 Chia sẻ app từ máy cá nhân](008-deploy.md) | GĐ8 | Đang làm |

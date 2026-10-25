@@ -15,11 +15,14 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.context.annotation.Import;
+import com.minishop.user.LoginThrottle;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -169,7 +172,7 @@ class SecurityConfigTest {
      * ({@code /login?error} sau khi đăng nhập sai, AC-003-11).
      */
     @ParameterizedTest
-    @ValueSource(strings = {"/login", "/login?error", "/login?foo", "/register", "/access-denied"})
+    @ValueSource(strings = {"/login", "/login?error", "/login?blocked", "/login?foo", "/register", "/access-denied"})
     void authPages_getIsNotRedirectedForAnonymous(String path) throws Exception {
         MvcResult result = mockMvc.perform(get(path)).andReturn();
 
@@ -197,6 +200,88 @@ class SecurityConfigTest {
     void loginPost_withoutCsrf_isForbidden() throws Exception {
         mockMvc.perform(post("/login").param("email", "a@b.vn").param("password", "x"))
                 .andExpect(status().isForbidden());
+    }
+
+    // ------------------------------------------------------------------ GĐ8: cổng giới hạn đăng nhập sai (AC-008-5, 7)
+
+    private static RequestPostProcessor fromAddress(String ip) {
+        return req -> {
+            req.setRemoteAddr(ip);
+            return req;
+        };
+    }
+
+    private static AbstractMockHttpServletRequestBuilder<?> loginPost(String email, String ip) {
+        return post("/login").with(csrf()).with(fromAddress(ip)).param("email", email).param("password", "Wrong-pass-1");
+    }
+
+    private static String uniqueEmail() {
+        return "throttle-" + UUID.randomUUID() + "@minishop.test";
+    }
+
+    /** AC-008-7: the "blocked" page is for guests, with its real query string, like /login?error. */
+    @Test
+    void loginBlockedPage_forAGuest_isNotRedirectedAndNotForbidden() throws Exception {
+        MvcResult result = mockMvc.perform(get("/login?blocked")).andReturn();
+
+        assertThat(result.getResponse().getRedirectedUrl()).isNull();
+        assertThat(result.getResponse().getStatus()).isNotEqualTo(403);
+    }
+
+    /** AC-008-7: the gate sits behind CsrfFilter, so a request without a token is rejected first and counts nothing. */
+    @Test
+    void loginPost_withoutCsrf_isForbiddenAndIsNeverCountedByTheGate() throws Exception {
+        String email = uniqueEmail();
+        for (int i = 0; i < 12; i++) {
+            mockMvc.perform(post("/login").with(fromAddress("198.51.100.1")).param("email", email)
+                            .param("password", "Wrong-pass-1"))
+                    .andExpect(status().isForbidden());
+        }
+
+        // had those 12 been counted, the email (limit 5) would be blocked already and the first of these would be refused
+        for (int i = 1; i <= 5; i++) {
+            mockMvc.perform(loginPost(email, "198.51.100.1"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/login?error"));
+        }
+    }
+
+    /** AC-008-7: refused with the exact redirect of the handler, whatever the password. */
+    @Test
+    void loginPost_afterFiveAttemptsForOneEmail_isRedirectedToTheBlockedPage() throws Exception {
+        String email = uniqueEmail();
+        for (int i = 1; i <= 5; i++) {
+            mockMvc.perform(loginPost(email, "198.51.100." + (10 + i)))
+                    .andExpect(redirectedUrl("/login?error"));
+        }
+
+        mockMvc.perform(loginPost(email, "198.51.100.30"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?blocked"))
+                .andExpect(header().string("Content-Security-Policy", containsString("default-src 'self'")));
+    }
+
+    /** AC-008-8: the 21st attempt from one address is refused, whichever email it carries. */
+    @Test
+    void loginPost_afterTwentyAttemptsFromOneAddress_isRedirectedToTheBlockedPage() throws Exception {
+        for (int i = 1; i <= 20; i++) {
+            mockMvc.perform(loginPost(uniqueEmail(), "198.51.100.40"))
+                    .andExpect(redirectedUrl("/login?error"));
+        }
+
+        mockMvc.perform(loginPost(uniqueEmail(), "198.51.100.40"))
+                .andExpect(redirectedUrl("/login?blocked"));
+        mockMvc.perform(loginPost(uniqueEmail(), "198.51.100.41"))
+                .andExpect(redirectedUrl("/login?error"));
+    }
+
+    /** AC-008-7, 10: one counter bean, and the filter is created by SecurityConfig, not a bean (QĐ4). */
+    @Test
+    void context_hasExactlyOneLoginThrottleBeanAndNoLoginThrottleFilterBean() {
+        assertThat(context.getBeansOfType(LoginThrottle.class)).hasSize(1);
+        assertThat(context.getBeansOfType(LoginThrottleFilter.class)).isEmpty();
+        assertThat(context.getBeansOfType(jakarta.servlet.Filter.class).values())
+                .noneMatch(filter -> filter instanceof LoginThrottleFilter);
     }
 
     /** AC-003-18 */

@@ -21,14 +21,36 @@ spring:
       include-exception: false
       # Boot 4.1 mặc định là always và phản chiếu lại đường dẫn người dùng gửi lên trong thân JSON; tắt hẳn (BR-007-2), xem ADR-0011
       include-path: never
+  h2:
+    console:
+      # DevTools bật H2 console ở mọi profile (kể cả khi dùng PostgreSQL); tắt ở đây, chỉ profile h2 bật lại, xem ADR-0012
+      enabled: false
   datasource:
     hikari:
+      # Mọi câu chờ khóa dòng chỉ chờ tối đa 5 giây rồi rollback và hiện trang 500 (thay vì treo vô hạn); profile h2 ghi đè bằng cú pháp H2, xem ADR-0012
+      connection-init-sql: "SET lock_timeout = '5s'"
       data-source-properties:
         # pgjdbc không đưa "Detail: Key (...)=(...)" vào thông điệp lỗi, vì phần đó có thể chứa dữ liệu cá nhân; tên ràng buộc vẫn còn nên ConstraintViolations chạy, xem ADR-0011
         logServerErrorDetail: false
 
 server:
+  # Dùng RemoteIpValve của Tomcat (chỉ tin proxy trong internal-proxies) thay vì ForwardedHeaderFilter (tin mọi kết nối); để chuyển hướng dùng https và IP thật qua tunnel, xem ADR-0012
+  forward-headers-strategy: native
+  servlet:
+    session:
+      cookie:
+        # Ghi tường minh cho mọi profile (trình duyệt vốn mặc định Lax); Secure chỉ đặt ở profile public để HTTP thường trong dev/test vẫn giữ được cookie, xem ADR-0012
+        same-site: lax
   tomcat:
+    remoteip:
+      # Chỉ tin header X-Forwarded-* khi kết nối đến từ chính máy này (cloudflared chạy trên máy); mặc định của Boot còn tin cả dải LAN, xem ADR-0012
+      internal-proxies: "127.0.0.0/8, ::1/128"
+      # Boot không có giá trị mặc định cho hai header này; không đặt thì RemoteIpValve không đọc IP và giao thức thật, xem ADR-0012
+      remote-ip-header: X-Forwarded-For
+      protocol-header: X-Forwarded-Proto
+      # Boot mặc định còn đọc X-Forwarded-Host và X-Forwarded-Port; cloudflared đã chuyển đúng Host, còn hai header này do client tự gửi được. Rỗng = Tomcat không đọc (header tên rỗng không tồn tại), xem ADR-0012
+      host-header: ""
+      port-header: ""
     # Đọc bỏ phần thân tới 50 MB (mặc định 2 MB thì Tomcat đóng kết nối) để trả được trang 413 thay vì "connection reset"; trên 50 MB vẫn ngắt, xem ADR-0011
     max-swallow-size: 50MB
 
@@ -42,6 +64,11 @@ management:
     web:
       exposure:
         include: health
+  endpoint:
+    health:
+      probes:
+        # Không có /actuator/health/liveness và /readiness; /actuator/health chỉ trả {"status":"UP"} xem ADR-0012
+        enabled: false
 
 app:
   seed:

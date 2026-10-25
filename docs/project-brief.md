@@ -17,7 +17,7 @@
 | Giao diện | Thymeleaf + Bootstrap 5 | **Giữ nguyên** | Xem mục 6.2. |
 | Kiến trúc | Phân lớp, chia package theo tính năng hoặc theo lớp | **Modular monolith**: chia package theo tính năng, mỗi tính năng có các lớp controller → service → repository | Xem mục 6.1. |
 | Test | Unit test cho service | Unit test (Mockito) **+ test tích hợp với PostgreSQL thật (Testcontainers)** | Câu SQL trừ kho phải được test trên đúng DB sẽ chạy thật. |
-| CI / Deploy | Không đề cập | **GitHub Actions CI từ GĐ1**; Docker image và deploy ở GĐ8 (tùy chọn) | CI chạy ngay từ commit code đầu tiên để `main` luôn xanh. Link demo trực tuyến tăng giá trị portfolio. |
+| CI / Deploy | Không đề cập | **GitHub Actions CI từ GĐ1**; GĐ8 (tùy chọn): chia sẻ app đang chạy trên máy cá nhân qua tunnel HTTPS (đổi từ deploy PaaS theo quyết định của người dùng 2026-10-25, ADR-0012) | CI chạy ngay từ commit code đầu tiên để `main` luôn xanh. Link demo trực tuyến tăng giá trị portfolio. |
 | Khách tự hủy đơn | Không có | **Có, chỉ khi đơn đang PENDING** | Tính năng tối thiểu của mọi trang bán hàng; dùng lại logic hoàn kho của admin nên tốn rất ít code. |
 
 ---
@@ -136,17 +136,17 @@ Nếu sau này cần thể hiện kỹ năng REST, có thể thêm `/api/product
 
 | Câu hỏi | Trả lời |
 |---|---|
-| **Chạy ở đâu?** | **Local:** `mvnw spring-boot:run` (Docker tự bật Postgres) tại `http://localhost:8080`. **Online (GĐ8, tùy chọn):** đóng gói Docker image, chạy trên một PaaS có gói miễn phí hoặc giá rẻ, dùng Postgres được quản lý và dịch vụ lưu ảnh đám mây. Chọn nhà cung cấp cụ thể vào lúc làm GĐ8, vì giá và gói miễn phí thay đổi thường xuyên. |
-| **Tên miền** | Dùng subdomain miễn phí của PaaS. |
-| **Cập nhật** | Git; đẩy lên `main` thì GitHub Actions chạy `mvnw verify`, xanh thì deploy. Mỗi giai đoạn gắn một tag `v0.x`. Flyway tự áp migration mới khi ứng dụng khởi động. |
+| **Chạy ở đâu?** | **Local:** `mvnw spring-boot:run` (Docker tự bật Postgres) tại `http://localhost:8080`. **Online (GĐ8, tùy chọn):** dự án học tập nên chỉ cần truy cập được khi chủ repo đang chạy app trên máy: bật chế độ công khai (profile `public`) rồi mở Cloudflare Quick Tunnel tới `localhost:8080` (spec 008, ADR-0012). Không PaaS, không Docker image, không CD. Deploy lên PaaS để chạy 24/7 là hướng phát triển sau. |
+| **Tên miền** | Subdomain ngẫu nhiên `*.trycloudflare.com` của Cloudflare Quick Tunnel, đổi mỗi lần chạy (GĐ8). |
+| **Cập nhật** | Git; đẩy lên `main` thì GitHub Actions chạy `mvnw verify` (không có CD: app chạy trên máy chủ repo). Mỗi giai đoạn gắn một tag `v0.x`. Flyway tự áp migration mới khi ứng dụng khởi động. |
 
 ## 10. Vận hành
 
 | Câu hỏi | Trả lời |
 |---|---|
-| **Theo dõi lỗi** | Log của Spring Boot; `@ControllerAdvice` ghi log lỗi 500; `/actuator/health` để PaaS kiểm tra ứng dụng còn sống. Không dùng APM, vì quá mức cần thiết. |
+| **Theo dõi lỗi** | Log của Spring Boot; mỗi lỗi 500 ghi đúng một dòng log (`UnhandledExceptionResolver`, ADR-0011); `/actuator/health` chỉ trả trạng thái để kiểm ứng dụng còn sống. Không dùng APM, vì quá mức cần thiết. |
 | **Ai sửa?** | Chủ repo. README có mục xử lý sự cố thường gặp. |
-| **Chi phí** | Local: 0 đồng. Online: cố gắng giữ ở mức 0 bằng gói miễn phí; gói miễn phí thường "ngủ" khi không có truy cập, chấp nhận được với một bản demo. |
+| **Chi phí** | Local: 0 đồng. Online (GĐ8): 0 đồng, Cloudflare Quick Tunnel không cần tài khoản; app chỉ truy cập được khi máy chủ repo đang chạy, chấp nhận được với một dự án học tập. |
 
 ## 11. Phát triển
 
@@ -159,7 +159,7 @@ Nếu sau này cần thể hiện kỹ năng REST, có thể thêm `/api/product
 | 5 | Checkout COD, lịch sử đơn, khách tự hủy đơn PENDING | 2 buổi |
 | 6 | Admin: dashboard, CRUD, upload ảnh, quản lý đơn, hoàn kho | 2–3 buổi |
 | 7 | Hoàn thiện validation, trang lỗi, giao diện, README | 1–2 buổi |
-| 8 | *(Tùy chọn)* Dockerfile, deploy online, CD từ `main` | 1 buổi |
+| 8 | *(Tùy chọn)* Chia sẻ app từ máy cá nhân qua tunnel: chế độ công khai (mật khẩu demo, giới hạn đăng nhập sai, cookie an toàn), `lock_timeout`, chạy PostgreSQL không Docker | 1 buổi |
 | | **Tổng** | **khoảng 12–16 buổi (3 tuần làm bán thời gian)** |
 
 \* Một buổi khoảng 2–3 giờ, gồm cả thời gian bạn đọc hiểu và chạy thử.
@@ -177,5 +177,5 @@ Nếu sau này cần thể hiện kỹ năng REST, có thể thêm `/api/product
 
 | # | Câu hỏi | Mặc định nếu bạn không đổi |
 |---|---|---|
-| 1 | Có làm GĐ8 (CI + deploy online) không? | Quyết định sau khi xong GĐ7 |
+| 1 | Có làm GĐ8 (CI + deploy online) không? | Đã quyết (2026-10-25): làm GĐ8 dạng chia sẻ từ máy cá nhân qua tunnel, không deploy PaaS (spec 008) |
 | 2 | Package gốc `com.minishop` | Giữ nguyên |
