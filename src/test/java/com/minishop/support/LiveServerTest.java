@@ -11,9 +11,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * A real Tomcat on a random port, the {@code h2} profile (no Docker needed) and the test-only error endpoints
+ * A real Tomcat on a random port, an in-memory H2 database and the test-only error endpoints
  * ({@link ErrorTestEndpoints}). Needed because MockMvc does not do an error dispatch, so it can never show the
- * content of an error page, and does not run Tomcat's own limits (phase 7 plan, QĐ12).
+ * content of an error page, does not run Tomcat's own limits (phase 7 plan, QĐ12), and only simulates sessions.
  *
  * <p>Every class annotated with this uses the exact same configuration, so they all share one Spring context
  * (and one in-memory database). Tests therefore must not leave data behind that another test could see: clean up
