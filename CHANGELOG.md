@@ -5,6 +5,22 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)).
+
+### Thay đổi
+- Database duy nhất là H2 nhúng lưu ra file `data/minishop.mv.db`; dữ liệu còn sau khi tắt app. Ảnh upload chuyển vào `data/uploads/`. Biến `DATA_DIR` đổi thư mục.
+- H2 console bật ở chế độ dev tại `/h2-console` (chỉ máy chạy app mở được), vẫn tắt ở profile `public`.
+- Test chạy trên H2 trong bộ nhớ, mỗi Spring context một database; CI chỉ cần JDK.
+- README viết lại cho người mới clone: chạy thử, gợi ý dạo một vòng, phần giao diện (UI/UX), dữ liệu lưu ở đâu.
+- Chia sẻ qua Cloudflare Tunnel chuyển sang "sau MVP": hướng dẫn tạm ở `docs/deploy-cloudflare.md`, code profile `public` giữ nguyên.
+- `.claude/` và `CLAUDE.md` (công cụ AI lúc phát triển) không còn nằm trong git.
+
+### Bỏ
+- PostgreSQL, Docker Compose (`compose.yaml`), Testcontainers, profile `local` và `h2`.
+
+### Bảo mật
+- Lỗi database ghi vào log 500 chỉ còn tên lớp và stack frame, không còn message: H2 đưa nguyên dòng dữ liệu (email, hash mật khẩu) vào thông báo lỗi. Tắt thêm logger `org.hibernate.orm.jdbc.error`.
+
 ## [0.8.0] - 2026-10-25
 
 GĐ8: chia sẻ app đang chạy trên máy cá nhân lên internet ([spec 008](docs/specs/008-deploy.md)).

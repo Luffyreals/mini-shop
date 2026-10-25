@@ -1,6 +1,5 @@
 package com.minishop.catalog;
 
-import com.minishop.TestcontainersConfiguration;
 import com.minishop.common.NotFoundException;
 import com.minishop.storage.ImageUpload;
 import com.minishop.storage.StorageService;
@@ -16,7 +15,6 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -32,9 +30,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({TestcontainersConfiguration.class, ProductService.class, ProductImages.class,
+@Import({ProductService.class, ProductImages.class,
         ProductQueryTest.StorageStub.class})
-@Testcontainers(disabledWithoutDocker = true)
 class ProductQueryTest {
 
     /** Giống LocalStorageService.toUrl: null/trống thành null, còn lại giữ nguyên. */

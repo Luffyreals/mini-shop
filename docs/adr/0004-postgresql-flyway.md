@@ -1,6 +1,6 @@
 # ADR-0004: PostgreSQL ở mọi môi trường, Flyway quản lý schema
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Bị thay thế bởi ADR-0013
 - **Ngày:** 2026-10-23
 
 ## Bối cảnh

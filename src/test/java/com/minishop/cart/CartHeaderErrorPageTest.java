@@ -15,7 +15,6 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.net.http.HttpResponse;
@@ -37,7 +36,6 @@ import static org.mockito.Mockito.verify;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties =
         "spring.datasource.url=jdbc:h2:mem:cart-header-error;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH")
-@ActiveProfiles("h2")
 @Import(ErrorTestEndpoints.class)
 @ExtendWith(OutputCaptureExtension.class)
 class CartHeaderErrorPageTest {

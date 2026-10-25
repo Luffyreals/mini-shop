@@ -14,6 +14,7 @@ import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.util.DisconnectedClientHelper;
 
 import java.io.IOException;
+import java.sql.SQLException;
 
 /**
  * Logs every unexpected exception exactly once and turns it into a 500 (ADR-0011).
@@ -28,7 +29,8 @@ import java.io.IOException;
  *
  * <p>Because the exception counts as handled here, it never reaches Tomcat, so Tomcat does not write a second
  * {@code Servlet.service() ... threw exception} line. The log line holds the method and the path without the
- * query string, plus the stack trace; never parameters, body or principal, which may be personal data.
+ * query string, plus the stack trace; never parameters, body or principal, which may be personal data. For a database
+ * error the messages of the cause chain are dropped too (see {@link #withoutDatabaseMessages}).
  *
  * <p>Three cases are not errors of ours: a client that disconnected and a malformed parameter that Tomcat
  * reports lazily (for example {@code ?q=%zz}) are logged at DEBUG only, and security exceptions are left to
@@ -61,9 +63,44 @@ class UnhandledExceptionResolver implements HandlerExceptionResolver, Ordered {
             sendError(response, invalid.getErrorCode());
             return new ModelAndView();
         }
-        log.error("Unhandled exception: {} {}", request.getMethod(), request.getRequestURI(), ex);
+        log.error("Unhandled exception: {} {}", request.getMethod(), request.getRequestURI(),
+                withoutDatabaseMessages(ex));
         sendError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         return new ModelAndView();
+    }
+
+    /**
+     * For a database error, the same cause chain and stack frames with every message replaced by the class name. H2
+     * writes whole rows into lock-timeout and constraint messages ({@code Map entry ... with key <3> and value (...,
+     * 'a@b.c', '{bcrypt}...')}), which would put personal data and password hashes into the log (ADR-0013). Other
+     * exceptions are logged unchanged.
+     */
+    static Throwable withoutDatabaseMessages(Throwable ex) {
+        Throwable current = ex;
+        for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
+            if (current instanceof SQLException) {
+                return redacted(ex, 0);
+            }
+            current = current.getCause();
+        }
+        return ex;
+    }
+
+    private static Throwable redacted(Throwable original, int depth) {
+        Throwable cause = original.getCause();
+        Throwable redactedCause = cause != null && cause != original && depth < MAX_CAUSE_DEPTH
+                ? redacted(cause, depth + 1) : null;
+        RedactedException copy = new RedactedException(original.getClass().getName(), redactedCause);
+        copy.setStackTrace(original.getStackTrace());
+        return copy;
+    }
+
+    /** Stands in for a logged exception; its message is the original class name only. */
+    static final class RedactedException extends RuntimeException {
+
+        RedactedException(String originalClassName, Throwable cause) {
+            super(originalClassName, cause, false, true);
+        }
     }
 
     private static boolean isSecurityException(Throwable ex) {

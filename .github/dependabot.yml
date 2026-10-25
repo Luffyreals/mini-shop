@@ -18,10 +18,3 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
-
-  - package-ecosystem: docker-compose
-    directory: /
-    schedule:
-      interval: monthly
-    commit-message:
-      prefix: build

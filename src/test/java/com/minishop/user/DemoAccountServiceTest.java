@@ -1,6 +1,5 @@
 package com.minishop.user;
 
-import com.minishop.TestcontainersConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +10,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,8 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({TestcontainersConfiguration.class, DemoAccountService.class, DemoAccountServiceTest.EncoderConfig.class})
-@Testcontainers(disabledWithoutDocker = true)
+@Import({DemoAccountService.class, DemoAccountServiceTest.EncoderConfig.class})
 class DemoAccountServiceTest {
 
     private static final String NEW_ADMIN = "New-Admin-Pass-2026";

@@ -6,7 +6,6 @@ import org.springframework.boot.context.TypeExcludeFilter;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.io.IOException;
 import java.net.URI;
@@ -15,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -33,22 +33,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Starts the real application the way {@code spring-boot:run} does (a plain {@link SpringApplicationBuilder}, no test
  * context), for tests of startup rules and profiles (phase 8, QĐ10): {@code PublicProfileStartupTest},
- * {@code LocalProfileTest}.
+ * {@code FileDatabaseTest}.
  *
  * <p><b>Isolation rules built in</b>
  * <ul>
  *   <li>Every value goes in as a command-line argument ({@code --NAME=value}), the highest property source. So a real
- *   environment variable of the developer ({@code SEED_ADMIN_PASSWORD}, {@code DB_URL}...) can never leak into a test,
+ *   environment variable of the developer ({@code SEED_ADMIN_PASSWORD}, {@code DATA_DIR}...) can never leak into a test,
  *   and "missing" is simulated with an empty value ({@code --NAME=}), which beats the real variable too.</li>
  *   <li>Never a duplicate key: two {@code --a=1 --a=2} arguments would be joined into {@code "1,2"}. Callers add only
  *   keys that {@link #start} does not set.</li>
- *   <li>Tomcat on a random port, Docker Compose support off, banner off.</li>
+ *   <li>Tomcat on a random port, banner off.</li>
  *   <li>Classes under {@code target/test-classes} are kept out of component scanning with a {@link TypeExcludeFilter}
  *   bean (what Spring Boot's own test support does for a test context). Without it the scan would pick up
- *   {@code TestcontainersConfiguration} (a second container and datasource) and the nested rogue {@code @Component}
- *   classes of the architecture tests.</li>
- *   <li>Each scenario gets its own database inside one PostgreSQL container ({@link #newDatabase}), so contexts that
- *   are open at the same time never see each other's rows.</li>
+ *   test-only beans and the nested rogue {@code @Component} classes of the architecture tests.</li>
+ *   <li>Each scenario gets its own H2 file database under {@code target/} ({@link #newDatabase}), so contexts that are
+ *   open at the same time never see each other's rows, and a scenario can stop the app and start it again on the
+ *   same data, like a real restart.</li>
  * </ul>
  */
 public final class StandaloneApp {
@@ -63,7 +63,7 @@ public final class StandaloneApp {
     /** Starts the application; the caller must close the returned context. */
     public static ConfigurableApplicationContext start(String... args) {
         List<String> all = new ArrayList<>(List.of(
-                "--server.port=0", "--spring.docker.compose.enabled=false", "--spring.main.banner-mode=off"));
+                "--server.port=0", "--spring.main.banner-mode=off"));
         all.addAll(List.of(args));
         return new SpringApplicationBuilder(MiniShopApplication.class)
                 .initializers(context -> context.getBeanFactory().registerSingleton(
@@ -104,35 +104,34 @@ public final class StandaloneApp {
 
     // ------------------------------------------------------------------ databases
 
-    /** Creates an empty database in the container and returns its name. */
-    public static String newDatabase(PostgreSQLContainer postgres) throws SQLException {
-        String name = "t" + UUID.randomUUID().toString().replace("-", "");
-        try (Connection connection = DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(),
-                postgres.getPassword()); Statement statement = connection.createStatement()) {
-            statement.execute("create database " + name);
-        }
-        return name;
+    /** Settings of {@code application.yml}; the test only chooses where the file lives. */
+    private static final String H2_SETTINGS = ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
+
+    /** A new, empty H2 file database under {@code target/} (removed by {@code mvn clean}); returns its JDBC URL. */
+    public static String newDatabase() {
+        Path directory = Path.of("target", "standalone-db", UUID.randomUUID().toString()).toAbsolutePath();
+        return "jdbc:h2:file:" + directory.resolve("minishop").toString().replace('\\', '/') + H2_SETTINGS;
     }
 
-    public static String jdbcUrl(PostgreSQLContainer postgres, String database) {
-        return "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432) + "/" + database;
-    }
-
-    public static Connection connect(PostgreSQLContainer postgres, String database) throws SQLException {
-        return DriverManager.getConnection(jdbcUrl(postgres, database), postgres.getUsername(), postgres.getPassword());
+    /**
+     * Opens a connection to a scenario database. While the app runs it shares the same database (same URL, same
+     * JVM); when the app is stopped, the file is opened and closed again with the connection.
+     */
+    public static Connection connect(String url) throws SQLException {
+        return DriverManager.getConnection(url, "sa", "");
     }
 
     /** Single value of a query on a scenario database. */
-    public static String scalar(PostgreSQLContainer postgres, String database, String sql) throws SQLException {
-        try (Connection connection = connect(postgres, database); Statement statement = connection.createStatement();
+    public static String scalar(String url, String sql) throws SQLException {
+        try (Connection connection = connect(url); Statement statement = connection.createStatement();
              var rs = statement.executeQuery(sql)) {
             assertThat(rs.next()).as(sql).isTrue();
             return rs.getString(1);
         }
     }
 
-    public static void execute(PostgreSQLContainer postgres, String database, String sql) throws SQLException {
-        try (Connection connection = connect(postgres, database); Statement statement = connection.createStatement()) {
+    public static void execute(String url, String sql) throws SQLException {
+        try (Connection connection = connect(url); Statement statement = connection.createStatement()) {
             statement.execute(sql);
         }
     }

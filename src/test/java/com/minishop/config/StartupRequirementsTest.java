@@ -13,32 +13,24 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * AC-008-1, 2, 15 and BR-008-1, 2: the checks that stop the app before any bean exists. Runs against a
+ * AC-008-1, 2 and BR-008-1, 2: the checks that stop the app before any bean exists. Runs against a
  * {@link MockEnvironment}, so no Spring context and no real environment variable is involved. The checks read the
- * <em>bound</em> properties ({@code app.seed.*-password}, {@code spring.datasource.*}) through a {@code Binder}, so
- * this test sets those, not the bare {@code SEED_*} / {@code DB_*} names; the last section maps the variables onto them
- * the way the {@code application-public.yml} / {@code application-local.yml} files do.
- * Messages are pinned word for word; none may ever contain a value (a password or a database URL).
+ * <em>bound</em> properties ({@code app.seed.*-password}) through a {@code Binder}, so this test sets those, not the
+ * bare {@code SEED_*} names; the last section maps the variables onto them the way {@code application-public.yml} does.
+ * Messages are pinned word for word; none may ever contain a value (a password).
  */
 class StartupRequirementsTest {
 
     private static final String GOOD_ADMIN = "Admin-Verify-2026";
     private static final String GOOD_USER = "User-Verify-2026";
-    private static final String GOOD_URL = "jdbc:postgresql://localhost:5432/minishop";
 
-    private static final String H2_PUBLIC = "Profiles 'h2' and 'public' cannot be active together";
-    private static final String H2_LOCAL = "Profiles 'h2' and 'local' cannot be active together";
     private static final String PUBLIC_MISSING = "Public mode requires environment variables: ";
     private static final String PUBLIC_WEAK = "Public mode requires non-default demo passwords: ";
     private static final String PUBLIC_SAME =
             "Public mode requires different passwords for SEED_ADMIN_PASSWORD and SEED_USER_PASSWORD";
-    private static final String LOCAL_MISSING = "Profile 'local' requires environment variables: ";
-    private static final String LOCAL_NOT_POSTGRES = "Profile 'local' requires DB_URL to start with jdbc:postgresql:";
 
-    private static final String LOCAL_ACTION =
-            "Set them as described in README section 'Chạy với PostgreSQL cài trên máy (không Docker)'.";
     private static final String PUBLIC_MISSING_ACTION =
-            "Set both demo passwords as described in README section 'Chia sẻ app đang chạy trên máy'.";
+            "Set both demo passwords as described in docs/deploy-cloudflare.md.";
     private static final String PUBLIC_WEAK_ACTION =
             "Use at least 12 characters with letters and digits, different from the dev defaults.";
 
@@ -61,20 +53,6 @@ class StartupRequirementsTest {
         return environment;
     }
 
-    private static MockEnvironment localEnv(String url, String username, String password) {
-        MockEnvironment environment = env("local");
-        if (url != null) {
-            environment.setProperty("spring.datasource.url", url);
-        }
-        if (username != null) {
-            environment.setProperty("spring.datasource.username", username);
-        }
-        if (password != null) {
-            environment.setProperty("spring.datasource.password", password);
-        }
-        return environment;
-    }
-
     private StartupRequirementException failure(MockEnvironment environment) {
         assertThatThrownBy(() -> requirements.postProcessEnvironment(environment, null))
                 .isInstanceOf(StartupRequirementException.class);
@@ -93,22 +71,11 @@ class StartupRequirementsTest {
     // ------------------------------------------------------------------ accepted configurations
 
     @Test
-    void noProfile_isAccepted_evenWithWeakPasswordsAndNoDatabaseVariables() {
+    void noProfile_isAccepted_evenWithWeakPasswords() {
         MockEnvironment environment = env();
         environment.setProperty("app.seed.admin-password", "Admin@123");
-        environment.setProperty("spring.datasource.url", "jdbc:h2:mem:x");
 
         assertOk(environment);
-    }
-
-    @Test
-    void h2Profile_isAccepted() {
-        assertOk(env("h2"));
-    }
-
-    @Test
-    void validLocalProfile_isAccepted() {
-        assertOk(localEnv(GOOD_URL, "minishop", "db-secret-1"));
     }
 
     @Test
@@ -117,110 +84,8 @@ class StartupRequirementsTest {
     }
 
     @Test
-    void validLocalAndPublicProfiles_areAccepted() {
-        MockEnvironment environment = env("local", "public");
-        environment.setProperty("spring.datasource.url", GOOD_URL);
-        environment.setProperty("spring.datasource.username", "minishop");
-        environment.setProperty("spring.datasource.password", "db-secret-1");
-        environment.setProperty("app.seed.admin-password", GOOD_ADMIN);
-        environment.setProperty("app.seed.user-password", GOOD_USER);
-
-        assertOk(environment);
-    }
-
-    @Test
     void order_isLowestPrecedence_soProfilesFromConfigFilesAreKnown() {
         assertThat(requirements.getOrder()).isEqualTo(Ordered.LOWEST_PRECEDENCE);
-    }
-
-    // ------------------------------------------------------------------ profile combinations
-
-    @Test
-    void h2WithPublic_isRefused() {
-        StartupRequirementException e = failure(env("h2", "public"));
-
-        assertThat(e.getMessage()).isEqualTo(H2_PUBLIC);
-        assertThat(e.action()).isEqualTo("Run public mode with the default (Docker) database or with 'local,public'.");
-    }
-
-    @Test
-    void h2WithLocal_isRefused() {
-        StartupRequirementException e = failure(env("h2", "local"));
-
-        assertThat(e.getMessage()).isEqualTo(H2_LOCAL);
-        assertThat(e.action()).isEqualTo(
-                "Choose one database: 'h2' (in memory) or 'local' (PostgreSQL installed on this machine).");
-    }
-
-    @Test
-    void h2WithPublic_isRefusedBeforeAnythingElseIsChecked() {
-        // no password variables at all, and 'local' without DB_*: the first applicable rule still wins
-        assertThat(failure(env("h2", "public")).getMessage()).isEqualTo(H2_PUBLIC);
-        assertThat(failure(env("h2", "local", "public")).getMessage()).isEqualTo(H2_PUBLIC);
-    }
-
-    @Test
-    void localVariablesAreCheckedBeforePublicOnes() {
-        MockEnvironment environment = env("local", "public"); // both groups of variables missing
-
-        assertThat(failure(environment).getMessage()).startsWith(LOCAL_MISSING);
-    }
-
-    @Test
-    void publicIsCheckedWhenLocalIsFine() {
-        MockEnvironment environment = env("local", "public");
-        environment.setProperty("spring.datasource.url", GOOD_URL);
-        environment.setProperty("spring.datasource.username", "minishop");
-        environment.setProperty("spring.datasource.password", "db-secret-1");
-
-        assertThat(failure(environment).getMessage()).isEqualTo(PUBLIC_MISSING + "SEED_ADMIN_PASSWORD, SEED_USER_PASSWORD");
-    }
-
-    // ------------------------------------------------------------------ local profile (AC-008-15)
-
-    @Test
-    void local_withNoVariables_namesAllThree() {
-        StartupRequirementException e = failure(localEnv(null, null, null));
-
-        assertThat(e.getMessage()).isEqualTo(LOCAL_MISSING + "DB_URL, DB_USERNAME, DB_PASSWORD");
-        assertThat(e.action()).isEqualTo(LOCAL_ACTION);
-    }
-
-    @Test
-    void local_listsOnlyTheMissingVariables() {
-        assertThat(failure(localEnv(GOOD_URL, "minishop", null)).getMessage()).isEqualTo(LOCAL_MISSING + "DB_PASSWORD");
-        assertThat(failure(localEnv(GOOD_URL, null, "pw-1")).getMessage()).isEqualTo(LOCAL_MISSING + "DB_USERNAME");
-        assertThat(failure(localEnv(null, "minishop", "pw-1")).getMessage()).isEqualTo(LOCAL_MISSING + "DB_URL");
-        assertThat(failure(localEnv(GOOD_URL, null, null)).getMessage())
-                .isEqualTo(LOCAL_MISSING + "DB_USERNAME, DB_PASSWORD");
-        assertThat(failure(localEnv(null, null, "pw-1")).getMessage()).isEqualTo(LOCAL_MISSING + "DB_URL, DB_USERNAME");
-    }
-
-    @Test
-    void local_emptyOrWhitespaceVariable_countsAsMissing() {
-        assertThat(failure(localEnv("", "minishop", "pw-1")).getMessage()).isEqualTo(LOCAL_MISSING + "DB_URL");
-        assertThat(failure(localEnv(GOOD_URL, "   ", "pw-1")).getMessage()).isEqualTo(LOCAL_MISSING + "DB_USERNAME");
-        assertThat(failure(localEnv(GOOD_URL, "minishop", "\t ")).getMessage()).isEqualTo(LOCAL_MISSING + "DB_PASSWORD");
-    }
-
-    @Test
-    void local_urlOfAnotherDatabase_isRefused() {
-        for (String url : new String[]{"jdbc:h2:mem:x", "postgresql://localhost/minishop",
-                "jdbc:mysql://localhost/minishop", "http://localhost", "JDBC:POSTGRESQL://localhost/x",
-                " jdbc:postgresql://localhost/x"}) {
-            StartupRequirementException e = failure(localEnv(url, "minishop", "pw-1"));
-
-            assertThat(e.getMessage()).as(url).isEqualTo(LOCAL_NOT_POSTGRES);
-            assertThat(e.action()).isEqualTo(LOCAL_ACTION);
-        }
-    }
-
-    @Test
-    void local_postgresUrlsAreAccepted() {
-        for (String url : new String[]{GOOD_URL, "jdbc:postgresql:minishop", "jdbc:postgresql://127.0.0.1:55432/x?a=b",
-                "jdbc:postgresql://[::1]:5432/minishop"}) {
-            assertOk(localEnv(url, "minishop", "pw-1"));
-        }
     }
 
     // ------------------------------------------------------------------ public profile (AC-008-1, 2)
@@ -333,22 +198,15 @@ class StartupRequirementsTest {
     void messagesAndActions_neverContainAnyConfiguredValue() {
         String weakAdmin = "Sh0rt-adm";
         String weakUser = "Sh0rt-usr";
-        String secretPassword = "Db-Secret-Pw-777";
-        String secretUrl = "jdbc:mysql://secret-host.example/secretdb";
-        String secretUser = "secret-db-user";
 
         MockEnvironment weakPublic = publicEnv(weakAdmin, weakUser);
         MockEnvironment samePublic = publicEnv("Same-Verify-Pass-1", "Same-Verify-Pass-1");
-        MockEnvironment badUrl = localEnv(secretUrl, secretUser, secretPassword);
-        MockEnvironment missingLocal = localEnv(secretUrl, secretUser, null);
         MockEnvironment missingPublic = publicEnv(weakAdmin, null);
 
-        for (MockEnvironment environment : new MockEnvironment[]{weakPublic, samePublic, badUrl, missingLocal,
-                missingPublic}) {
+        for (MockEnvironment environment : new MockEnvironment[]{weakPublic, samePublic, missingPublic}) {
             StartupRequirementException e = failure(environment);
             assertThat(e.getMessage() + " | " + e.action())
-                    .doesNotContain(weakAdmin, weakUser, "Same-Verify-Pass-1", secretPassword, secretUrl, secretUser,
-                            "secret-host", "secretdb");
+                    .doesNotContain(weakAdmin, weakUser, "Same-Verify-Pass-1");
         }
     }
 
@@ -362,17 +220,14 @@ class StartupRequirementsTest {
     // ------------------------------------------------------------------ the bound value is what is checked
 
     /**
-     * What {@code application-public.yml} and {@code application-local.yml} do: they bind the variables onto the
-     * properties that {@code SeedProperties} and the datasource read. The test environment gets the same mapping.
+     * What {@code application-public.yml} does: it binds the variables onto the properties that {@code SeedProperties}
+     * reads. The test environment gets the same mapping.
      */
     private static MockEnvironment yamlEnv(String... profiles) {
         MockEnvironment environment = env(profiles);
         environment.getPropertySources().addLast(new MapPropertySource("applicationConfig", Map.of(
                 "app.seed.admin-password", "${SEED_ADMIN_PASSWORD}",
-                "app.seed.user-password", "${SEED_USER_PASSWORD}",
-                "spring.datasource.url", "${DB_URL}",
-                "spring.datasource.username", "${DB_USERNAME}",
-                "spring.datasource.password", "${DB_PASSWORD}")));
+                "app.seed.user-password", "${SEED_USER_PASSWORD}")));
         return environment;
     }
 
@@ -407,40 +262,6 @@ class StartupRequirementsTest {
 
         assertThat(e.getMessage()).isEqualTo(PUBLIC_MISSING + "SEED_ADMIN_PASSWORD, SEED_USER_PASSWORD");
         assertThat(e.getMessage() + e.action()).doesNotContain("${");
-    }
-
-    @Test
-    void unresolvedPlaceholder_countsAsMissing_forTheDatabaseVariables() {
-        MockEnvironment environment = yamlEnv("local");
-
-        assertThat(failure(environment).getMessage())
-                .isEqualTo(LOCAL_MISSING + "DB_URL, DB_USERNAME, DB_PASSWORD");
-    }
-
-    @Test
-    void unresolvedDbUrl_isMissingEvenWhenTheOtherTwoAreSet() {
-        MockEnvironment environment = yamlEnv("local");
-        withEnvironmentVariables(environment, Map.of("DB_USERNAME", "minishop", "DB_PASSWORD", "db-secret-1"));
-
-        assertThat(failure(environment).getMessage()).isEqualTo(LOCAL_MISSING + "DB_URL");
-    }
-
-    @Test
-    void yamlMapping_withAllDatabaseVariables_isAccepted() {
-        MockEnvironment environment = yamlEnv("local");
-        withEnvironmentVariables(environment,
-                Map.of("DB_URL", GOOD_URL, "DB_USERNAME", "minishop", "DB_PASSWORD", "db-secret-1"));
-
-        assertOk(environment);
-    }
-
-    @Test
-    void yamlMapping_withANonPostgresUrlVariable_isRefused() {
-        MockEnvironment environment = yamlEnv("local");
-        withEnvironmentVariables(environment,
-                Map.of("DB_URL", "jdbc:h2:mem:x", "DB_USERNAME", "minishop", "DB_PASSWORD", "db-secret-1"));
-
-        assertThat(failure(environment).getMessage()).isEqualTo(LOCAL_NOT_POSTGRES);
     }
 
     @Test
@@ -526,14 +347,6 @@ class StartupRequirementsTest {
     }
 
     @Test
-    void databaseValuesWithPlaceholderSyntax_areReadLiterallyAndNeverPrinted() {
-        assertOk(localEnv(GOOD_URL, "minishop", "pa${ss}word"));
-
-        StartupRequirementException e = failure(localEnv("jdbc:h2:mem:${x}", "minishop", "pa${ss}word"));
-        assertThat(e.getMessage() + " | " + e.action()).doesNotContain("pa${ss}word").doesNotContain("${");
-    }
-
-    @Test
     void valueThatCannotBeRead_isReportedByVariableNameWithoutTheCause() {
         MockEnvironment environment = env("public");
         // a circular reference makes the placeholder resolution throw; its message would contain the text
@@ -550,17 +363,4 @@ class StartupRequirementsTest {
         assertThat(e.getMessage() + e.action()).doesNotContain("loop");
     }
 
-    @Test
-    void databaseValueThatCannotBeRead_isReportedByVariableName() {
-        MockEnvironment environment = env("local");
-        environment.setProperty("spring.datasource.url", GOOD_URL);
-        environment.setProperty("spring.datasource.username", "minishop");
-        environment.setProperty("spring.datasource.password", "${loop.a}");
-        environment.setProperty("loop.a", "${loop.a}");
-
-        StartupRequirementException e = failure(environment);
-
-        assertThat(e.getMessage()).isEqualTo("Cannot read the value of DB_PASSWORD");
-        assertThat(e).hasNoCause();
-    }
 }

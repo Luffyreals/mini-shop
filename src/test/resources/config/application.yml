@@ -1,6 +1,12 @@
-# Test-only overrides. Spring Boot reads classpath:/config/application.yml AFTER classpath:/application.yml, so this
-# key wins in every test context without being a @DynamicPropertySource (which would change the Spring context
-# cache key and make each test class start its own context and PostgreSQL container).
+# Test-only overrides. Spring Boot reads classpath:/config/application.yml AFTER classpath:/application.yml, so these
+# keys win in every test context without being a @DynamicPropertySource (which would change the Spring context
+# cache key and make each test class start its own context).
+spring:
+  datasource:
+    # In memory, never the developer's data/ folder. ${random.uuid} is resolved once per Spring context, so every
+    # cached context has its own database (what one PostgreSQL container per context used to give, ADR-0013).
+    # DB_CLOSE_DELAY=-1 keeps it alive even if the pool briefly holds no connection.
+    url: jdbc:h2:mem:test-${random.uuid};MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
 # Uploads written by tests land under target/ and are removed by "mvn clean" (QĐ14, phase 6 plan).
 app:
   storage:

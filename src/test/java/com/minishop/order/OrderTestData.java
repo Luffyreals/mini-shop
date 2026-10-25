@@ -32,7 +32,7 @@ final class OrderTestData {
     TestUser createUser() {
         String email = "u" + UUID.randomUUID().toString().replace("-", "").substring(0, 16) + "@order.test";
         Long id = jdbc.queryForObject(
-                "insert into users (email, password_hash, full_name, role) values (?, ?, 'Order Tester', 'USER') returning id",
+                "select id from final table (insert into users (email, password_hash, full_name, role) values (?, ?, 'Order Tester', 'USER'))",
                 Long.class, email, encoder.encode(PASSWORD));
         return new TestUser(id, email);
     }
@@ -40,7 +40,7 @@ final class OrderTestData {
     long createProduct(String suffix, long price, int stock) {
         Long categoryId = jdbc.queryForObject("select min(id) from categories", Long.class);
         return jdbc.queryForObject(
-                "insert into products (category_id, name, price, stock, active) values (?, ?, ?, ?, true) returning id",
+                "select id from final table (insert into products (category_id, name, price, stock, active) values (?, ?, ?, ?, true))",
                 Long.class, categoryId, "Order test " + suffix + " " + UUID.randomUUID().toString().substring(0, 8),
                 price, stock);
     }
@@ -71,7 +71,7 @@ final class OrderTestData {
 
     /** Dựng giỏ DB bằng SQL; {@code lines} là cặp {productId, quantity}, thêm theo thứ tự đã cho. */
     void createCart(long userId, long[]... lines) {
-        Long cartId = jdbc.queryForObject("insert into carts (user_id) values (?) returning id", Long.class, userId);
+        Long cartId = jdbc.queryForObject("select id from final table (insert into carts (user_id) values (?))", Long.class, userId);
         for (long[] line : lines) {
             jdbc.update("insert into cart_items (cart_id, product_id, quantity) values (?, ?, ?)",
                     cartId, line[0], (int) line[1]);
@@ -99,8 +99,8 @@ final class OrderTestData {
             total = total.add(price.multiply(BigDecimal.valueOf(item[1])));
         }
         Long orderId = jdbc.queryForObject(
-                "insert into orders (user_id, status, receiver_name, phone, shipping_address, payment_method, total_amount) "
-                        + "values (?, ?, 'Người nhận', '0912345678', 'Địa chỉ', 'COD', ?) returning id",
+                "select id from final table (insert into orders (user_id, status, receiver_name, phone, shipping_address, payment_method, total_amount) "
+                        + "values (?, ?, 'Người nhận', '0912345678', 'Địa chỉ', 'COD', ?))",
                 Long.class, userId, status, total);
         for (long[] item : items) {
             jdbc.update("insert into order_items (order_id, product_id, product_name, unit_price, quantity) "

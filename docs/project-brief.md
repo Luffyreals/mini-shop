@@ -4,6 +4,8 @@
 > Dự án **học tập / portfolio**. Yêu cầu ban đầu của bạn chỉ là tham khảo; công nghệ và kiến trúc bên dưới là lựa chọn tối ưu cho bối cảnh này, kèm lý do.
 > Mục ⏳ là những gì còn mở.
 
+> **Cập nhật 2026-10-25 (sau v0.8.0):** dự án được định hướng lại là dự án học tập tập trung vào UI/UX, repo public. Database chuyển sang **H2 lưu ra file trong `data/`**, bỏ PostgreSQL, Docker Compose và Testcontainers ([ADR-0013](adr/0013-h2-file-database-no-docker.md)); các dòng nhắc tới PostgreSQL bên dưới là lịch sử. Phần chia sẻ qua Cloudflare Tunnel (GĐ8) để **sau MVP** ([docs/deploy-cloudflare.md](deploy-cloudflare.md)).
+
 ---
 
 ## 0. Tóm tắt các quyết định chính

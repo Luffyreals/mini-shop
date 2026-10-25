@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fail when any test was skipped (spec 001, AC-001-14).
-# A skipped Testcontainers test (no Docker) must never count as a green build.
+# A skipped test must never count as a green build.
 # Reads surefire/failsafe XML reports, prints totals, and appends a table to
 # $GITHUB_STEP_SUMMARY when that variable is set.
 set -u

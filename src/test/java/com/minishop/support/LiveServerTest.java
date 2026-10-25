@@ -2,7 +2,6 @@ package com.minishop.support;
 
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -28,7 +27,6 @@ import java.lang.annotation.Target;
 @Inherited
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties =
         "spring.datasource.url=jdbc:h2:mem:live-server;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH")
-@ActiveProfiles("h2")
 @Import(ErrorTestEndpoints.class)
 public @interface LiveServerTest {
 }

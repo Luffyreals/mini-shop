@@ -3,6 +3,7 @@ package com.minishop.common;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.ThrowableProxy;
 import ch.qos.logback.core.read.ListAppender;
 import org.apache.tomcat.util.http.InvalidParameterException;
 import org.junit.jupiter.api.AfterEach;
@@ -18,6 +19,7 @@ import org.springframework.security.authentication.InsufficientAuthenticationExc
 import org.springframework.web.servlet.ModelAndView;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -208,6 +210,33 @@ class UnhandledExceptionResolverTest {
         assertThat(mav).isNull();
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(events.list).isEmpty();
+    }
+
+    /** ADR-0013: H2 puts whole rows into its messages; a database error is logged with class names only. */
+    @Test
+    void databaseError_isLoggedWithClassNamesAndFramesButNoMessages() {
+        SQLException h2 = new SQLException("Map entry with value (3, 'khach@example.com', '{bcrypt}$2a$10$hash')");
+        RuntimeException ex = new IllegalStateException("could not lock row of khach@example.com", h2);
+
+        resolver.resolveException(request("POST", "/cart/items", null), new MockHttpServletResponse(), null, ex);
+
+        assertThat(events.list).hasSize(1);
+        Throwable logged = ((ThrowableProxy) events.list.get(0).getThrowableProxy()).getThrowable();
+        assertThat(logged.getMessage()).isEqualTo("java.lang.IllegalStateException");
+        assertThat(logged.getStackTrace()).isEqualTo(ex.getStackTrace());
+        assertThat(logged.getCause().getMessage()).isEqualTo("java.sql.SQLException");
+        for (Throwable t = logged; t != null; t = t.getCause()) {
+            assertThat(String.valueOf(t.getMessage())).doesNotContain("khach@example.com", "bcrypt");
+        }
+    }
+
+    @Test
+    void otherError_isLoggedUnchanged() {
+        RuntimeException ex = new IllegalStateException("boom");
+
+        resolver.resolveException(request("GET", "/x", null), new MockHttpServletResponse(), null, ex);
+
+        assertThat(((ThrowableProxy) events.list.get(0).getThrowableProxy()).getThrowable()).isSameAs(ex);
     }
 
     @Test

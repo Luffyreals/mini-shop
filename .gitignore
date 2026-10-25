@@ -25,8 +25,17 @@ logs/
 # File làm việc của skill design-taste-frontend (ảnh chụp màn hình, bản nháp)
 .taste-skill/
 
-# Ảnh do admin upload khi chạy local
+# Dữ liệu khi chạy app: database H2 (data/minishop.mv.db) và ảnh admin upload (data/uploads/).
+# Xóa thư mục data/ là app tự tạo lại dữ liệu mẫu ở lần chạy sau.
+data/
+*.mv.db
+*.trace.db
+# Thư mục ảnh upload của phiên bản cũ (trước khi chuyển vào data/)
 uploads/
+
+# Công cụ AI dùng trong lúc phát triển (Claude Code: agents, skills, hướng dẫn); app chạy không cần
+.claude/
+CLAUDE.md
 
 # Biến môi trường / secret
 .env
