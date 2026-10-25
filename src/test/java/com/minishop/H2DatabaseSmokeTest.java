@@ -13,7 +13,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,13 +46,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Chạy ở mọi nơi, không cần Docker: V1 chạy được trên H2 (PostgreSQL mode), Hibernate validate đạt,
- * seed chạy được (AC-001-13, AC-001-4 phía profile h2).
+ * Ứng dụng đầy đủ trên H2 (PostgreSQL mode), database duy nhất của dự án (ADR-0013): V1/V2 chạy, Hibernate validate
+ * đạt, seed chạy được, H2 console mở ở chế độ dev (AC-001-13, AC-001-4).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("h2")
-class H2ProfileSmokeTest {
+class H2DatabaseSmokeTest {
 
     @Autowired
     MockMvc mockMvc;
@@ -95,12 +93,12 @@ class H2ProfileSmokeTest {
     }
 
     @Test
-    void h2ConsoleSecurityFilterChain_existsInH2Profile() {
+    void h2ConsoleSecurityFilterChain_existsInDevMode() {
         assertThat(context.containsBean("h2ConsoleSecurityFilterChain")).isTrue();
     }
 
     /**
-     * AC-001-4 phía profile h2: lớp bảo mật cho qua {@code /h2-console}, không chuyển sang trang đăng nhập.
+     * AC-001-4 ở chế độ dev: lớp bảo mật cho qua {@code /h2-console}, không chuyển sang trang đăng nhập.
      * MockMvc chỉ chạy qua DispatcherServlet chứ không qua servlet riêng của H2 console, nên ở đây không
      * assert 200; việc console thật sự mở được nằm trong checklist của phase-verifier.
      */
@@ -123,8 +121,7 @@ class H2ProfileSmokeTest {
     }
 
     /**
-     * AC-008-6, 13 (ADR-0012): the H2 profile replaces the PostgreSQL {@code SET lock_timeout} with H2's own syntax
-     * ({@code SET LOCK_TIMEOUT 5000}, milliseconds). If it were wrong, Hikari could not create a single connection and
+     * AC-008-6, 13 (ADR-0012, ADR-0013): every connection runs H2's {@code SET LOCK_TIMEOUT 5000} (milliseconds). If it were wrong, Hikari could not create a single connection and
      * the context would not start; this pins the value too. H2's {@code LOCK_TIMEOUT()} function reports the setting of
      * the current session, and the pool runs the init SQL on every physical connection.
      */
@@ -133,9 +130,9 @@ class H2ProfileSmokeTest {
         assertThat(jdbc.queryForObject("select lock_timeout()", Integer.class)).isEqualTo(5000);
     }
 
-    /** AC-008-5, 6: only the h2 profile turns the H2 console on (application.yml turns it off for every other profile). */
+    /** AC-008-5, 6 (ADR-0013): dev mode turns the H2 console on; only the public profile turns it off. */
     @Test
-    void h2ConsoleProperty_isEnabledInH2Profile() {
+    void h2ConsoleProperty_isEnabledInDevMode() {
         assertThat(context.getEnvironment().getProperty("spring.h2.console.enabled", Boolean.class)).isTrue();
         assertThat(context.getEnvironment().getProperty("spring.datasource.hikari.connection-init-sql"))
                 .isEqualTo("SET LOCK_TIMEOUT 5000");

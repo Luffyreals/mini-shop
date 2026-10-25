@@ -25,8 +25,8 @@ body:
     attributes:
       label: Profile đang chạy
       options:
-        - mặc định (PostgreSQL qua Docker)
-        - h2
+        - mặc định (chạy trên máy, ./mvnw spring-boot:run)
+        - public (chia sẻ qua Cloudflare Tunnel)
         - khác
   - type: textarea
     id: logs

@@ -4,22 +4,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Khởi động toàn bộ ứng dụng trên PostgreSQL thật (Testcontainers).
- * Máy không có Docker thì test được bỏ qua thay vì fail (spec 001, AC-001-2); CI luôn chạy đủ.
+ * Khởi động toàn bộ ứng dụng trên H2 trong bộ nhớ (ADR-0013); không cần Docker hay database cài sẵn.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
-@Testcontainers(disabledWithoutDocker = true)
 class MiniShopApplicationTests {
 
     @Autowired

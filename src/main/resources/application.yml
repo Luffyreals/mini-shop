@@ -23,15 +23,18 @@ spring:
       include-path: never
   h2:
     console:
-      # DevTools bật H2 console ở mọi profile (kể cả khi dùng PostgreSQL); tắt ở đây, chỉ profile h2 bật lại, xem ADR-0012
-      enabled: false
+      # Chỉ mở cho trình duyệt trên chính máy này (Boot mặc định web-allow-others=false); profile public tắt hẳn, xem ADR-0013
+      enabled: true
+      path: /h2-console
   datasource:
+    # H2 nhúng, lưu ra file data/minishop.mv.db (tương đối với thư mục chạy app, đã nằm trong .gitignore); tắt app mở lại vẫn còn dữ liệu.
+    # Chế độ tương thích PostgreSQL để V1/V2 và các truy vấn chạy y như trước, xem ADR-0013
+    url: jdbc:h2:file:${DATA_DIR:./data}/minishop;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ''
     hikari:
-      # Mọi câu chờ khóa dòng chỉ chờ tối đa 5 giây rồi rollback và hiện trang 500 (thay vì treo vô hạn); profile h2 ghi đè bằng cú pháp H2, xem ADR-0012
-      connection-init-sql: "SET lock_timeout = '5s'"
-      data-source-properties:
-        # pgjdbc không đưa "Detail: Key (...)=(...)" vào thông điệp lỗi, vì phần đó có thể chứa dữ liệu cá nhân; tên ràng buộc vẫn còn nên ConstraintViolations chạy, xem ADR-0011
-        logServerErrorDetail: false
+      # Mọi câu chờ khóa dòng chỉ chờ tối đa 5 giây rồi rollback và hiện trang 500 (thay vì treo vô hạn); cú pháp H2, đơn vị ms, xem ADR-0012
+      connection-init-sql: "SET LOCK_TIMEOUT 5000"
 
 server:
   # Dùng RemoteIpValve của Tomcat (chỉ tin proxy trong internal-proxies) thay vì ForwardedHeaderFilter (tin mọi kết nối); để chuyển hướng dùng https và IP thật qua tunnel, xem ADR-0012
@@ -58,6 +61,8 @@ logging:
   level:
     # Hibernate tự log lỗi JDBC ở mức ERROR, kể cả ca đã xử lý êm; tắt để mỗi lỗi chỉ một dòng ERROR (UnhandledExceptionResolver), xem ADR-0011
     org.hibernate.engine.jdbc.spi.SqlExceptionHelper: off
+    # Hibernate 7 ghi cùng thông báo ở mức WARN qua logger này; thông báo vi phạm UNIQUE của H2 kèm giá trị dòng (email...), nên tắt, xem ADR-0013
+    org.hibernate.orm.jdbc.error: off
 
 management:
   endpoints:
@@ -77,5 +82,5 @@ app:
     user-password: ${SEED_USER_PASSWORD:User@123}
   storage:
     local:
-      # Tương đối với thư mục chạy ứng dụng, đã nằm trong .gitignore
-      upload-dir: ${UPLOAD_DIR:uploads}
+      # Cạnh file database trong data/ (đã nằm trong .gitignore): xóa một thư mục là làm lại từ đầu, xem ADR-0013
+      upload-dir: ${UPLOAD_DIR:${DATA_DIR:./data}/uploads}

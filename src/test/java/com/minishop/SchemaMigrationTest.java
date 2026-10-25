@@ -6,12 +6,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 
@@ -24,8 +22,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(TestcontainersConfiguration.class)
-@Testcontainers(disabledWithoutDocker = true)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SchemaMigrationTest {
 
@@ -40,14 +36,14 @@ class SchemaMigrationTest {
 
     @BeforeEach
     void insertParents() {
-        categoryId = insertReturningId("insert into categories (name) values ('c') returning id");
-        userId = insertReturningId("insert into users (email, password_hash, full_name, role) "
-                + "values ('a@x.local', 'h', 'A', 'USER') returning id");
-        productId = insertReturningId("insert into products (category_id, name, price, stock) "
-                + "values (" + categoryId + ", 'p', 100, 5) returning id");
-        cartId = insertReturningId("insert into carts (user_id) values (" + userId + ") returning id");
-        orderId = insertReturningId("insert into orders (user_id, status, receiver_name, phone, shipping_address, "
-                + "payment_method, total_amount) values (" + userId + ", 'PENDING', 'r', '1', 'addr', 'COD', 0) returning id");
+        categoryId = insertReturningId("select id from final table (insert into categories (name) values ('c'))");
+        userId = insertReturningId("select id from final table (insert into users (email, password_hash, full_name, role) "
+                + "values ('a@x.local', 'h', 'A', 'USER'))");
+        productId = insertReturningId("select id from final table (insert into products (category_id, name, price, stock) "
+                + "values (" + categoryId + ", 'p', 100, 5))");
+        cartId = insertReturningId("select id from final table (insert into carts (user_id) values (" + userId + "))");
+        orderId = insertReturningId("select id from final table (insert into orders (user_id, status, receiver_name, phone, shipping_address, "
+                + "payment_method, total_amount) values (" + userId + ", 'PENDING', 'r', '1', 'addr', 'COD', 0))");
     }
 
     @AfterEach

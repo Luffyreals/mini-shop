@@ -1,15 +1,14 @@
-# Chế độ công khai: chia sẻ app đang chạy trên máy này qua tunnel (xem ADR-0012 và README, mục "Chia sẻ app đang chạy trên máy").
+# Chế độ công khai: chia sẻ app đang chạy trên máy này qua tunnel (xem ADR-0012 và docs/deploy-cloudflare.md).
 # Bắt buộc đặt SEED_ADMIN_PASSWORD và SEED_USER_PASSWORD (>= 12 ký tự, khác mật khẩu dev); thiếu thì app không khởi động.
 #
 # Git Bash:
 #   export SEED_ADMIN_PASSWORD='...' SEED_USER_PASSWORD='...'
-#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=public        # PostgreSQL bằng Docker
-#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local,public  # PostgreSQL cài trên máy
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=public
 # PowerShell:
 #   $env:SEED_ADMIN_PASSWORD='...'; $env:SEED_USER_PASSWORD='...'
 #   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=public"
 #
-# Không kết hợp với profile h2 (StartupRequirements từ chối khi khởi động).
+# Dùng chung database H2 trong data/ với chế độ dev; khi khởi động, hai tài khoản demo được đặt lại mật khẩu theo biến môi trường.
 server:
   # Tomcat chỉ nghe trên loopback: cloudflared và trình duyệt trên máy vẫn vào được, máy khác trong cùng mạng thì không, xem ADR-0012
   address: 127.0.0.1
@@ -30,7 +29,7 @@ spring:
       enabled: false
   h2:
     console:
-      # Nhắc lại cho chắc: H2 console không bao giờ ra internet, xem ADR-0012
+      # H2 console (bật ở chế độ dev) không bao giờ ra internet, xem ADR-0012 và ADR-0013
       enabled: false
 management:
   endpoint:

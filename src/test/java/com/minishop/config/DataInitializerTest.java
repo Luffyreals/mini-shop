@@ -1,6 +1,5 @@
 package com.minishop.config;
 
-import com.minishop.TestcontainersConfiguration;
 import com.minishop.catalog.CategoryRepository;
 import com.minishop.catalog.Product;
 import com.minishop.catalog.ProductRepository;
@@ -16,7 +15,6 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 
@@ -29,9 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({TestcontainersConfiguration.class, DataInitializer.class, PasswordEncoderConfig.class})
+@Import({DataInitializer.class, PasswordEncoderConfig.class})
 @EnableConfigurationProperties(SeedProperties.class)
-@Testcontainers(disabledWithoutDocker = true)
 class DataInitializerTest {
 
     @Autowired

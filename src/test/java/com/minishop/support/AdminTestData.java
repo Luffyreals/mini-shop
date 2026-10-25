@@ -58,7 +58,7 @@ public final class AdminTestData {
         String email = "u" + UUID.randomUUID().toString().replace("-", "").substring(0, 16) + "@admin.test";
         String fullName = role == Role.ADMIN ? "Admin Tester" : "Customer Tester";
         Long id = jdbc.queryForObject(
-                "insert into users (email, password_hash, full_name, role) values (?, ?, ?, ?) returning id",
+                "select id from final table (insert into users (email, password_hash, full_name, role) values (?, ?, ?, ?))",
                 Long.class, email, encoder.encode(PASSWORD), fullName, role.name());
         return new TestUser(id, email, fullName);
     }
@@ -66,7 +66,7 @@ public final class AdminTestData {
     // ------------------------------------------------------------- categories
 
     public long createCategory(String suffix) {
-        return jdbc.queryForObject("insert into categories (name) values (?) returning id", Long.class,
+        return jdbc.queryForObject("select id from final table (insert into categories (name) values (?))", Long.class,
                 uniqueName(suffix));
     }
 
@@ -92,7 +92,7 @@ public final class AdminTestData {
 
     public long createProduct(long categoryId, String suffix, long price, int stock, boolean active) {
         return jdbc.queryForObject(
-                "insert into products (category_id, name, price, stock, active) values (?, ?, ?, ?, ?) returning id",
+                "select id from final table (insert into products (category_id, name, price, stock, active) values (?, ?, ?, ?, ?))",
                 Long.class, categoryId, uniqueName(suffix), price, stock, active);
     }
 
@@ -139,7 +139,7 @@ public final class AdminTestData {
 
     /** A DB cart built with SQL; {@code lines} are {productId, quantity} pairs. */
     public void createCart(long userId, long[]... lines) {
-        Long cartId = jdbc.queryForObject("insert into carts (user_id) values (?) returning id", Long.class, userId);
+        Long cartId = jdbc.queryForObject("select id from final table (insert into carts (user_id) values (?))", Long.class, userId);
         for (long[] line : lines) {
             jdbc.update("insert into cart_items (cart_id, product_id, quantity) values (?, ?, ?)",
                     cartId, line[0], (int) line[1]);
@@ -178,8 +178,8 @@ public final class AdminTestData {
     /** An order header with a given total and no lines (enough for dashboard and list tests). */
     public long insertOrderWithTotal(long userId, String status, BigDecimal total) {
         return jdbc.queryForObject(
-                "insert into orders (user_id, status, receiver_name, phone, shipping_address, payment_method, total_amount) "
-                        + "values (?, ?, 'Người nhận', '0912345678', 'Địa chỉ', 'COD', ?) returning id",
+                "select id from final table (insert into orders (user_id, status, receiver_name, phone, shipping_address, payment_method, total_amount) "
+                        + "values (?, ?, 'Người nhận', '0912345678', 'Địa chỉ', 'COD', ?))",
                 Long.class, userId, status, total);
     }
 

@@ -1,5 +1,9 @@
 # Quy trình phát triển
 
+## Chuẩn bị
+
+Chỉ cần **JDK 25**. Không cần Docker hay PostgreSQL: app và test dùng H2 (xem [README](README.md)). Chạy `./mvnw verify` trước khi mở PR.
+
 ## Nhánh
 
 - `main` luôn chạy được và `./mvnw verify` luôn xanh. Không commit thẳng vào `main`.
@@ -7,7 +11,7 @@
   - `phase-<N>/<mo-ta-ngan>`, ví dụ `phase-1/project-setup`
   - `fix/<mo-ta>`, `docs/<mo-ta>`, `chore/<mo-ta>` cho việc ngoài giai đoạn
 - Mở Pull Request vào `main`, điền đủ template, tự review diff, rồi chọn **Squash and merge**.
-- Nhánh `main` **không bật bảo vệ** (branch protection / ruleset) vì repo private và chỉ có một người phát triển; các quy tắc trên được giữ bằng kỷ luật. Xem xét bật lại khi chuyển repo sang public hoặc có thêm người.
+- Repo public: nên bật bảo vệ nhánh `main` (ruleset: bắt buộc PR, bắt buộc check `CI / build` xanh) để người ngoài không đẩy thẳng vào `main`.
 
 ## Commit message
 

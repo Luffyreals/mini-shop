@@ -1,6 +1,5 @@
 package com.minishop.order;
 
-import com.minishop.TestcontainersConfiguration;
 import com.minishop.cart.CartCheckout;
 import com.minishop.user.CurrentUser;
 import com.minishop.user.Role;
@@ -13,14 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.IllegalTransactionStateException;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
@@ -56,8 +53,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
-@Testcontainers(disabledWithoutDocker = true)
 class OrderIntegrationTest {
 
     private static final int ROUNDS = 20;
@@ -277,8 +272,9 @@ class OrderIntegrationTest {
     private void awaitBackendWaitingOnLock() throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {
-            Integer waiting = jdbc.queryForObject("select count(*) from pg_stat_activity "
-                    + "where datname = current_database() and wait_event_type = 'Lock'", Integer.class);
+            // H2: a session waiting for a row lock names the session that holds it
+            Integer waiting = jdbc.queryForObject(
+                    "select count(*) from information_schema.sessions where blocker_id is not null", Integer.class);
             if (waiting != null && waiting > 0) {
                 return;
             }

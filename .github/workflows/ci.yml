@@ -30,11 +30,11 @@ jobs:
           java-version: '25'
           cache: maven
 
-      # Runner có sẵn Docker nên test Testcontainers luôn chạy ở đây (spec 001, AC-001-1, AC-001-7)
+      # Chỉ cần JDK: database là H2 trong bộ nhớ, không cần Docker (ADR-0013)
       - name: Build and test
         run: ./mvnw -B -ntp verify
 
-      # Test bị bỏ qua (ví dụ không có Docker) không được tính là xanh (AC-001-14).
+      # Test bị bỏ qua không được tính là xanh (AC-001-14).
       # Cũng ghi bảng tổng chạy/fail/skipped vào job summary (AC-001-17).
       - name: Fail if any test was skipped
         run: bash .github/scripts/check-no-skipped-tests.sh

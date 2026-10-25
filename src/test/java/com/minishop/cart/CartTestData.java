@@ -29,7 +29,7 @@ final class CartTestData {
     TestUser createUser() {
         String email = "u" + UUID.randomUUID().toString().replace("-", "").substring(0, 16) + "@cart.test";
         Long id = jdbc.queryForObject(
-                "insert into users (email, password_hash, full_name, role) values (?, ?, 'Cart Tester', 'USER') returning id",
+                "select id from final table (insert into users (email, password_hash, full_name, role) values (?, ?, 'Cart Tester', 'USER'))",
                 Long.class, email, encoder.encode(PASSWORD));
         return new TestUser(id, email);
     }
@@ -37,7 +37,7 @@ final class CartTestData {
     long createProduct(String suffix, long price, int stock) {
         Long categoryId = jdbc.queryForObject("select min(id) from categories", Long.class);
         Long id = jdbc.queryForObject(
-                "insert into products (category_id, name, price, stock, active) values (?, ?, ?, ?, true) returning id",
+                "select id from final table (insert into products (category_id, name, price, stock, active) values (?, ?, ?, ?, true))",
                 Long.class, categoryId, "Cart test " + suffix + " " + UUID.randomUUID().toString().substring(0, 8),
                 price, stock);
         return id;
@@ -57,7 +57,7 @@ final class CartTestData {
 
     /** Dựng giỏ DB trực tiếp bằng SQL; {@code lines} là cặp {productId, quantity}. */
     void createCart(long userId, long[]... lines) {
-        Long cartId = jdbc.queryForObject("insert into carts (user_id) values (?) returning id", Long.class, userId);
+        Long cartId = jdbc.queryForObject("select id from final table (insert into carts (user_id) values (?))", Long.class, userId);
         for (long[] line : lines) {
             jdbc.update("insert into cart_items (cart_id, product_id, quantity) values (?, ?, ?)",
                     cartId, line[0], (int) line[1]);

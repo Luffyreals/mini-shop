@@ -1,9 +1,9 @@
 package com.minishop.config;
 
 import com.minishop.user.LoginThrottle;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -79,12 +79,14 @@ public class SecurityConfig {
     }
 
     /**
-     * H2 console chỉ tồn tại ở profile {@code h2}. Console dùng iframe và form không có CSRF token,
-     * nên cần chuỗi filter riêng, ưu tiên cao hơn và chỉ áp dụng cho {@code /h2-console/**}.
+     * H2 console chỉ tồn tại khi {@code spring.h2.console.enabled=true} (chế độ dev; profile {@code public} tắt).
+     * Console dùng iframe và form không có CSRF token, nên cần chuỗi filter riêng, ưu tiên cao hơn và chỉ áp dụng
+     * cho {@code /h2-console/**}. Chính console chỉ nhận kết nối từ máy này (Boot mặc định
+     * {@code web-allow-others=false}), xem ADR-0013.
      */
     @Bean
     @Order(1)
-    @Profile("h2")
+    @ConditionalOnBooleanProperty("spring.h2.console.enabled")
     SecurityFilterChain h2ConsoleSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .securityMatcher("/h2-console/**")

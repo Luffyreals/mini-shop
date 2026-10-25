@@ -13,9 +13,6 @@ import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -38,13 +35,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * AC-008-1..5 (startup rules, reset of the demo passwords, seed, no H2 console, health only, headers) and the cookie and
  * redirect part of AC-008-11 and AC-008-12.
  *
- * <p>The refusals (AC-008-1, 2) point the datasource at {@code 127.0.0.1:1}, where nothing listens: if the check ran
- * after the DB connection, the failure would be "Connection refused" instead of our message. Every scenario that needs a
- * database gets its own, inside one PostgreSQL container, so contexts that are open together never share rows. All
+ * <p>The refusals (AC-008-1, 2) point the datasource at an H2 server on {@code 127.0.0.1:1}, where nothing listens: if
+ * the check ran after the DB connection, the failure would be "Connection refused" instead of our message. Every
+ * scenario that needs a database gets its own H2 file under {@code target/}, so contexts that are open together never
+ * share rows. All
  * values are passed as command-line arguments, so a real {@code SEED_*} variable on the developer's machine cannot
  * change the result. Passwords used here are test values and never the real ones.
  */
-@Testcontainers(disabledWithoutDocker = true)
 @ExtendWith(OutputCaptureExtension.class)
 class PublicProfileStartupTest {
 
@@ -57,9 +54,6 @@ class PublicProfileStartupTest {
     private static final String EXPECTED_CSP = "default-src 'self'; img-src 'self' data:; object-src 'none'; "
             + "base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
-    @Container
-    static final PostgreSQLContainer postgres = new PostgreSQLContainer(TestcontainersConfiguration.POSTGRES_IMAGE);
-
     private static final PasswordEncoder ENCODER = PasswordEncoderFactories.createDelegatingPasswordEncoder();
 
     private static ConfigurableApplicationContext shared;
@@ -67,7 +61,7 @@ class PublicProfileStartupTest {
 
     @BeforeAll
     static void startSharedPublicApp() throws Exception {
-        String database = StandaloneApp.newDatabase(postgres);
+        String database = StandaloneApp.newDatabase();
         shared = StandaloneApp.start(publicRun(database, NEW_ADMIN, NEW_USER));
         sharedPort = StandaloneApp.portOf(shared);
     }
@@ -82,9 +76,7 @@ class PublicProfileStartupTest {
     // ------------------------------------------------------------------ argument builders
 
     private static String[] databaseArgs(String database) {
-        return new String[]{"--spring.datasource.url=" + StandaloneApp.jdbcUrl(postgres, database),
-                "--spring.datasource.username=" + postgres.getUsername(),
-                "--spring.datasource.password=" + postgres.getPassword()};
+        return new String[]{"--spring.datasource.url=" + database};
     }
 
     private static String[] join(String[] first, String... more) {
@@ -106,8 +98,7 @@ class PublicProfileStartupTest {
     /** A run that must be refused before any database connection (the datasource points at a closed port). */
     private static String[] refusedRun(String profiles, String adminPassword, String userPassword) {
         return new String[]{"--spring.profiles.active=" + profiles,
-                "--spring.datasource.url=jdbc:postgresql://127.0.0.1:1/none", "--spring.datasource.username=nobody",
-                "--spring.datasource.password=nobody",
+                "--spring.datasource.url=jdbc:h2:tcp://127.0.0.1:1/none",
                 "--SEED_ADMIN_PASSWORD=" + adminPassword, "--SEED_USER_PASSWORD=" + userPassword};
     }
 
@@ -183,32 +174,20 @@ class PublicProfileStartupTest {
                 "Same-Verify-Pass-1");
     }
 
-    @Test
-    void start_withH2AndPublicProfiles_isRefused(CapturedOutput output) {
-        int offset = output.getAll().length();
-
-        Throwable failure = StandaloneApp.startExpectingFailure(refusedRun("h2,public", NEW_ADMIN, NEW_USER));
-
-        assertRefused(failure, output, offset, "Profiles 'h2' and 'public' cannot be active together", NEW_ADMIN,
-                NEW_USER);
-        assertThat(output.getAll().substring(offset)).contains("Run public mode with the default (Docker) database "
-                + "or with 'local,public'.");
-    }
-
     // ------------------------------------------------------------------ AC-008-3: reset of the demo passwords
 
     @Test
     void start_whenDemoAccountsHaveDevPasswords_resetsExactlyThoseTwoBeforeTomcatStarts(CapturedOutput output)
             throws Exception {
-        String database = StandaloneApp.newDatabase(postgres);
+        String database = StandaloneApp.newDatabase();
         // 1st run: plain dev mode seeds the demo accounts with Admin@123 / User@123
         try (ConfigurableApplicationContext dev = StandaloneApp.start(devRun(database))) {
             assertThat(dev).isNotNull();
         }
         String otherHash = ENCODER.encode("Other-pass-1");
-        StandaloneApp.execute(postgres, database, "insert into users (email, password_hash, full_name, role) values "
+        StandaloneApp.execute(database, "insert into users (email, password_hash, full_name, role) values "
                 + "('khac@minishop.test', '" + otherHash + "', 'Người khác', 'USER')");
-        assertThat(StandaloneApp.scalar(postgres, database, "select count(*) from users")).isEqualTo("3");
+        assertThat(StandaloneApp.scalar(database, "select count(*) from users")).isEqualTo("3");
         int offset = output.getAll().length();
 
         // 2nd run: public mode with new passwords
@@ -230,7 +209,7 @@ class PublicProfileStartupTest {
             assertThat(ENCODER.matches("Admin@123", hashOf(database, ADMIN_EMAIL))).isFalse();
             assertThat(ENCODER.matches("User@123", hashOf(database, USER_EMAIL))).isFalse();
             assertThat(hashOf(database, "khac@minishop.test")).as("another account is untouched").isEqualTo(otherHash);
-            assertThat(StandaloneApp.scalar(postgres, database, "select count(*) from users")).isEqualTo("3");
+            assertThat(StandaloneApp.scalar(database, "select count(*) from users")).isEqualTo("3");
 
             int port = StandaloneApp.portOf(publicApp);
             // the dev password no longer logs in, the new one does
@@ -248,7 +227,7 @@ class PublicProfileStartupTest {
     }
 
     private static String hashOf(String database, String email) throws Exception {
-        return StandaloneApp.scalar(postgres, database,
+        return StandaloneApp.scalar(database,
                 "select password_hash from users where email = '" + email + "'");
     }
 
@@ -257,7 +236,7 @@ class PublicProfileStartupTest {
     @Test
     void start_onEmptyDatabase_seedsCatalogAndDemoAccountsWithTheConfiguredPasswords(CapturedOutput output)
             throws Exception {
-        String database = StandaloneApp.newDatabase(postgres);
+        String database = StandaloneApp.newDatabase();
         int offset = output.getAll().length();
 
         try (ConfigurableApplicationContext app = StandaloneApp.start(publicRun(database, NEW_ADMIN, NEW_USER))) {
@@ -270,9 +249,9 @@ class PublicProfileStartupTest {
             assertThat(log).contains("Seeded 2 users").contains("Seeded 5 categories and 22 products");
             assertThat(log).doesNotContain(NEW_ADMIN, NEW_USER);
 
-            assertThat(StandaloneApp.scalar(postgres, database, "select count(*) from users")).isEqualTo("2");
-            assertThat(StandaloneApp.scalar(postgres, database, "select count(*) from categories")).isEqualTo("5");
-            assertThat(StandaloneApp.scalar(postgres, database, "select count(*) from products")).isEqualTo("22");
+            assertThat(StandaloneApp.scalar(database, "select count(*) from users")).isEqualTo("2");
+            assertThat(StandaloneApp.scalar(database, "select count(*) from categories")).isEqualTo("5");
+            assertThat(StandaloneApp.scalar(database, "select count(*) from products")).isEqualTo("22");
             assertThat(ENCODER.matches(NEW_ADMIN, hashOf(database, ADMIN_EMAIL))).isTrue();
             assertThat(ENCODER.matches(NEW_USER, hashOf(database, USER_EMAIL))).isTrue();
             assertThat(ENCODER.matches("Admin@123", hashOf(database, ADMIN_EMAIL))).as("never the dev password")

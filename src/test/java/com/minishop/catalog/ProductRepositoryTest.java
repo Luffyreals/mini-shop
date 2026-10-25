@@ -1,13 +1,10 @@
 package com.minishop.catalog;
 
-import com.minishop.TestcontainersConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 
@@ -16,8 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Trừ kho nguyên tử trên PostgreSQL thật (ADR-0005, AC-001-11, AC-001-12). */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(TestcontainersConfiguration.class)
-@Testcontainers(disabledWithoutDocker = true)
 class ProductRepositoryTest {
 
     @Autowired

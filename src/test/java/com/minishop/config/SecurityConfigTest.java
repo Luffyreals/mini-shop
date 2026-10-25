@@ -64,14 +64,17 @@ class SecurityConfigTest {
                 .andExpect(redirectedUrl("/login"));
     }
 
-    /** AC-001-4: ở profile mặc định, /h2-console không công khai và không có filter chain riêng. */
+    /**
+     * ADR-0013: ở chế độ dev, H2 console có filter chain riêng chỉ cho {@code /h2-console/**} (console tự giới hạn
+     * máy này); đường dẫn khác vẫn theo chuỗi chính. Profile public không có chain này ({@code PublicProfileStartupTest}).
+     */
     @Test
-    void h2Console_inDefaultProfile_redirectsToLoginAndHasNoDedicatedFilterChain() throws Exception {
-        mockMvc.perform(get("/h2-console"))
+    void h2Console_inDevMode_hasDedicatedFilterChainOnlyForItsOwnPath() throws Exception {
+        assertThat(context.containsBean("h2ConsoleSecurityFilterChain")).isTrue();
+
+        mockMvc.perform(get("/h2-console-other"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
-
-        assertThat(context.containsBean("h2ConsoleSecurityFilterChain")).isFalse();
     }
 
     /** AC-001-13: actuator health là công khai, không bị chuyển sang /login (slice không có actuator nên không assert 200). */

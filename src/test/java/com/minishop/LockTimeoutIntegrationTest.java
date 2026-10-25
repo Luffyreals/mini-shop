@@ -11,14 +11,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -42,22 +40,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * transaction rolls back and the visitor gets the 500 of phase 7, with exactly one {@code ERROR} log line.
  *
  * <p>Deterministic by construction: the "other transaction" is a plain JDBC {@link Connection} of the test thread that
- * holds the row lock; the real MockMvc request runs on the same thread and simply blocks until PostgreSQL cancels the
- * statement ({@code SQLSTATE 55P03}). No sleeping, no second thread, no race. After the request, the holder writes a
+ * holds the row lock; the real MockMvc request runs on the same thread and simply blocks until H2 gives up on the lock
+ * (error {@code 50200}, ADR-0013). No sleeping, no second thread, no race. After the request, the holder writes a
  * small change and commits, which proves the first transaction is not harmed by the second one's timeout.
  *
  * <p>One case per lock the application takes: {@code users} (cart writes), {@code orders} (customer cancel),
  * {@code categories} (admin delete) and the conditional {@code UPDATE products} of {@code decrementStock} (checkout),
  * which has no {@code @Lock} at all and is therefore the case a per-query JPA hint would have missed.
  *
- * <p>Same annotations as {@code LoginFlowTest}, so the Spring context (and the PostgreSQL container) is shared. All data
+ * <p>Same annotations as {@code LoginFlowTest}, so the Spring context (and its in-memory database) is shared. All data
  * is private to this class (emails {@code @locktimeout.test}, names starting with {@code Lock test}) and removed in
  * {@code @BeforeEach} and {@code @AfterEach}; seed accounts and products are never touched.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
-@Testcontainers(disabledWithoutDocker = true)
 @ExtendWith(OutputCaptureExtension.class)
 class LockTimeoutIntegrationTest {
 
@@ -103,7 +99,7 @@ class LockTimeoutIntegrationTest {
 
     @Test
     void connections_haveFiveSecondLockTimeout() {
-        assertThat(jdbc.queryForObject("show lock_timeout", String.class)).isEqualTo("5s");
+        assertThat(jdbc.queryForObject("select lock_timeout()", Integer.class)).isEqualTo(5000);
     }
 
     @Test
@@ -167,8 +163,8 @@ class LockTimeoutIntegrationTest {
     }
 
     /**
-     * The holder uses FOR NO KEY UPDATE, which does not conflict with the FOR KEY SHARE that the foreign key of
-     * {@code order_items} takes on the product row. So the order is saved, and the request waits exactly at the
+     * The holder locks the product row with FOR UPDATE; H2 checks the foreign key of {@code order_items} without
+     * waiting for that lock. So the order is saved, and the request waits exactly at the
      * conditional {@code UPDATE products} of {@code decrementStock}: the statement the plan calls out because it has
      * no {@code @Lock}.
      */
@@ -178,7 +174,7 @@ class LockTimeoutIntegrationTest {
         long userId = createUser();
         long productId = createProduct(createCategory(), 100_000, 5);
         createCart(userId, productId, 1);
-        Connection holder = holdRow("select id from products where id = ? for no key update", productId);
+        Connection holder = holdRow("select id from products where id = ? for update", productId);
         int logOffset = output.getAll().length();
 
         Timed result = timed(() -> mockMvc.perform(post("/checkout").with(csrf()).with(customer(userId))
@@ -216,7 +212,7 @@ class LockTimeoutIntegrationTest {
         }
         assertThat(errorLines).as("exactly one ERROR line").hasSize(1);
         assertThat(errorLines.get(0)).contains("Unhandled exception: " + request);
-        assertThat(log).contains("lock timeout");
+        assertThat(log).contains("CannotAcquireLockException");
         assertThat(log).as("no personal data in the log")
                 .doesNotContain("@locktimeout.test", "Lock Tester", RECEIVER, PHONE, ADDRESS);
     }
@@ -272,31 +268,31 @@ class LockTimeoutIntegrationTest {
 
     private long createUser() {
         String email = "u" + UUID.randomUUID().toString().replace("-", "").substring(0, 16) + "@locktimeout.test";
-        return jdbc.queryForObject("insert into users (email, password_hash, full_name, role) "
-                + "values (?, ?, 'Lock Tester', 'USER') returning id", Long.class, email, encoder.encode("Test-pass-1"));
+        return jdbc.queryForObject("select id from final table (insert into users (email, password_hash, full_name, role) "
+                + "values (?, ?, 'Lock Tester', 'USER'))", Long.class, email, encoder.encode("Test-pass-1"));
     }
 
     private long createCategory() {
-        return jdbc.queryForObject("insert into categories (name) values (?) returning id", Long.class,
+        return jdbc.queryForObject("select id from final table (insert into categories (name) values (?))", Long.class,
                 "Lock test category " + UUID.randomUUID().toString().substring(0, 8));
     }
 
     private long createProduct(long categoryId, long price, int stock) {
-        return jdbc.queryForObject("insert into products (category_id, name, price, stock, active) "
-                        + "values (?, ?, ?, ?, true) returning id", Long.class,
+        return jdbc.queryForObject("select id from final table (insert into products (category_id, name, price, stock, active) "
+                        + "values (?, ?, ?, ?, true))", Long.class,
                 categoryId, "Lock test product " + UUID.randomUUID().toString().substring(0, 8), price, stock);
     }
 
     private void createCart(long userId, long productId, int quantity) {
-        Long cartId = jdbc.queryForObject("insert into carts (user_id) values (?) returning id", Long.class, userId);
+        Long cartId = jdbc.queryForObject("select id from final table (insert into carts (user_id) values (?))", Long.class, userId);
         jdbc.update("insert into cart_items (cart_id, product_id, quantity) values (?, ?, ?)",
                 cartId, productId, quantity);
     }
 
     private long createOrder(long userId, long productId, int quantity) {
-        Long orderId = jdbc.queryForObject("insert into orders (user_id, status, receiver_name, phone, "
+        Long orderId = jdbc.queryForObject("select id from final table (insert into orders (user_id, status, receiver_name, phone, "
                 + "shipping_address, payment_method, total_amount) values (?, 'PENDING', 'Nguoi nhan', '0912345678', "
-                + "'Dia chi', 'COD', ?) returning id", Long.class, userId, 100_000L * quantity);
+                + "'Dia chi', 'COD', ?))", Long.class, userId, 100_000L * quantity);
         jdbc.update("insert into order_items (order_id, product_id, product_name, unit_price, quantity) "
                 + "select ?, p.id, p.name, p.price, ? from products p where p.id = ?", orderId, quantity, productId);
         return orderId;

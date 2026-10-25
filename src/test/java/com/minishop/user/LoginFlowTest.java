@@ -1,13 +1,11 @@
 package com.minishop.user;
 
-import com.minishop.TestcontainersConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
@@ -20,7 +18,6 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.RequestBuilder;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.net.URI;
 import java.util.Map;
@@ -41,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Luồng đăng nhập/đăng xuất đầu-cuối với tài khoản seed trên PostgreSQL thật. Các ca cũ chỉ đọc.
- * Không dùng @MockitoSpyBean để dùng chung context với các test Testcontainers khác.
+ * Không dùng @MockitoSpyBean để dùng chung context với các test tích hợp khác.
  *
  * <p>GĐ8 (giới hạn đăng nhập sai, AC-008-7, 9, 10): bộ đếm sống cùng Spring context, mà context này được dùng chung
  * (QĐ10). Vì vậy các ca mới chỉ làm đăng nhập sai với tài khoản riêng ({@code throttle-<uuid>@minishop.test}, tạo bằng
@@ -51,8 +48,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
-@Testcontainers(disabledWithoutDocker = true)
 class LoginFlowTest {
 
     private static final String USER_EMAIL = "user@minishop.local";
