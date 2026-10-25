@@ -1,2 +1,3 @@
-org.springframework.boot.EnvironmentPostProcessor=com.minishop.config.StartupRequirements
+org.springframework.boot.EnvironmentPostProcessor=com.minishop.config.StartupRequirements,\
+com.minishop.config.DataDirectory
 org.springframework.boot.diagnostics.FailureAnalyzer=com.minishop.config.StartupRequirementFailureAnalyzer
