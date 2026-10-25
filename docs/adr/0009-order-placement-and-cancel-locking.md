@@ -5,7 +5,7 @@
 
 ## Bối cảnh
 
-GĐ5 ([spec 005](../specs/005-checkout-and-orders.md)) thêm hai thao tác ghi vào tồn kho:
+GĐ5 ([spec 005](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/005-checkout-and-orders.md)) thêm hai thao tác ghi vào tồn kho:
 - **Đặt hàng** đọc giỏ DB, tạo đơn, trừ kho từng dòng, rồi xóa giỏ.
 - **Khách hủy đơn** `PENDING`: đổi trạng thái và cộng lại kho.
 

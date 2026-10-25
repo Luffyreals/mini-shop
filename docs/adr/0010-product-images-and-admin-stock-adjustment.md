@@ -5,7 +5,7 @@
 
 ## Bối cảnh
 
-GĐ6 ([spec 006](../specs/006-admin.md)) cho admin ba quyền ghi mới, mỗi quyền chạm vào một invariant:
+GĐ6 ([spec 006](https://github.com/Luffyreals/mini-shop/blob/v0.8.0/docs/specs/006-admin.md)) cho admin ba quyền ghi mới, mỗi quyền chạm vào một invariant:
 - **Upload ảnh sản phẩm.** File do người dùng gửi lên là bề mặt tấn công: một file HTML đổi đuôi thành `.jpg` vẫn có đuôi và content type "hợp lệ"; tên file như `../../x.png` có thể ghi ra ngoài thư mục; SVG có thể chứa script. Brief §6.1 yêu cầu ảnh đi qua interface `StorageService` để GĐ8 thay bằng dịch vụ đám mây mà không sửa nghiệp vụ.
 - **Đổi tồn kho sau khi tạo sản phẩm.** `Product.stock` đã `updatable = false` (ADR-0005), vì form sửa đọc 10, khách mua 2, admin lưu 10 là mất 2 sản phẩm đã bán.
 - **Xóa danh mục.** Spec cấm xóa danh mục còn sản phẩm (kể cả sản phẩm đã ẩn). Nếu admin thêm sản phẩm vào danh mục đúng lúc đang xóa, cách "đếm rồi xóa" hoặc ra lỗi khóa ngoại (trang 500), hoặc phải bắt exception sau khi transaction PostgreSQL đã hỏng.
