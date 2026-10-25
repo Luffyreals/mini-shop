@@ -5,6 +5,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-25
+
 GĐ8: chia sẻ app đang chạy trên máy cá nhân lên internet ([spec 008](docs/specs/008-deploy.md)).
 
 ### Thêm
