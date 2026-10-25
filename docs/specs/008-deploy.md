@@ -1,7 +1,7 @@
 # Spec 008: Chia sẻ app đang chạy trên máy cá nhân lên internet (chế độ công khai qua tunnel)
 
 - **Giai đoạn:** GĐ8 (tùy chọn)
-- **Trạng thái:** Đang làm
+- **Trạng thái:** Hoàn thành
 - **Liên quan:** brief §4 (demo), §7 (bảo mật, dữ liệu cá nhân), §9 (triển khai), §10 (vận hành), §12 (link demo); ADR-0004, 0007, 0008, 0009, 0011; CLAUDE.md "The seed must be gated before any deployment"; spec 003 câu hỏi 7 (đăng nhập sai), spec 007 §2 (danh sách việc của GĐ8)
 
 > **Thay đổi so với brief §9 (quyết định của người dùng, 2026-10-25):** dự án là dự án học tập, nên **không** deploy lên PaaS và không có CD. App chỉ cần truy cập được từ internet **trong lúc chủ repo đang chạy nó trên máy mình**. Vì vậy GĐ8 bỏ Docker image, PaaS, DB và lưu ảnh trên đám mây, và chỉ giữ những việc cần để một app chạy trên máy cá nhân được mở ra internet một cách an toàn. Brief §9, §11 sẽ được cập nhật theo quyết định này.
@@ -163,3 +163,4 @@ Nguồn tra cứu (2026-10-25): [Cloudflare docs: Quick Tunnels (TryCloudflare)]
 | 2026-10-25 | Người dùng duyệt spec và 9 câu hỏi mở theo khuyến nghị; trạng thái `Đã duyệt` |
 | 2026-10-25 | Người dùng duyệt kế hoạch [phase-8](../plans/phase-8.md): BR-008-2 và AC-008-2 thêm "mật khẩu admin phải khác mật khẩu user" (câu hỏi 1 của kế hoạch); README khuyến nghị PostgreSQL 17, người dùng thử bằng bản 18 đang có (câu hỏi 2); trạng thái `Đang làm` |
 | 2026-10-25 | Sau review: giới hạn đăng nhập đếm mỗi lần thử ngay tại cổng, trước khi kiểm mật khẩu (request song song không vượt được ngưỡng); không tin `X-Forwarded-Host`/`-Port`; `/actuator/health` chỉ trả `{"status":"UP"}`. `phase-verifier` đạt mọi mục kiểm được trên máy (tunnel được giả lập bằng header), `./mvnw verify` 2174 test, 0 bỏ qua. Còn chờ chủ repo chạy tunnel thật: AC-008-17, AC-008-18 và phần tunnel của AC-008-22 (bước U2–U4 của kế hoạch). Vẫn `Đang làm` |
+| 2026-10-25 | Người dùng nghiệm thu bằng việc merge PR #15. Các bước tunnel thật (U2–U4: AC-008-17, AC-008-18, phần tunnel của AC-008-22) do chủ repo tự chạy; kết quả không được ghi lại trong phiên làm việc. Trạng thái `Hoàn thành` |
