@@ -90,8 +90,8 @@ class DataInitializer implements ApplicationRunner {
         items.add(product(home, "Bình giữ nhiệt 500 ml", "Inox hai lớp, giữ nóng 12 giờ", 275000, 70, "binh-giu-nhiet-500ml"));
         items.add(product(books, "Sổ tay bìa cứng A5", "200 trang giấy kẻ ngang", 59000, 150, "so-tay-bia-cung-a5"));
         items.add(product(books, "Bộ bút bi mực gel 10 cây", "Ngòi 0.5 mm, mực đen", 45000, 200, "bo-but-bi-muc-gel-10-cay"));
-        items.add(product(books, "Truyện ngắn chọn lọc", "Tuyển tập truyện ngắn Việt Nam", 98000, 18));
-        items.add(product(books, "Giáo trình lập trình Java cơ bản", "Kiến thức nền tảng cho người mới", 175000, 22));
+        items.add(product(books, "Truyện ngắn chọn lọc", "Tuyển tập truyện ngắn Việt Nam", 98000, 18, "truyen-ngan-chon-loc"));
+        items.add(product(books, "Giáo trình lập trình Java cơ bản", "Kiến thức nền tảng cho người mới", 175000, 22, "giao-trinh-lap-trinh-java-co-ban"));
         items.add(product(sports, "Thảm tập yoga chống trượt", "Dày 6 mm, kèm túi đựng", 230000, 55, "tham-tap-yoga-chong-truot"));
         items.add(product(sports, "Bóng đá số 5", "Da tổng hợp, dùng cho sân cỏ nhân tạo", 280000, 28, "bong-da-so-5"));
         items.add(product(sports, "Dây nhảy thể lực", "Tay cầm chống trượt, chỉnh được độ dài", 79000, 90, "day-nhay-the-luc"));

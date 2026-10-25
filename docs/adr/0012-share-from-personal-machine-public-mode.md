@@ -1,6 +1,6 @@
 # ADR-0012: Chia sẻ app từ máy cá nhân qua Cloudflare Quick Tunnel; chế độ công khai (`public`) và chạy PostgreSQL không Docker (`local`)
 
-- **Trạng thái:** Chấp nhận; phần database (profile `local`, `h2`, Docker Compose) bị thay thế bởi ADR-0013
+- **Trạng thái:** Bị thay thế bởi ADR-0014 (phần database đã bị thay thế bởi ADR-0013 trước đó)
 - **Ngày:** 2026-10-25
 
 ## Bối cảnh

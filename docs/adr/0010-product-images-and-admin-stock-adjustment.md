@@ -1,6 +1,6 @@
 # ADR-0010: Ảnh sản phẩm qua `StorageService` phục vụ tại `/uploads/**`; admin điều chỉnh tồn kho bằng câu UPDATE có điều kiện; khóa `categories` trước `products`
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Chấp nhận; phần phục vụ ảnh tại `/uploads/**` bị thay thế bởi ADR-0014
 - **Ngày:** 2026-10-24
 
 ## Bối cảnh
