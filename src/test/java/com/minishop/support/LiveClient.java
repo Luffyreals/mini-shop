@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -34,13 +35,14 @@ public final class LiveClient {
     private static final Pattern CSRF = Pattern.compile("name=\"_csrf\"\\s+value=\"([^\"]+)\"");
 
     private final int port;
+    private final CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
     private final HttpClient client;
     private boolean loggedIn;
 
     public LiveClient(int port) {
         this.port = port;
         this.client = HttpClient.newBuilder()
-                .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+                .cookieHandler(cookies)
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -48,6 +50,23 @@ public final class LiveClient {
 
     public String url(String path) {
         return "http://localhost:" + port + path;
+    }
+
+    /** The current {@code JSESSIONID} in this visitor's cookie jar, or {@code null} when it has no session. */
+    public String sessionId() {
+        return cookies.getCookieStore().getCookies().stream()
+                .filter(cookie -> cookie.getName().equals("JSESSIONID"))
+                .map(HttpCookie::getValue)
+                .findFirst().orElse(null);
+    }
+
+    /** Puts a given {@code JSESSIONID} into this visitor's cookie jar, like an attacker who planted it. */
+    public LiveClient withSessionId(String sessionId) {
+        HttpCookie cookie = new HttpCookie("JSESSIONID", sessionId);
+        cookie.setPath("/");
+        cookie.setVersion(0);
+        cookies.getCookieStore().add(URI.create(url("/")), cookie);
+        return this;
     }
 
     /** The {@code _csrf} value of the first form in the page; fails the test when there is none. */

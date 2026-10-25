@@ -225,19 +225,6 @@ class LoginFlowTest {
                 .andExpect(content().string(containsString("Xin chào, Khách hàng mẫu")));
     }
 
-    /** AC-003-19: chống session fixation. */
-    @Test
-    void login_changesSessionId() throws Exception {
-        MockHttpSession session = new MockHttpSession();
-        mockMvc.perform(get("/login").session(session)).andExpect(status().isOk());
-        String before = session.getId();
-
-        MockHttpSession after = sessionOf(login(USER_EMAIL, userPassword, session));
-
-        assertThat(after).isNotNull();
-        assertThat(after.getId()).isNotEqualTo(before);
-    }
-
     /** AC-003-20: không có mật khẩu sinh tự động, UserDetailsService duy nhất là của ứng dụng. */
     @Test
     void context_hasOnlyShopUserDetailsService() {
