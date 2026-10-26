@@ -4,7 +4,7 @@
 
 Ứng dụng bán hàng mini chạy trên Windows, viết 100% bằng Java: giao diện JavaFX, nghiệp vụ Spring (không có web server). Đây là **dự án học tập tập trung vào UI/UX**: không phải cửa hàng thật, không có thanh toán thật.
 
-> **Đang chuyển đổi.** Đến `v0.8.0`, Mini Shop là website (Spring MVC + Thymeleaf). Từ sau đó app được làm lại thành ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)), theo từng giai đoạn D1–D6. Hiện đã xong **D1**: cửa sổ khung với thanh trên cùng, database, dữ liệu mẫu, hộp thoại lỗi. Các màn cửa hàng, giỏ hàng, đặt hàng và quản trị được làm lại ở D2–D5; bản web vẫn xem được ở tag `v0.8.0`.
+> **Đang chuyển đổi.** Đến `v0.8.0`, Mini Shop là website (Spring MVC + Thymeleaf). Từ sau đó app được làm lại thành ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)), theo từng giai đoạn D1–D6. Hiện đã xong **D1** (cửa sổ khung với thanh trên cùng, database, dữ liệu mẫu, hộp thoại lỗi) và **D2** (đăng nhập, đăng ký, đăng xuất, menu tài khoản, giỏ khách trong bộ nhớ). Các màn cửa hàng, giỏ hàng, đặt hàng và quản trị được làm lại ở D3–D5; bản web vẫn xem được ở tag `v0.8.0`.
 
 Clone về là chạy được, **chỉ cần JDK 25**: không cần Docker, không cần cài database. Dữ liệu lưu trong thư mục `data/` trên máy bạn, nên tắt app mở lại vẫn còn.
 
@@ -21,7 +21,7 @@ Clone về là chạy được, **chỉ cần JDK 25**: không cần Docker, kh�
 
    Trên Windows PowerShell dùng `.\mvnw.cmd javafx:run`. Lần chạy đầu tự tải Maven và thư viện nên mất vài phút; sau đó cửa sổ "Mini Shop" mở trong khoảng 10 giây. Đóng cửa sổ là tắt app.
 
-**Tài khoản demo** (tự tạo ở lần chạy đầu, cùng 5 danh mục và 22 sản phẩm mẫu; màn đăng nhập có ở D2):
+**Tài khoản demo** (tự tạo ở lần chạy đầu, cùng 5 danh mục và 22 sản phẩm mẫu; bấm "Đăng nhập" ở góc trên phải):
 
 | Vai trò | Email | Mật khẩu |
 |---|---|---|
@@ -71,7 +71,8 @@ App dùng **H2**, một database viết bằng Java chạy bên trong app, lưu 
 - [x] GĐ1–GĐ8 (`v0.1.0`–`v0.8.0`): bản web, gồm nền móng, sản phẩm, đăng nhập, giỏ hàng, đặt hàng, quản trị, hoàn thiện
 - [x] Tái cấu trúc: chạy chỉ với JDK, dữ liệu lưu trong `data/`
 - [x] D1: nền tảng desktop JavaFX (cửa sổ khung, chạy nền, lỗi, một cửa sổ)
-- [ ] D2: tài khoản và giỏ khách · D3: cửa hàng · D4: giỏ hàng và đặt hàng · D5: quản trị · D6: hoàn thiện và đóng gói `MiniShop.exe`
+- [x] D2: tài khoản và giỏ khách (đăng nhập, đăng ký, đăng xuất, gộp giỏ khách khi đăng nhập)
+- [ ] D3: cửa hàng · D4: giỏ hàng và đặt hàng · D5: quản trị · D6: hoàn thiện và đóng gói `MiniShop.exe`
 
 ## Đóng góp
 

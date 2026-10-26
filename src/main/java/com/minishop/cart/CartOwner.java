@@ -1,8 +1,8 @@
 package com.minishop.cart;
 
 /**
- * Ai đang sở hữu giỏ của request hiện tại. Chỉ được xác định từ principal hoặc session
- * (không từ URL hay tham số), nên không thể truy cập giỏ của người khác.
+ * Ai đang sở hữu giỏ hiện tại. Chỉ được xác định từ phiên đăng nhập của app, qua {@code CurrentCartOwner}
+ * (không từ tham số do màn hình truyền vào), nên không thể truy cập giỏ của người khác.
  */
 sealed interface CartOwner {
 
@@ -10,7 +10,7 @@ sealed interface CartOwner {
     record Customer(Long userId) implements CartOwner {
     }
 
-    /** Khách: giỏ trong session. */
+    /** Khách: giỏ trong bộ nhớ của tiến trình. */
     record Guest(GuestCartStore store) implements CartOwner {
     }
 }

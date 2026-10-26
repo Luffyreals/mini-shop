@@ -14,6 +14,8 @@ import java.lang.classfile.attribute.RecordComponentInfo;
 import java.lang.classfile.attribute.RuntimeVisibleAnnotationsAttribute;
 import java.lang.classfile.Annotation;
 import java.lang.constant.ClassDesc;
+import java.lang.constant.ConstantDescs;
+import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -314,6 +316,72 @@ class DesktopRulesDetectViolationsTest {
         assertGreen(ArchitectureTest.javafxConcurrent_onlyInDesktop, classes);
     }
 
+    // ------------------------------------------------------------------ D2 rule 1: nothing below desktop knows desktop
+
+    @Test
+    void servicesEntitiesAndRepositories_flagADependencyOnDesktop() throws IOException {
+        JavaClasses classes = classes(
+                type("com.minishop.catalog.FakeService").annotation("org.springframework.stereotype.Service")
+                        .field("com.minishop.desktop.Toasts"),
+                type("com.minishop.cart.FakeEntity").annotation("jakarta.persistence.Entity")
+                        .field("com.minishop.desktop.ShellPresenter"),
+                type("com.minishop.order.FakeRepository").asInterface()
+                        .implementing("org.springframework.data.repository.Repository")
+                        .field("com.minishop.desktop.BackgroundTasks"));
+
+        assertRed(ArchitectureTest.servicesEntitiesAndRepositories_doNotDependOnDesktop, classes, "FakeService");
+        assertRed(ArchitectureTest.servicesEntitiesAndRepositories_doNotDependOnDesktop, classes, "FakeEntity");
+        assertRed(ArchitectureTest.servicesEntitiesAndRepositories_doNotDependOnDesktop, classes, "FakeRepository");
+    }
+
+    @Test
+    void servicesEntitiesAndRepositories_acceptPresentersThatUseDesktopAndServicesThatDoNot() throws IOException {
+        JavaClasses classes = classes(
+                type("com.minishop.catalog.ProductPresenter").field("com.minishop.desktop.BackgroundTasks")
+                        .field("com.minishop.catalog.FakeService"),
+                type("com.minishop.catalog.FakeService").annotation("org.springframework.stereotype.Service")
+                        .field("com.minishop.common.SafeExceptionLog"),
+                type("com.minishop.catalog.FakeEntity").annotation("jakarta.persistence.Entity")
+                        .field("java.lang.String"));
+
+        assertGreen(ArchitectureTest.servicesEntitiesAndRepositories_doNotDependOnDesktop, classes);
+    }
+
+    // ------------------------------------------------------------------ D2 rule 2: one login path
+
+    private static final String PASSWORD_ENCODER = "org.springframework.security.crypto.password.PasswordEncoder";
+
+    @Test
+    void onlyUserChecksPasswords_flagsMatchesOnThePasswordEncoderFromAnotherFeature() throws IOException {
+        JavaClasses classes = classes(type("com.minishop.cart.QuickLogin").callsMatches(PASSWORD_ENCODER, true));
+
+        assertRed(ArchitectureTest.onlyUserChecksPasswords, classes, "QuickLogin");
+    }
+
+    @Test
+    void onlyUserChecksPasswords_flagsMatchesThroughAConcreteEncoderType() throws IOException {
+        JavaClasses classes = classes(
+                type("com.minishop.order.BcryptLogin")
+                        .callsMatches("org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder", false),
+                type("com.minishop.config.DelegatingLogin")
+                        .callsMatches("org.springframework.security.crypto.password.DelegatingPasswordEncoder", false));
+
+        assertRed(ArchitectureTest.onlyUserChecksPasswords, classes, "BcryptLogin");
+        assertRed(ArchitectureTest.onlyUserChecksPasswords, classes, "DelegatingLogin");
+    }
+
+    @Test
+    void onlyUserChecksPasswords_acceptsUserEncodeInConfigAndMatchesOfOtherTypes() throws IOException {
+        JavaClasses classes = classes(
+                type("com.minishop.user.AuthService").callsMatches(PASSWORD_ENCODER, true),
+                type("com.minishop.user.helper.Deeper").callsMatches(PASSWORD_ENCODER, true),
+                type("com.minishop.config.Seeder").callsEncode(PASSWORD_ENCODER, true),
+                type("com.minishop.cart.Parser").call("java.util.regex.Matcher", false, "matches",
+                        ConstantDescs.CD_boolean));
+
+        assertGreen(ArchitectureTest.onlyUserChecksPasswords, classes);
+    }
+
     // ------------------------------------------------------------------ CurrentUser
 
     @Test
@@ -357,6 +425,9 @@ class DesktopRulesDetectViolationsTest {
         return new ClassFileImporter().importPath(root);
     }
 
+    private record Call(String owner, boolean ownerIsInterface, String method, MethodTypeDesc type) {
+    }
+
     /** A class that has one field per referenced type (so each type becomes a dependency), plus optional parts. */
     private static final class ClassSpec {
 
@@ -364,6 +435,7 @@ class DesktopRulesDetectViolationsTest {
         private final List<String> fieldTypes = new ArrayList<>();
         private final List<String> annotations = new ArrayList<>();
         private final List<String> interfaces = new ArrayList<>();
+        private final List<Call> calls = new ArrayList<>();
         private String superclass = "java.lang.Object";
         private boolean isInterface;
         private boolean isRecord;
@@ -399,6 +471,22 @@ class DesktopRulesDetectViolationsTest {
             return this;
         }
 
+        /** A method {@code run} that calls {@code owner.method(...)} once (null receiver and arguments; never run). */
+        ClassSpec call(String owner, boolean ownerIsInterface, String method, ClassDesc returnType,
+                       ClassDesc... parameters) {
+            calls.add(new Call(owner, ownerIsInterface, method, MethodTypeDesc.of(returnType, parameters)));
+            return this;
+        }
+
+        ClassSpec callsMatches(String owner, boolean ownerIsInterface) {
+            return call(owner, ownerIsInterface, "matches", ConstantDescs.CD_boolean, ClassDesc.of("java.lang.CharSequence"),
+                    ConstantDescs.CD_String);
+        }
+
+        ClassSpec callsEncode(String owner, boolean ownerIsInterface) {
+            return call(owner, ownerIsInterface, "encode", ConstantDescs.CD_String, ClassDesc.of("java.lang.CharSequence"));
+        }
+
         ClassSpec asInterface() {
             isInterface = true;
             return this;
@@ -419,6 +507,24 @@ class DesktopRulesDetectViolationsTest {
                 if (!annotations.isEmpty()) {
                     builder.with(RuntimeVisibleAnnotationsAttribute.of(annotations.stream()
                             .map(type -> Annotation.of(ClassDesc.of(type))).toList()));
+                }
+                if (!calls.isEmpty()) {
+                    builder.withMethodBody("run", MethodTypeDesc.of(ConstantDescs.CD_void), AccessFlag.PUBLIC.mask(),
+                            code -> {
+                                for (Call call : calls) {
+                                    ClassDesc owner = ClassDesc.of(call.owner());
+                                    for (int i = 0; i <= call.type().parameterCount(); i++) {
+                                        code.aconst_null();   // the receiver, then one null per parameter
+                                    }
+                                    if (call.ownerIsInterface()) {
+                                        code.invokeinterface(owner, call.method(), call.type());
+                                    } else {
+                                        code.invokevirtual(owner, call.method(), call.type());
+                                    }
+                                    code.pop();
+                                }
+                                code.return_();
+                            });
                 }
                 for (int i = 0; i < fieldTypes.size(); i++) {
                     int fieldFlags = isInterface

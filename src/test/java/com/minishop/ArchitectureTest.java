@@ -10,10 +10,15 @@ import com.tngtech.archunit.lang.ArchRule;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.persistence.Entity;
 import org.springframework.data.repository.Repository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleName;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -220,6 +225,27 @@ class ArchitectureTest {
     static final ArchRule javafxConcurrent_onlyInDesktop = noClasses()
             .that().resideOutsideOfPackage("com.minishop.desktop..")
             .should().dependOnClassesThat().resideInAPackage("javafx.concurrent..");
+
+    /**
+     * Luật D2-1 (QĐ15, AC-009-11): service, entity và repository không biết {@code desktop}. Service không biết giao
+     * diện; chỉ presenter gọi service, qua {@code BackgroundTasks}.
+     */
+    @ArchTest
+    static final ArchRule servicesEntitiesAndRepositories_doNotDependOnDesktop = noClasses()
+            .that().areAnnotatedWith(Service.class)
+            .or().areAnnotatedWith(Entity.class)
+            .or().areAssignableTo(Repository.class)
+            .should().dependOnClassesThat().resideInAPackage("com.minishop.desktop..");
+
+    /**
+     * Luật D2-2 (QĐ15, AC-009-6): chỉ có một đường đăng nhập. Ngoài {@code com.minishop.user..}, không ai gọi
+     * {@code matches} của một {@code PasswordEncoder} (kể cả qua kiểu cụ thể như {@code BCryptPasswordEncoder}).
+     * {@code config} vẫn được gọi {@code encode} để seed.
+     */
+    @ArchTest
+    static final ArchRule onlyUserChecksPasswords = noClasses()
+            .that().resideOutsideOfPackage("com.minishop.user..")
+            .should().callMethodWhere(target(name("matches")).and(target(owner(assignableTo(PasswordEncoder.class)))));
 
     /** ADR-0014: {@code CurrentUser} là record thuần giá trị (không implements {@code UserDetails}). */
     @ArchTest

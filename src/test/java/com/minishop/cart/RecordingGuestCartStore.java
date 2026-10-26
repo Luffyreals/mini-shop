@@ -6,7 +6,7 @@ import java.util.Optional;
  * Test double của {@link GuestCartStore}: giỏ nằm trong một trường, có đếm số lần {@code getOrCreate},
  * {@code save} và {@code clear} để test khẳng định "không tạo session" (AC-004-5, 6, 14, 22).
  */
-final class InMemoryGuestCartStore implements GuestCartStore {
+final class RecordingGuestCartStore implements GuestCartStore {
 
     private SessionCart cart;
     private int getOrCreateCalls;
@@ -14,7 +14,7 @@ final class InMemoryGuestCartStore implements GuestCartStore {
     private int clearCalls;
 
     /** Dựng sẵn dữ liệu cho test, không tính vào bộ đếm. */
-    InMemoryGuestCartStore seed(Long productId, int quantity) {
+    RecordingGuestCartStore seed(Long productId, int quantity) {
         if (cart == null) {
             cart = new SessionCart();
         }

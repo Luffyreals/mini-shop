@@ -67,7 +67,7 @@ class CartIntegrationTest {
         long a = data.createProduct("A", 100_000, 10);
         int carts = data.totalRows("carts");
         int items = data.totalRows("cart_items");
-        InMemoryGuestCartStore store = new InMemoryGuestCartStore();
+        RecordingGuestCartStore store = new RecordingGuestCartStore();
         CartOwner guest = new CartOwner.Guest(store);
 
         CartChange change = cartService.add(guest, a, 2);
@@ -85,7 +85,7 @@ class CartIntegrationTest {
     /** Spec §8: khách xem giỏ trống không tạo giỏ trong store (không tạo session). */
     @Test
     void guest_viewingAndCountingAnEmptyCart_createsNothingInTheStore() {
-        InMemoryGuestCartStore store = new InMemoryGuestCartStore();
+        RecordingGuestCartStore store = new RecordingGuestCartStore();
         CartOwner guest = new CartOwner.Guest(store);
 
         assertThat(cartService.view(guest).isEmpty()).isTrue();
@@ -379,7 +379,7 @@ class CartIntegrationTest {
         cartService.update(customer, b, 50);         // capped at stock
         cartService.remove(customer, b);
 
-        CartOwner guest = new CartOwner.Guest(new InMemoryGuestCartStore());
+        CartOwner guest = new CartOwner.Guest(new RecordingGuestCartStore());
         cartService.add(guest, a, 1);
         cartService.add(guest, c, 2);
         cartService.update(guest, c, 3);

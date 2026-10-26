@@ -22,6 +22,7 @@ Tài liệu cho người muốn đọc code: công nghệ, cách chia package, c
 - Luồng trạng thái đơn được kiểm soát chặt: `PENDING → CONFIRMED → SHIPPING → DELIVERED`, hoặc `CANCELLED`
 - Ảnh upload được kiểm cả nội dung file (magic bytes) và lưu bằng tên ngẫu nhiên ([ADR-0010](adr/0010-product-images-and-admin-stock-adjustment.md))
 - Không gọi service trên luồng JavaFX: `desktop.BackgroundTasks` chạy việc trên virtual thread rồi trả kết quả về luồng giao diện
+- Phiên đăng nhập là bean `user.AppSession` (một `CurrentUser` bất biến, chỉ đổi trên luồng giao diện). `AuthService.login` chạy ngoài giao dịch; việc gộp giỏ khách cắm vào qua `user.LoginHook` (do `cart` cài đặt) nên `user` không phụ thuộc `cart`, và gộp lỗi không làm hỏng đăng nhập
 
 **Luồng khởi động:**
 

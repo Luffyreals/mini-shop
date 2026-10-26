@@ -7,14 +7,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Giỏ hàng của khách vãng lai, lưu thẳng làm attribute của {@code HttpSession}.
+ * Giỏ hàng của khách vãng lai, giữ trong bộ nhớ của tiến trình qua {@code GuestCartStore}.
  *
  * <ul>
- *   <li><b>Chỉ chứa id sản phẩm và số lượng.</b> Không có entity (sẽ bị serialize, lazy loading hỏng),
+ *   <li><b>Chỉ chứa id sản phẩm và số lượng.</b> Không có entity (lazy loading hỏng),
  *       không có giá hay tên (giá cũ sẽ bị dùng lại): trang giỏ luôn đọc dữ liệu hiện tại từ DB.</li>
- *   <li><b>Mọi method {@code synchronized}</b>: hai tab của cùng một khách dùng chung object này trong
- *       session, và {@link LinkedHashMap} có thể hỏng cấu trúc khi bị sửa đồng thời.</li>
- *   <li><b>{@link Serializable}</b>: session có thể được lưu ra đĩa hoặc phân tán; chỉ chứa kiểu đơn giản
+ *   <li><b>Mọi method {@code synchronized}</b>: nhiều luồng nền có thể cùng sửa giỏ này, và
+ *       {@link LinkedHashMap} có thể hỏng cấu trúc khi bị sửa đồng thời.</li>
+ *   <li><b>{@link Serializable}</b>: giữ từ bản web; vô hại vì chỉ chứa kiểu đơn giản
  *       nên luôn serialize được.</li>
  * </ul>
  */
@@ -22,8 +22,6 @@ final class SessionCart implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
-
-    static final String SESSION_ATTRIBUTE = "minishop.cart";
 
     /** id sản phẩm -> số lượng, giữ thứ tự thêm vào. */
     private final LinkedHashMap<Long, Integer> lines = new LinkedHashMap<>();

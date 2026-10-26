@@ -2,7 +2,7 @@ package com.minishop.desktop;
 
 import com.minishop.catalog.ProductRepository;
 import com.minishop.support.FxTestSupport;
-import com.minishop.support.StandaloneApp;
+import com.minishop.support.TestShellApp;
 import javafx.application.Application;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -25,7 +25,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.testfx.api.FxToolkit;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,30 +40,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ShellSmokeTest {
 
-    /** The app as the launcher would build it, except that the context excludes test classes. */
-    static final class TestApp extends MiniShopApp {
-
-        final AtomicReference<ConfigurableApplicationContext> builtContext = new AtomicReference<>();
-
-        @Override
-        protected ConfigurableApplicationContext createContext(String[] args) {
-            ConfigurableApplicationContext context = StandaloneApp.builder()
-                    .headless(false)
-                    .run("--spring.main.banner-mode=off");
-            builtContext.set(context);
-            return context;
-        }
-    }
-
     private static Thread.UncaughtExceptionHandler previousHandler;
-    private static TestApp app;
+    private static TestShellApp app;
     private static Stage stage;
 
     @BeforeAll
     static void startApp() throws Exception {
         Stage primary = FxTestSupport.startToolkit();
         previousHandler = Thread.getDefaultUncaughtExceptionHandler();
-        app = (TestApp) FxToolkit.setupApplication(TestApp::new);
+        app = (TestShellApp) FxToolkit.setupApplication(TestShellApp::new);
         stage = primary;
         FxTestSupport.await("the main window", () -> primary.isShowing());
     }
@@ -72,7 +56,7 @@ class ShellSmokeTest {
     @AfterAll
     static void cleanUp() throws Exception {
         Thread.setDefaultUncaughtExceptionHandler(previousHandler);
-        if (app != null && app.builtContext.get() != null && app.builtContext.get().isActive()) {
+        if (app != null && app.context() != null && app.context().isActive()) {
             FxToolkit.cleanupApplication(app);
         }
         FxTestSupport.hideAllWindows();
@@ -126,7 +110,8 @@ class ShellSmokeTest {
     @Test
     @Order(4)
     void start_leavesEveryActionDisabledUntilAFeatureAttachesIt() {
-        for (String id : List.of("navStore", "navNew", "navCategories", "cartButton", "accountButton")) {
+        // The account button is not in this list: the login (D2) attaches its action, see the test below.
+        for (String id : List.of("navStore", "navNew", "navCategories", "cartButton")) {
             assertThat(isDisabled(id)).as("#" + id + " is disabled").isTrue();
         }
         assertThat(isDisabled("searchBox")).as("the search box is disabled").isTrue();
@@ -146,7 +131,7 @@ class ShellSmokeTest {
     void start_installsTheAppUncaughtHandlerAndSeedsTheCatalog() {
         assertThat(Thread.getDefaultUncaughtExceptionHandler()).isInstanceOf(UncaughtErrorHandler.class);
 
-        ConfigurableApplicationContext context = app.builtContext.get();
+        ConfigurableApplicationContext context = app.context();
         assertThat(context.isActive()).isTrue();
         assertThat(context.getBean(ProductRepository.class).count()).as("the seed ran").isPositive();
         assertThat(context.getBean(Navigator.class)).isNotNull();
@@ -158,7 +143,7 @@ class ShellSmokeTest {
     void navigatorIsAttachedToTheContentArea() {
         // The bean is the one MainWindow attached: navigating to a route with no factory fails by the factory lookup
         // (not by "not attached"), which proves the lookup path is wired in the real context.
-        Navigator navigator = app.builtContext.get().getBean(Navigator.class);
+        Navigator navigator = app.context().getBean(Navigator.class);
 
         org.assertj.core.api.Assertions.assertThatIllegalStateException()
                 .isThrownBy(() -> navigator.navigateTo(new Route() { }))
@@ -166,9 +151,20 @@ class ShellSmokeTest {
     }
 
     @Test
+    @Order(8)
+    void start_enablesTheGuestAccountButtonBecauseTheLoginAttachedItsAction() {
+        Button account = (Button) lookup("accountButton");
+
+        assertThat(isDisabled("accountButton")).as("#accountButton is enabled for a guest").isFalse();
+        assertThat(account.getText()).isEqualTo("Đăng nhập");
+        assertThat(account.getAccessibleText()).isEqualTo("Đăng nhập");
+        assertThat(((Label) lookup("cartBadge")).getText()).as("a guest's cart is empty").isEqualTo("0");
+    }
+
+    @Test
     @Order(100)
     void stop_closesTheSpringContextAndTheBackgroundExecutor() throws Exception {
-        ConfigurableApplicationContext context = app.builtContext.get();
+        ConfigurableApplicationContext context = app.context();
         FxBackgroundTasks tasks = context.getBean(FxBackgroundTasks.class);
 
         FxToolkit.cleanupApplication((Application) app);

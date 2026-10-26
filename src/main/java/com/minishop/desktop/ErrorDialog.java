@@ -2,16 +2,10 @@ package com.minishop.desktop;
 
 import javafx.application.Platform;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.stage.StageStyle;
-import javafx.stage.Window;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,8 +52,6 @@ final class ErrorDialog {
      * Gọi trên luồng giao diện. Trả về {@code Stage} để test tra node.
      */
     static Stage show(String message, Runnable onClosed) {
-        Theme.tryLoadFonts();
-
         Label text = new Label(message);
         text.setId("errorMessage");
         text.getStyleClass().addAll("text-h2", "dialog-message");
@@ -80,22 +72,7 @@ final class ErrorDialog {
         card.setMaxWidth(CARD_WIDTH);
         card.setAccessibleText(message);
 
-        StackPane root = new StackPane(card);
-        root.getStyleClass().add("dialog-root");
-
-        Scene scene = new Scene(root);
-        scene.setFill(Color.TRANSPARENT);
-        applyStyle(scene);
-
-        Stage stage = new Stage(StageStyle.TRANSPARENT);
-        Window owner = pickOwner();
-        if (owner != null) {
-            stage.initOwner(owner);
-        }
-        stage.initModality(Modality.APPLICATION_MODAL);
-        stage.setTitle(MiniShopApp.TITLE);
-        stage.setResizable(false);
-        stage.setScene(scene);
+        Stage stage = ModalDialogs.create(card);
 
         boolean[] closed = {false};
         stage.setOnHidden(event -> {
@@ -112,34 +89,5 @@ final class ErrorDialog {
         stage.toFront();
         close.requestFocus();
         return stage;
-    }
-
-    /**
-     * Gắn theme; thiếu phông hay stylesheet thì hộp thoại vẫn hiện bằng kiểu mặc định của JavaFX, vì đây là
-     * nơi cuối cùng báo lỗi cho người dùng (kể cả lỗi hỏng tài nguyên giao diện).
-     */
-    private static void applyStyle(Scene scene) {
-        try {
-            Theme.addStylesheet(scene);
-        } catch (RuntimeException e) {
-            LOG.warn("Could not apply the theme to the error dialog: {}", e.toString());
-        }
-    }
-
-    /** Cửa sổ đang hiện (ưu tiên cái đang có focus) để hộp thoại căn giữa theo nó; không có thì {@code null}. */
-    private static Window pickOwner() {
-        Window first = null;
-        for (Window window : Window.getWindows()) {
-            if (!window.isShowing()) {
-                continue;
-            }
-            if (window.isFocused()) {
-                return window;
-            }
-            if (first == null) {
-                first = window;
-            }
-        }
-        return first;
     }
 }
