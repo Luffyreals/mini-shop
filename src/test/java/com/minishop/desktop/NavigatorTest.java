@@ -230,4 +230,111 @@ class NavigatorTest {
         assertThat(childIds(content)).containsExactly("home");
         assertThat(navigator.currentRoute()).isEqualTo(new HomeRoute());
     }
+
+    // ------------------------------------------------------------------ goHome (QĐ10 of D2, AC-009-10)
+
+    @Test
+    void goHome_withoutAHomeRoute_clearsTheContentAndSetsTheCurrentRouteToNull() {
+        StackPane content = contentArea();
+        Navigator navigator = attached(content, new RecordingFactory<>(DetailRoute.class, "detail"));
+        FxTestSupport.runOnFx(() -> navigator.navigateTo(new DetailRoute(1)));
+        List<Route> seen = new ArrayList<>();
+        FxTestSupport.runOnFx(() -> navigator.currentRouteProperty().addListener((o, was, now) -> seen.add(now)));
+
+        FxTestSupport.runOnFx(navigator::goHome);
+
+        assertThat(childIds(content)).isEmpty();
+        assertThat(navigator.currentRoute()).isNull();
+        assertThat(seen).as("listeners are told the route is gone").containsExactly((Route) null);
+    }
+
+    @Test
+    void goHome_withoutAHomeRoute_whenNothingIsShown_isHarmless() {
+        StackPane content = contentArea();
+        Navigator navigator = attached(content, new RecordingFactory<>(HomeRoute.class, "home"));
+
+        FxTestSupport.runOnFx(navigator::goHome);
+
+        assertThat(childIds(content)).isEmpty();
+        assertThat(navigator.currentRoute()).isNull();
+    }
+
+    @Test
+    void goHome_withAHomeRoute_buildsTheScreenOfThatRoute() {
+        StackPane content = contentArea();
+        RecordingFactory<HomeRoute> home = new RecordingFactory<>(HomeRoute.class, "home");
+        Navigator navigator = attached(content, home, new RecordingFactory<>(DetailRoute.class, "detail"));
+        HomeRoute homeRoute = new HomeRoute();
+        navigator.setHomeRoute(homeRoute);
+        FxTestSupport.runOnFx(() -> navigator.navigateTo(new DetailRoute(5)));
+
+        FxTestSupport.runOnFx(navigator::goHome);
+
+        assertThat(childIds(content)).containsExactly("home");
+        assertThat(navigator.currentRoute()).isSameAs(homeRoute);
+        assertThat(home.created).containsExactly(homeRoute);
+    }
+
+    @Test
+    void goHome_afterTheHomeRouteIsRemoved_clearsTheContentAgain() {
+        StackPane content = contentArea();
+        Navigator navigator = attached(content, new RecordingFactory<>(HomeRoute.class, "home"));
+        navigator.setHomeRoute(new HomeRoute());
+        FxTestSupport.runOnFx(navigator::goHome);
+        assertThat(childIds(content)).containsExactly("home");
+
+        navigator.setHomeRoute(null);
+        FxTestSupport.runOnFx(navigator::goHome);
+
+        assertThat(childIds(content)).isEmpty();
+        assertThat(navigator.currentRoute()).isNull();
+    }
+
+    @Test
+    void goHome_fromAnotherThread_clearsTheContentOnTheFxThread() {
+        StackPane content = contentArea();
+        Navigator navigator = attached(content, new RecordingFactory<>(DetailRoute.class, "detail"));
+        FxTestSupport.runOnFx(() -> navigator.navigateTo(new DetailRoute(1)));
+
+        navigator.goHome();
+        FxTestSupport.await("the content to be cleared", () -> childIds(content).isEmpty());
+
+        assertThat(navigator.currentRoute()).isNull();
+    }
+
+    @Test
+    void goHome_fromAnotherThread_withAHomeRoute_buildsItOnTheFxThread() {
+        StackPane content = contentArea();
+        RecordingFactory<HomeRoute> home = new RecordingFactory<>(HomeRoute.class, "home");
+        Navigator navigator = attached(content, home);
+        navigator.setHomeRoute(new HomeRoute());
+
+        navigator.goHome();
+        FxTestSupport.await("the home screen", () -> childIds(content).equals(List.of("home")));
+
+        assertThat(home.createdOnFxThread).isTrue();
+    }
+
+    @Test
+    void goHome_withAHomeRouteThatHasNoFactory_throwsAtTheCallAndKeepsTheContent() {
+        StackPane content = contentArea();
+        Navigator navigator = attached(content, new RecordingFactory<>(DetailRoute.class, "detail"));
+        FxTestSupport.runOnFx(() -> navigator.navigateTo(new DetailRoute(1)));
+        navigator.setHomeRoute(new HomeRoute());
+
+        assertThatIllegalStateException()
+                .isThrownBy(navigator::goHome)
+                .withMessageContaining(HomeRoute.class.getName());
+
+        assertThat(childIds(content)).containsExactly("detail");
+    }
+
+    @Test
+    void goHome_beforeAttach_throwsOnTheFxThread() {
+        Navigator navigator = new Navigator(List.of());
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> FxTestSupport.runOnFx(navigator::goHome))
+                .withMessageContaining("chưa được gắn");
+    }
 }

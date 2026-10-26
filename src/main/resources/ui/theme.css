@@ -141,6 +141,127 @@
     -fx-opacity: 0.55;
 }
 
+/* ---- Ô nhập (TextField, PasswordField): dạng pill, nền surface-muted; viền focus accent ở trên ---- */
+.text-field,
+.password-field {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 999px;
+    -fx-padding: 11px 20px;
+    -fx-prompt-text-fill: -ms-muted;
+    -fx-text-fill: -ms-ink;
+}
+
+/* ---- Biểu mẫu: nhãn, gợi ý, lỗi và thông báo đều là chữ (không chỉ màu) ---- */
+.field-label {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+}
+
+.field-hint {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+    -fx-wrap-text: true;
+}
+
+.field-error {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-danger;
+    -fx-wrap-text: true;
+}
+
+/* form-notice: thông báo thành công. Chữ màu ink (-ms-success trên nền trắng chỉ ~3.4:1, thiếu cho chữ 15px);
+   trạng thái nằm ở câu chữ và dấu tích màu success đứng trước (đồ họa cần 3:1 là đủ) */
+.form-notice {
+    -fx-font-size: 15px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-wrap-text: true;
+    -fx-content-display: left;
+    -fx-graphic-text-gap: 10px;
+}
+
+.form-notice-icon {
+    -fx-fill: transparent;
+    -fx-stroke: -ms-success;
+    -fx-stroke-width: 2.5px;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+
+/* link-button: nút chữ không nền ("Chưa có tài khoản? Đăng ký"); gạch chân khi trỏ chuột hoặc có focus,
+   viền focus accent lấy từ .button:focused */
+.link-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+    -fx-padding: 6px 12px;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+}
+
+.link-button:hover,
+.link-button:focused {
+    -fx-underline: true;
+}
+
+/* dialog-title: tiêu đề hộp thoại, h1 32 */
+.dialog-title {
+    -fx-font-size: 32px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -ms-ink;
+}
+
+/* ---- Menu của nút tài khoản (MainWindow): thẻ trắng bo 20, mục dạng pill ---- */
+.account-menu {
+    -fx-background-color: -ms-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 20px;
+    -fx-padding: 8px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 24, 0, 0, 8);
+}
+
+.account-menu .menu-item {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 999px;
+    -fx-padding: 8px 18px;
+}
+
+.account-menu .menu-item .label {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 15px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+}
+
+.account-menu .menu-item:hover,
+.account-menu .menu-item:focused {
+    -fx-background-color: -ms-surface-muted;
+}
+
+.account-menu .menu-item:focused {
+    -fx-border-color: -ms-accent;
+}
+
+.account-menu .menu-item:hover .label,
+.account-menu .menu-item:focused .label {
+    -fx-text-fill: -ms-ink;
+}
+
 /* ---- Thanh trên ---- */
 .top-bar {
     -fx-padding: 10px 12px 10px 24px;

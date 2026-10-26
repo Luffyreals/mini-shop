@@ -31,6 +31,7 @@ public class Navigator {
     private final ReadOnlyObjectWrapper<Route> currentRoute = new ReadOnlyObjectWrapper<>(this, "currentRoute");
     private Map<Class<?>, ScreenFactory<?>> factories;
     private StackPane content;
+    private volatile Route homeRoute;
 
     @Autowired
     public Navigator(ObjectProvider<ScreenFactory<?>> factories) {
@@ -63,6 +64,30 @@ public class Navigator {
             show(factory, route);
         } else {
             Platform.runLater(() -> show(factory, route));
+        }
+    }
+
+    /**
+     * Đặt route của "trang chủ" cho {@link #goHome()}; {@code null} để gỡ. Chưa kiểm factory ở đây: route
+     * chưa có factory sẽ ném lỗi khi {@code goHome()} điều hướng tới nó. D3 đặt {@code HomeRoute}.
+     */
+    public void setHomeRoute(Route route) {
+        this.homeRoute = route;
+    }
+
+    /**
+     * Về "trang chủ" (đăng xuất, AC-009-10): điều hướng tới route đã đặt bằng {@link #setHomeRoute}; nếu chưa
+     * đặt thì xóa vùng nội dung và đặt {@link #currentRoute()} về {@code null}. Gọi từ luồng nào cũng được,
+     * giống {@link #navigateTo}.
+     */
+    public void goHome() {
+        Route home = homeRoute;
+        if (home != null) {
+            navigateTo(home);
+        } else if (Platform.isFxApplicationThread()) {
+            clear();
+        } else {
+            Platform.runLater(this::clear);
         }
     }
 
@@ -101,6 +126,14 @@ public class Navigator {
         Node screen = create(factory, route);
         content.getChildren().setAll(screen);
         currentRoute.set(route);
+    }
+
+    private void clear() {
+        if (content == null) {
+            throw new IllegalStateException("Navigator chưa được gắn vào vùng nội dung");
+        }
+        content.getChildren().clear();
+        currentRoute.set(null);
     }
 
     private static <R extends Route> Node create(ScreenFactory<R> factory, Route route) {

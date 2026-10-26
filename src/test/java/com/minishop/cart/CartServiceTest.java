@@ -45,7 +45,7 @@ import static org.mockito.Mockito.when;
 /**
  * Quy tắc nghiệp vụ của {@link CartService} (AC-004-2..8, 11..16, 20..22; BR-004-1..7).
  *
- * <p>Repository là mock; giỏ khách là {@link InMemoryGuestCartStore}; giỏ DB là {@link Cart} thật nằm trong
+ * <p>Repository là mock; giỏ khách là {@link RecordingGuestCartStore}; giỏ DB là {@link Cart} thật nằm trong
  * bộ nhớ. Hầu hết case chạy cho cả hai loại chủ giỏ ({@code customer=false} là khách).
  */
 @ExtendWith(MockitoExtension.class)
@@ -111,7 +111,7 @@ class CartServiceTest {
     /** Giỏ của một chủ giỏ cụ thể, cùng cách dựng dữ liệu và đọc kết quả cho cả hai loại. */
     private final class Fixture {
         final boolean customer;
-        final InMemoryGuestCartStore store = new InMemoryGuestCartStore();
+        final RecordingGuestCartStore store = new RecordingGuestCartStore();
         Cart cart;
         final CartOwner owner;
 
