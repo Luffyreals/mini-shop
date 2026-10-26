@@ -1,6 +1,6 @@
 # ADR-0011: Xử lý lỗi tập trung: trang lỗi qua `BasicErrorController`, một cơ chế 404, log 500 bằng resolver cuối chuỗi
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Bị thay thế bởi ADR-0014
 - **Ngày:** 2026-10-24
 
 ## Bối cảnh

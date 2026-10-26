@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Dữ liệu riêng của test giỏ trên PostgreSQL thật (QĐ12): người dùng email đuôi {@code @cart.test}, sản phẩm tên
+ * Dữ liệu riêng của test giỏ trên H2 thật (QĐ12): người dùng email đuôi {@code @cart.test}, sản phẩm tên
  * bắt đầu bằng {@code Cart test }, danh mục lấy từ seed. Không bao giờ sửa tài khoản hay sản phẩm seed.
  */
 final class CartTestData {

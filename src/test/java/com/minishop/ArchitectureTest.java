@@ -1,36 +1,24 @@
 package com.minishop;
 
 import com.minishop.catalog.ProductRepository;
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaCodeUnit;
-import com.tngtech.archunit.core.domain.TryCatchBlock;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
-import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
-import com.tngtech.archunit.lang.ConditionEvents;
-import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.persistence.Entity;
-import jakarta.servlet.Filter;
 import org.springframework.data.repository.Repository;
-import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import java.util.Set;
+import org.springframework.stereotype.Service;
 
 import static com.tngtech.archunit.base.DescribedPredicate.not;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleName;
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.codeUnits;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 /** AC-001-15: quy tắc phụ thuộc giữa các tính năng được kiểm tự động, không cần Docker. */
@@ -112,19 +100,6 @@ class ArchitectureTest {
     static final ArchRule featureSlices_haveNoCycles = slices().matching("com.minishop.(*)..")
             .should().beFreeOfCycles();
 
-    @ArchTest
-    static final ArchRule controllers_doNotDependOnRepositories = noClasses()
-            .that().areAnnotatedWith(Controller.class)
-            .or().areAnnotatedWith(RestController.class)
-            .should().dependOnClassesThat().areAssignableTo(Repository.class);
-
-    /** Spec 002 §8: view chỉ nhận DTO, controller không đụng tới entity. */
-    @ArchTest
-    static final ArchRule controllers_doNotDependOnEntities = noClasses()
-            .that().areAnnotatedWith(Controller.class)
-            .or().areAnnotatedWith(RestController.class)
-            .should().dependOnClassesThat().areAnnotatedWith(Entity.class);
-
     /** GĐ6: admin chỉ được dùng catalog, order, storage, user và common (không cart, không config). */
     @ArchTest
     static final ArchRule admin_dependsOnlyOnAllowedFeatures = noClasses().that().resideInAPackage("com.minishop.admin..")
@@ -150,58 +125,106 @@ class ArchitectureTest {
     static final ArchRule noFieldInjection = fields()
             .should().notBeAnnotatedWith(Autowired.class);
 
-    // ---------------------------------------------------------------------------------------------------------------
-    // GĐ7, spec 007 §8 và ADR-0011: xử lý lỗi nằm một chỗ (common), controller chỉ khai báo trang 404 bằng @NotFoundPage.
-
-    /** Spec 007 §8: không còn @ControllerAdvice 404 lặp lại trong catalog, cart, order, admin; chỉ common được có advice. */
-    @ArchTest
-    static final ArchRule onlyCommonDeclaresControllerAdvice = noClasses()
-            .that().resideOutsideOfPackage("com.minishop.common..")
-            .should().beAnnotatedWith(ControllerAdvice.class)
-            .orShould().beAnnotatedWith(RestControllerAdvice.class);
-
-    /** Spec 007 §8: không method @ExceptionHandler nào ngoài common (kể cả trong controller, như 404 quản trị của GĐ6). */
-    @ArchTest
-    static final ArchRule exceptionHandlersOnlyInCommon = noMethods()
-            .that().areDeclaredInClassesThat().resideOutsideOfPackage("com.minishop.common..")
-            .should().beAnnotatedWith(ExceptionHandler.class);
-
-    /** Spec 007 §8: controller không bắt Exception, RuntimeException hay Throwable (lỗi lạ để resolver cuối chuỗi log). */
-    @ArchTest
-    static final ArchRule controllers_doNotCatchGenericExceptions = codeUnits()
-            .that().areDeclaredInClassesThat().areMetaAnnotatedWith(Controller.class)
-            .should(notCatchGenericExceptions());
-
-    // ---------------------------------------------------------------------------------------------------------------
-    // GĐ8, ADR-0012 và plan QĐ4: cổng đăng nhập sai nằm trong chuỗi filter của Spring Security.
+    // ------------------------------------------------------------------ desktop (ADR-0014, spec 009)
 
     /**
-     * QĐ4: một {@code jakarta.servlet.Filter} là bean Spring thì Boot đăng ký nó thêm một lần nữa như servlet filter
-     * thường, chạy ngoài Spring Security (ở đây: {@code LoginThrottleFilter} sẽ chạy trước cả CsrfFilter và chạy hai
-     * lần). Filter phải được tạo bằng {@code new} trong {@code SecurityConfig}. Dùng "meta-annotated" để bắt luôn
-     * {@code @Service}, {@code @Configuration}... (đều mang {@code @Component}).
+     * Lớp giao diện của tính năng: {@code *Screen}, {@code *Drawer}, {@code *Dialog}, {@code *Presenter}, kể cả lớp
+     * lồng và lớp ẩn danh của chúng (tên nhị phân {@code ProductScreen$1}).
+     */
+    private static final DescribedPredicate<JavaClass> UI_CLASSES = nameMatching(
+            "UI classes (*Screen, *Drawer, *Dialog, *Presenter)", ".*(Screen|Drawer|Dialog|Presenter)(\\$.*)?");
+
+    private static final DescribedPredicate<JavaClass> PRESENTERS = nameMatching(
+            "presenters (*Presenter)", ".*Presenter(\\$.*)?");
+
+    private static DescribedPredicate<JavaClass> nameMatching(String description, String regex) {
+        return DescribedPredicate.describe(description, javaClass -> javaClass.getName().matches(regex));
+    }
+
+    /** Luật 1: ngoài {@code desktop} chỉ lớp giao diện được import {@code javafx..}. */
+    @ArchTest
+    static final ArchRule javafx_onlyInDesktopAndUiClasses = noClasses()
+            .that().resideOutsideOfPackage("com.minishop.desktop..").and(not(UI_CLASSES))
+            .should().dependOnClassesThat().resideInAPackage("javafx..");
+
+    /**
+     * Luật 2 (danh sách cho phép): từ {@code javafx..}, presenter chỉ được dùng {@code javafx.beans..} và
+     * {@code javafx.collections..}. Mọi gói khác (scene, stage, concurrent, fxml, application, animation, geometry...)
+     * đều bị cấm.
      */
     @ArchTest
-    static final ArchRule servletFilters_areNotSpringComponents = noClasses()
-            .that().areAssignableTo(Filter.class)
-            .should().beMetaAnnotatedWith(Component.class);
+    static final ArchRule presenters_useOnlyJavaFxBeansAndCollections = noClasses().that(PRESENTERS)
+            .should().dependOnClassesThat(resideInAPackage("javafx..")
+                    .and(not(resideInAnyPackage("javafx.beans..", "javafx.collections.."))))
+            .allowEmptyShould(true);
 
-    private static final Set<String> GENERIC_EXCEPTIONS = Set.of(
-            Exception.class.getName(), RuntimeException.class.getName(), Throwable.class.getName());
+    /** Tên nút giao diện: {@code *Screen}, {@code *Drawer}, {@code *Dialog} (kể cả lớp lồng, ẩn danh). */
+    private static final DescribedPredicate<JavaClass> UI_NODE_CLASSES = nameMatching(
+            "UI node classes (*Screen, *Drawer, *Dialog)", ".*(Screen|Drawer|Dialog)(\\$.*)?");
 
-    static ArchCondition<JavaCodeUnit> notCatchGenericExceptions() {
-        return new ArchCondition<>("not catch Exception, RuntimeException or Throwable") {
-            @Override
-            public void check(JavaCodeUnit unit, ConditionEvents events) {
-                for (TryCatchBlock block : unit.getTryCatchBlocks()) {
-                    for (JavaClass caught : block.getCaughtThrowables()) {
-                        if (GENERIC_EXCEPTIONS.contains(caught.getName())) {
-                            events.add(SimpleConditionEvent.violated(unit, unit.getFullName() + " catches "
-                                    + caught.getName() + " at " + block.getSourceCodeLocation()));
-                        }
-                    }
-                }
-            }
-        };
-    }
+    /** AC-009-11: nút giao diện ngoài {@code desktop} không gọi {@code @Service}; chỉ presenter gọi, qua {@code BackgroundTasks}. */
+    @ArchTest
+    static final ArchRule uiNodes_doNotDependOnServices = noClasses()
+            .that().resideOutsideOfPackage("com.minishop.desktop..").and(UI_NODE_CLASSES)
+            .should().dependOnClassesThat().areAnnotatedWith(Service.class)
+            .allowEmptyShould(true);
+
+    /** Luật 3a: service không import JavaFX. */
+    @ArchTest
+    static final ArchRule services_doNotDependOnJavaFx = noClasses().that().areAnnotatedWith(Service.class)
+            .should().dependOnClassesThat().resideInAPackage("javafx..");
+
+    /** Luật 3b: entity không import JavaFX. */
+    @ArchTest
+    static final ArchRule entities_doNotDependOnJavaFx = noClasses().that().areAnnotatedWith(Entity.class)
+            .should().dependOnClassesThat().resideInAPackage("javafx..");
+
+    /** Luật 3c: repository không import JavaFX. */
+    @ArchTest
+    static final ArchRule repositories_doNotDependOnJavaFx = noClasses().that().areAssignableTo(Repository.class)
+            .should().dependOnClassesThat().resideInAPackage("javafx..");
+
+    /** Luật 3d: {@code common}, {@code config} và {@code storage} không import JavaFX. */
+    @ArchTest
+    static final ArchRule commonConfigAndStorage_doNotDependOnJavaFx = noClasses()
+            .that().resideInAnyPackage("com.minishop.common..", "com.minishop.config..", "com.minishop.storage..")
+            .should().dependOnClassesThat().resideInAPackage("javafx..");
+
+    /** {@code common} là tầng dưới của mọi tính năng và không còn dính web (ADR-0014). */
+    @ArchTest
+    static final ArchRule common_doesNotDependOnSpringWeb = noClasses().that().resideInAPackage("com.minishop.common..")
+            .should().dependOnClassesThat().resideInAnyPackage("org.springframework.web..");
+
+    /** Luật 4 (QĐ4): {@code desktop} là tầng dưới, không bao giờ import một tính năng. */
+    @ArchTest
+    static final ArchRule desktop_dependsOnNoFeature = noClasses().that().resideInAPackage("com.minishop.desktop..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.minishop.catalog..", "com.minishop.cart..", "com.minishop.order..", "com.minishop.user..",
+                    "com.minishop.admin..", "com.minishop.storage..", "com.minishop.config..");
+
+    /** Luật 5: tầng dưới không biết {@code desktop}. */
+    @ArchTest
+    static final ArchRule commonAndConfig_doNotDependOnDesktop = noClasses()
+            .that().resideInAnyPackage("com.minishop.common..", "com.minishop.config..")
+            .should().dependOnClassesThat().resideInAPackage("com.minishop.desktop..");
+
+    /** Luật 6: màn hình không đụng repository hay entity; gọi service qua {@code BackgroundTasks}. */
+    @ArchTest
+    static final ArchRule uiClasses_doNotUseRepositoriesOrEntities = noClasses().that(UI_CLASSES)
+            .should().dependOnClassesThat().areAssignableTo(Repository.class)
+            .orShould().dependOnClassesThat().areAnnotatedWith(Entity.class)
+            .allowEmptyShould(true);
+
+    /** Luật 7 (AC-009-11): việc nền chỉ đi qua {@code BackgroundTasks}, nên ngoài {@code desktop} không dùng {@code javafx.concurrent}. */
+    @ArchTest
+    static final ArchRule javafxConcurrent_onlyInDesktop = noClasses()
+            .that().resideOutsideOfPackage("com.minishop.desktop..")
+            .should().dependOnClassesThat().resideInAPackage("javafx.concurrent..");
+
+    /** ADR-0014: {@code CurrentUser} là record thuần giá trị (không implements {@code UserDetails}). */
+    @ArchTest
+    static final ArchRule currentUser_isARecord = classes()
+            .that().haveFullyQualifiedName("com.minishop.user.CurrentUser")
+            .should().beRecords();
 }
+

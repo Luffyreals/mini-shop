@@ -1,9 +1,9 @@
 package com.minishop.catalog;
 
+import com.minishop.common.NotFoundException;
 import com.minishop.storage.ImageUpload;
 import com.minishop.support.AdminTestData;
 import com.minishop.support.TestImages;
-import com.minishop.user.CurrentUser;
 import com.minishop.user.Role;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,13 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -33,37 +30,26 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Product administration on a real PostgreSQL (AC-006-17, 19, 22, 23, 25..27, 30, 32, 33, 37, 51): the upload
- * flow through MockMvc and the public file, the list, the stale-form stock rule (deterministic, no sleeping),
+ * Product administration on H2 (AC-006-17, 19, 22, 23, 25..27, 30, 32, 33, 37, 51): the upload
+ * flow through the service and the stored file, the list, the stale-form stock rule (deterministic, no sleeping),
  * image replacement and rollback, hide/show against the storefront, and the stock adjustment at its bounds.
  * No @Transactional (the tests need real commits); only {@link AdminTestData} rows and files under the test
  * upload directory.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 class ProductAdminIntegrationTest {
 
     private static final Pattern UPLOAD_PATH = Pattern.compile("/uploads/[0-9a-f-]{36}\\.png");
 
     @Autowired
-    MockMvc mockMvc;
+    ProductService productService;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -107,14 +93,6 @@ class ProductAdminIntegrationTest {
 
     // ---------------------------------------------------------------- helpers
 
-    private RequestPostProcessor loggedInAdmin() {
-        return user(new CurrentUser(admin.id(), admin.email(), null, admin.fullName(), Role.ADMIN));
-    }
-
-    private static RequestPostProcessor loggedInCustomer(AdminTestData.TestUser u) {
-        return user(new CurrentUser(u.id(), u.email(), null, u.fullName(), Role.USER));
-    }
-
     private static ProductDraft draft(long categoryId, String name, String price) {
         return new ProductDraft(name, categoryId, new BigDecimal(price), null);
     }
@@ -133,13 +111,19 @@ class ProductAdminIntegrationTest {
         }
     }
 
-    private String html(String url, RequestPostProcessor who) throws Exception {
-        return mockMvc.perform(get(url).with(who)).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+
+    /** Seed images live under {@code static/} until B2b moves them to the resource root; accept either place. */
+    private static Path seedImageFile(String seedPath) {
+        return Stream.of(Path.of("src/main/resources/static" + seedPath), Path.of("src/main/resources" + seedPath))
+                .map(Path::toAbsolutePath)
+                .filter(Files::exists)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("seed image is in neither resource location: " + seedPath));
     }
 
-    private String publicHtml(String url) throws Exception {
-        return mockMvc.perform(get(url)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    private static boolean seedImageOnClasspath(String seedPath) {
+        return new ClassPathResource("static" + seedPath).exists()
+                || new ClassPathResource(seedPath.substring(1)).exists();
     }
 
     private List<Long> adminListIds(String query) {
@@ -150,44 +134,40 @@ class ProductAdminIntegrationTest {
 
     // ------------------------------------------------- AC-006-19, 27, 51
 
+    /**
+     * Was the web test {@code postProduct_withPng…} and H2DatabaseSmokeTest#admin_fullFlow (product with a PNG). The
+     * price notation "1.250.000" is {@code admin.PriceInputTest}; here the parsed 1250000 reaches the service.
+     * Serving the file publicly was a web concern and is gone with the web layer.
+     */
     @Test
-    void postProduct_withPngAndFormattedPrice_createsRowStoresUuidFileAndServesItPublicly() throws Exception {
+    void create_withPngUpload_createsRowStoresUuidFileAndShowsOnTheStorefront() throws Exception {
         String name = AdminTestData.NAME_PREFIX + "Bình nước 1L";
         byte[] png = TestImages.png(500 * 1024);
+        ImageUpload upload = ImageUpload.from("ảnh sản phẩm (1).PNG", "image/png", png.length,
+                new ByteArrayResource(png)).orElseThrow();
 
-        String location = mockMvc.perform(multipart("/admin/products")
-                        .file(new MockMultipartFile("image", "ảnh sản phẩm (1).PNG", "image/png", png))
-                        .param("name", name).param("categoryId", String.valueOf(category))
-                        .param("price", "1.250.000").param("initialStock", "30").param("active", "true")
-                        .param("description", "Giữ nhiệt 12 giờ")
-                        .with(loggedInAdmin()).with(csrf()))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(flash().attribute("notice", "Đã thêm sản phẩm " + name + "."))
-                .andReturn().getResponse().getRedirectedUrl();
+        SavedProduct saved = productAdminService.create(admin.id(),
+                new ProductDraft(name, category, new BigDecimal("1250000"), "Giữ nhiệt 12 giờ"), 30, true, upload);
 
-        assertThat(location).matches("/admin/products/\\d+/edit");
-        long id = Long.parseLong(location.split("/")[3]);
-        Map<String, Object> row = data.productRow(id);
+        assertThat(saved.name()).isEqualTo(name);
+        Map<String, Object> row = data.productRow(saved.id());
         assertThat((BigDecimal) row.get("price")).isEqualByComparingTo("1250000");
         assertThat(row.get("stock")).isEqualTo(30);
         assertThat(row.get("active")).isEqualTo(true);
         assertThat(row.get("category_id")).isEqualTo(category);
+        assertThat(row.get("description")).isEqualTo("Giữ nhiệt 12 giờ");
         String imagePath = (String) row.get("image_path");
         assertThat(imagePath).matches(UPLOAD_PATH.pattern());
         assertThat(imagePath).doesNotContain("ảnh").doesNotContain("PNG");
         Path file = data.uploadFile(imagePath);
         assertThat(file).exists().hasBinaryContent(png);
 
-        // The storefront shows the new image, and the file is public (no login).
-        String detail = publicHtml("/products/" + id);
-        Matcher m = Pattern.compile("src=\"(" + UPLOAD_PATH.pattern() + ")\"").matcher(detail);
-        assertThat(m.find()).as("detail page has the uploaded image").isTrue();
-        assertThat(m.group(1)).isEqualTo(imagePath);
-        byte[] served = mockMvc.perform(get(imagePath)).andExpect(status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
-                        .string("X-Content-Type-Options", "nosniff"))
-                .andReturn().getResponse().getContentAsByteArray();
-        assertThat(served).isEqualTo(png);
+        // The storefront reads the new product and points at the stored file.
+        ProductDetailView detail = productService.getDetail(saved.id());
+        assertThat(detail.name()).isEqualTo(name);
+        assertThat(detail.price()).isEqualByComparingTo("1250000");
+        assertThat(detail.inStock()).isTrue();
+        assertThat(detail.imageUrl()).contains(file.getFileName().toString());
     }
 
     // ---------------------------------------------------------- AC-006-17
@@ -213,8 +193,10 @@ class ProductAdminIntegrationTest {
         // A bad page is page 1.
         assertThat(adminListIds("|abc")).containsExactlyElementsOf(newestFirst.subList(0, 20));
 
-        String page = html("/admin/products", loggedInAdmin());
-        assertThat(page).contains("Đã ẩn").contains("Đang bán").contains("/admin/products/" + hiddenA + "/edit");
+        assertThat(productAdminService.list(null, null).products()).filteredOn(r -> r.id() == hiddenA)
+                .singleElement().satisfies(r -> assertThat(r.active()).isFalse());
+        assertThat(productAdminService.list(null, null).products()).filteredOn(r -> r.id() == newestFirst.get(2))
+                .singleElement().satisfies(r -> assertThat(r.active()).isTrue());
     }
 
     @Test
@@ -228,11 +210,8 @@ class ProductAdminIntegrationTest {
         assertThat(adminListIds("%|")).containsExactly(percent);
         assertThat(adminListIds("_|")).containsExactly(underscore);
         assertThat(productAdminService.list("không-có-sản-phẩm-nào-như-vậy", null).isEmpty()).isTrue();
-
-        // .param (not a URL template) so MockMvc does not encode the percent sign a second time.
-        String page = mockMvc.perform(get("/admin/products").param("q", "%").with(loggedInAdmin()))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        assertThat(page).contains("100% cotton").doesNotContain("áo-search");
+        assertThat(productAdminService.list("%", null).products()).extracting(AdminProductRow::name)
+                .containsExactly(data.productName(percent));
     }
 
     // ---------------------------------------------------------- AC-006-23
@@ -319,16 +298,16 @@ class ProductAdminIntegrationTest {
         long product = data.createProduct(category, "Seed image", 100_000, 5, true);
         String seedPath = "/images/products/ao-thun-cotton-co-tron.jpg";
         data.setImagePath(product, seedPath);
-        Path staticFile = Path.of("src/main/resources/static" + seedPath).toAbsolutePath();
-        assertThat(staticFile).exists();
+        Path seedFile = seedImageFile(seedPath);
+        assertThat(seedFile).exists();
         Set<Path> uploadsBefore = filesInUploadDir();
 
         productAdminService.update(admin.id(), product, draft(category, data.productName(product), "100000"), png(200));
 
         String newPath = (String) data.productRow(product).get("image_path");
         assertThat(newPath).matches(UPLOAD_PATH.pattern());
-        assertThat(staticFile).exists();
-        assertThat(new org.springframework.core.io.ClassPathResource("static" + seedPath).exists()).isTrue();
+        assertThat(seedFile).exists();
+        assertThat(seedImageOnClasspath(seedPath)).isTrue();
         assertThat(filesInUploadDir()).hasSize(uploadsBefore.size() + 1).contains(data.uploadFile(newPath));
     }
 
@@ -356,69 +335,64 @@ class ProductAdminIntegrationTest {
 
     // ---------------------------------------------------------- AC-006-22
 
+    /**
+     * Was a web test through the cart and order pages. The cart shows current prices (CartIntegrationTest#
+     * view_afterPriceChange_showsNewPriceAndTotal) and the order shows its snapshot through OrderService
+     * (OrderIntegrationTest#getOrder_afterProductPriceAndNameChange_stillShowsSnapshot); here the edit itself:
+     * the storefront shows the new data and the stored order lines are not touched.
+     */
     @Test
-    void update_nameAndPrice_showOnStorefrontAndCartButOldOrderKeepsSnapshot() throws Exception {
+    void update_nameAndPrice_showOnStorefrontButOldOrderLineKeepsSnapshot() {
         var customer = data.createUser(Role.USER);
         long product = data.createProduct(category, "Before edit", 100_000, 10, true);
         String oldName = data.productName(product);
-        data.createCart(customer.id(), new long[]{product, 2});
         long orderId = data.insertOrder(customer.id(), "PENDING", new long[]{product, 1});
         String newName = AdminTestData.NAME_PREFIX + "After edit " + product;
 
-        mockMvc.perform(post("/admin/products/" + product).with(loggedInAdmin()).with(csrf())
-                        .param("name", newName).param("categoryId", String.valueOf(category))
-                        .param("price", "150.000").param("description", "Mới"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/products/" + product + "/edit"))
-                .andExpect(flash().attribute("notice", "Đã cập nhật sản phẩm " + newName + "."));
+        String saved = productAdminService.update(admin.id(), product,
+                new ProductDraft(newName, category, new BigDecimal("150000"), "Mới"), null);
 
-        assertThat(publicHtml("/products/" + product)).contains(newName).contains("150.000 ₫");
-        assertThat(html("/cart", loggedInCustomer(customer))).contains(newName).contains("150.000 ₫")
-                .doesNotContain(oldName);
-        String order = html("/orders/" + orderId, loggedInCustomer(customer));
-        assertThat(order).contains(oldName).contains("100.000 ₫").doesNotContain(newName);
+        assertThat(saved).isEqualTo(newName);
+        ProductDetailView detail = productService.getDetail(product);
+        assertThat(detail.name()).isEqualTo(newName);
+        assertThat(detail.price()).isEqualByComparingTo("150000");
+        assertThat(detail.description()).isEqualTo("Mới");
+        Map<String, Object> line = jdbc.queryForMap(
+                "select product_name, unit_price from order_items where order_id = ?", orderId);
+        assertThat(line.get("product_name")).isEqualTo(oldName);
+        assertThat((BigDecimal) line.get("unit_price")).isEqualByComparingTo("100000");
     }
 
     // ---------------------------------------------------------- AC-006-25
 
+    /** The cart line of a hidden product is labelled discontinued: CartIntegrationTest#view_withHidden…. */
     @Test
-    void hide_thenShow_removesProductFromStorefrontAndMarksCartLineDiscontinued() throws Exception {
+    void setActive_hideThenShow_removesProductFromStorefrontAndKeepsCartLines() {
         var customer = data.createUser(Role.USER);
         long product = data.createProduct(category, "Hide me", 100_000, 10, true);
         data.createCart(customer.id(), new long[]{product, 1});
         String name = data.productName(product);
 
-        mockMvc.perform(post("/admin/products/" + product + "/hide").with(loggedInAdmin()).with(csrf())
-                        .param("from", "edit"))
-                .andExpect(redirectedUrl("/admin/products/" + product + "/edit"))
-                .andExpect(flash().attribute("notice",
-                        "Đã ẩn sản phẩm " + name + ". Khách sẽ không thấy sản phẩm này nữa."));
+        assertThat(productAdminService.setActive(admin.id(), product, false)).isEqualTo(name);
 
         assertThat(data.productRow(product).get("active")).isEqualTo(false);
-        mockMvc.perform(get("/products/" + product)).andExpect(status().isNotFound());
-        assertThat(html("/cart", loggedInCustomer(customer))).contains("Sản phẩm đã ngừng bán");
+        assertThatThrownBy(() -> productService.getDetail(product)).isInstanceOf(NotFoundException.class);
+        assertThat(data.cartLines(customer.id())).containsExactly(Map.entry(product, 1));
 
-        mockMvc.perform(post("/admin/products/" + product + "/show").with(loggedInAdmin()).with(csrf())
-                        .param("from", "edit"))
-                .andExpect(flash().attribute("notice", "Đã hiện lại sản phẩm " + name + "."));
+        assertThat(productAdminService.setActive(admin.id(), product, true)).isEqualTo(name);
 
-        mockMvc.perform(get("/products/" + product)).andExpect(status().isOk())
-                .andExpect(content().string(containsString(name)));
+        assertThat(productService.getDetail(product).name()).isEqualTo(name);
     }
 
     // -------------------------------------------------- AC-006-32, 33, 37
 
     @Test
-    void postStock_plusFive_updatesStockAndFlashesNewValue() throws Exception {
+    void adjustStock_plusFive_updatesStockAndReportsNewValue() {
         long product = data.createProduct(category, "Stock plus", 100_000, 10, true);
         String name = data.productName(product);
 
-        mockMvc.perform(post("/admin/products/" + product + "/stock").with(loggedInAdmin()).with(csrf())
-                        .param("delta", "+5"))
-                .andExpect(redirectedUrl("/admin/products/" + product + "/edit"))
-                .andExpect(flash().attribute("notice",
-                        "Đã cập nhật tồn kho sản phẩm " + name + ". Tồn kho hiện tại: 15."))
-                .andExpect(flash().attribute("noticeKind", "success"));
+        assertThat(productAdminService.adjustStock(admin.id(), product, 5))
+                .isEqualTo(new StockAdjustResult.Adjusted(name, 15));
 
         assertThat(data.stock(product)).isEqualTo(15);
     }

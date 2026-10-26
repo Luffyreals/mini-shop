@@ -1,6 +1,6 @@
 # ADR-0003: Render phía server bằng Thymeleaf
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Bị thay thế bởi ADR-0014
 - **Ngày:** 2026-10-23
 
 ## Bối cảnh

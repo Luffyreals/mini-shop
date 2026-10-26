@@ -1,10 +1,10 @@
 package com.minishop.order;
 
 import com.minishop.catalog.ProductAdminService;
+import com.minishop.common.NotFoundException;
 import com.minishop.catalog.StockAdjustResult;
 import com.minishop.support.AdminTestData;
 import com.minishop.support.AdminTestData.Outcome;
-import com.minishop.user.CurrentUser;
 import com.minishop.user.Role;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -13,12 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -31,15 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Admin order handling on a real PostgreSQL (AC-006-35, 36, 38, 42, 44, 46..48, 51): list and detail
@@ -49,13 +37,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * No @Transactional: races need real transactions. Only {@link AdminTestData} rows.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 class OrderAdminIntegrationTest {
 
     private static final int ROUNDS = 20;
-
-    @Autowired
-    MockMvc mockMvc;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -102,14 +86,6 @@ class OrderAdminIntegrationTest {
     }
 
     // ---------------------------------------------------------------- helpers
-
-    private RequestPostProcessor loggedInAdmin() {
-        return user(new CurrentUser(admin.id(), admin.email(), null, admin.fullName(), Role.ADMIN));
-    }
-
-    private static RequestPostProcessor loggedInCustomer(AdminTestData.TestUser u) {
-        return user(new CurrentUser(u.id(), u.email(), null, u.fullName(), Role.USER));
-    }
 
     private static CheckoutForm form() {
         return new CheckoutForm("Người nhận", "0912345678", "12 Lê Lợi", null);
@@ -196,20 +172,17 @@ class OrderAdminIntegrationTest {
     // ---------------------------------------------------------- AC-006-44
 
     @Test
-    void postStatusCancelled_onConfirmedOrder_cancelsRestoresStockAndFlashes() throws Exception {
+    void changeStatus_cancelledOnConfirmedOrder_cancelsAndRestoresStock() {
         var u = customer();
         long a = data.createProduct(category, "Cancel A", 100_000, 3, true);   // 5 before the order took 2
         long orderId = data.insertOrder(u.id(), "CONFIRMED", new long[]{a, 2});
 
-        mockMvc.perform(post("/admin/orders/" + orderId + "/status").with(loggedInAdmin()).with(csrf())
-                        .param("status", "CANCELLED"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/orders/" + orderId))
-                .andExpect(flash().attribute("notice", "Đã hủy đơn hàng #" + orderId + " và hoàn lại tồn kho."))
-                .andExpect(flash().attribute("noticeKind", "success"));
+        StatusChangeResult result = orderAdminService.changeStatus(admin.id(), orderId, "CANCELLED");
 
+        assertThat(result).isInstanceOf(StatusChangeResult.Cancelled.class);
         assertThat(data.orderStatus(orderId)).isEqualTo("CANCELLED");
         assertThat(data.stock(a)).isEqualTo(5);
+        assertThat(orderAdminService.getOrder(orderId).isFinalStatus()).isTrue();
     }
 
     @Test
@@ -243,39 +216,90 @@ class OrderAdminIntegrationTest {
     // ---------------------------------------------------------- AC-006-42
 
     @Test
-    void postStatusConfirmed_onPendingOrder_customerSeesNewStatusAndNoCancelButton() throws Exception {
+    void changeStatus_confirmedOnPendingOrder_customerSeesNewStatusAndCanNoLongerCancel() {
         var u = customer();
         long a = data.createProduct(category, "Confirm", 100_000, 5, true);
         long orderId = data.insertOrder(u.id(), "PENDING", new long[]{a, 1});
-        MockHttpSession session = new MockHttpSession();
-        mockMvc.perform(get("/orders/" + orderId).with(loggedInCustomer(u)).session(session))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Hủy đơn hàng")));
+        assertThat(orderService.getOrder(u.id(), orderId).cancellable()).isTrue();
 
-        mockMvc.perform(post("/admin/orders/" + orderId + "/status").with(loggedInAdmin()).with(csrf())
-                        .param("status", "CONFIRMED"))
-                .andExpect(flash().attribute("notice",
-                        "Đã chuyển đơn hàng #" + orderId + " sang trạng thái Đã xác nhận."));
+        StatusChangeResult result = orderAdminService.changeStatus(admin.id(), orderId, "CONFIRMED");
 
-        String html = mockMvc.perform(get("/orders/" + orderId).with(loggedInCustomer(u)))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        assertThat(html).contains("Đã xác nhận").doesNotContain("Hủy đơn hàng").doesNotContain("/cancel");
+        assertThat(result).isEqualTo(new StatusChangeResult.Changed("Đã xác nhận"));
+        OrderDetailView seenByCustomer = orderService.getOrder(u.id(), orderId);
+        assertThat(seenByCustomer.statusLabel()).isEqualTo("Đã xác nhận");
+        assertThat(seenByCustomer.cancellable()).isFalse();
+        assertThat(orderService.cancelByCustomer(u.id(), orderId)).isEqualTo(CancelResult.NOT_CANCELLABLE);
         assertThat(data.stock(a)).isEqualTo(5);
     }
 
     // ---------------------------------------------------------- AC-006-48
 
+    /** BR-009-4: the customer path never opens another account's order, even with an admin's id; the admin path does. */
     @Test
-    void adminOpeningAnotherUsersOrderOnTheCustomerPath_is404ButAdminPathWorks() throws Exception {
+    void adminIdOnTheCustomerPath_isNotFoundButTheAdminServiceOpensTheOrder() {
         var owner = customer();
         long a = data.createProduct(category, "Foreign", 100_000, 5, true);
         long orderId = data.insertOrder(owner.id(), "PENDING", new long[]{a, 1});
 
-        mockMvc.perform(get("/orders/" + orderId).with(loggedInAdmin())).andExpect(status().isNotFound());
-        mockMvc.perform(get("/orders").with(loggedInAdmin())).andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("/orders/" + orderId))));
-        mockMvc.perform(get("/admin/orders/" + orderId).with(loggedInAdmin())).andExpect(status().isOk())
-                .andExpect(content().string(containsString("Đơn hàng #" + orderId)));
+        assertThatThrownBy(() -> orderService.getOrder(admin.id(), orderId)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> orderService.cancelByCustomer(admin.id(), orderId))
+                .isInstanceOf(NotFoundException.class);
+        assertThat(orderService.listOrders(admin.id(), null).orders()).extracting(OrderSummaryView::id)
+                .doesNotContain(orderId);
+
+        AdminOrderDetail detail = orderAdminService.getOrder(orderId);
+        assertThat(detail.id()).isEqualTo(orderId);
+        assertThat(detail.customerEmail()).isEqualTo(owner.email());
+        assertThat(data.orderStatus(orderId)).isEqualTo("PENDING");
+    }
+
+    // ---------------------------------------------------------- AC-006-52
+
+    /**
+     * The main flow of the brief at service level (was AdminFlowTest and H2DatabaseSmokeTest#admin_fullFlow): a
+     * customer orders, the admin walks the order PENDING, CONFIRMED, SHIPPING, DELIVERED (each step offers only the
+     * next buttons), stock stays decremented, the customer sees "Đã giao" and the revenue grows by the order total.
+     */
+    @Test
+    void customerOrders_adminWalksOrderToDelivered_customerSeesDeliveredAndRevenueGrows() {
+        var u = customer();
+        long product = data.createProduct(category, "Flow", 100_000, 10, true);
+        BigDecimal revenueBefore = orderAdminService.dashboard().deliveredRevenue();
+        data.createCart(u.id(), new long[]{product, 2});
+        long orderId = orderService.placeOrder(u.id(), form(), new BigDecimal("200000"));
+        assertThat(data.stock(product)).isEqualTo(8);
+        assertThat(orderAdminService.listOrders("PENDING", null).orders()).extracting(AdminOrderRow::id)
+                .contains(orderId);
+        assertThat(orderAdminService.getOrder(orderId).actions()).extracting(StatusAction::targetStatus)
+                .containsExactly("CONFIRMED", "CANCELLED");
+
+        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "CONFIRMED"))
+                .isEqualTo(new StatusChangeResult.Changed("Đã xác nhận"));
+        assertThat(orderAdminService.getOrder(orderId).actions()).extracting(StatusAction::targetStatus)
+                .containsExactly("SHIPPING", "CANCELLED");
+
+        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "SHIPPING"))
+                .isEqualTo(new StatusChangeResult.Changed("Đang giao"));
+        assertThat(orderAdminService.getOrder(orderId).actions()).extracting(StatusAction::targetStatus)
+                .containsExactly("DELIVERED");
+
+        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "DELIVERED"))
+                .isEqualTo(new StatusChangeResult.Changed("Đã giao"));
+        assertThat(orderAdminService.getOrder(orderId).isFinalStatus()).isTrue();
+        assertThat(data.orderStatus(orderId)).isEqualTo("DELIVERED");
+        assertThat(data.stock(product)).isEqualTo(8);
+
+        // A refused step changes nothing: a delivered order cannot be cancelled, so no stock comes back.
+        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "CANCELLED"))
+                .isEqualTo(new StatusChangeResult.NotAllowed("Đã giao", "Đã hủy"));
+        assertThat(data.stock(product)).isEqualTo(8);
+
+        assertThat(orderService.listOrders(u.id(), null).orders()).singleElement().satisfies(o -> {
+            assertThat(o.id()).isEqualTo(orderId);
+            assertThat(o.statusLabel()).isEqualTo("Đã giao");
+        });
+        assertThat(orderAdminService.dashboard().deliveredRevenue().subtract(revenueBefore))
+                .isEqualByComparingTo("200000");
     }
 
     private static void pause(long nanos) {

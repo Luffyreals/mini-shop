@@ -1,6 +1,6 @@
 # ADR-0007: Đăng nhập bằng form trên session, principal riêng, email luôn chữ thường
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Bị thay thế bởi ADR-0014
 - **Ngày:** 2026-10-24
 
 ## Bối cảnh

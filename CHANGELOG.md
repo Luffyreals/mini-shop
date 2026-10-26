@@ -5,19 +5,26 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
-Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)).
+Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)). Sau đó Mini Shop chuyển từ website sang ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)); giai đoạn D1 dựng nền tảng, các màn hình được làm lại ở D2–D5.
 
 ### Thay đổi
+- App là ứng dụng desktop JavaFX 25 chạy bằng `./mvnw javafx:run`; Spring chạy không có web server. Cửa sổ khung có thanh trên cùng (logo, mục điều hướng, ô tìm kiếm, nút giỏ, nút đăng nhập; các nút bật dần ở D2–D4), theme "soft modern" và phông Plus Jakarta Sans đóng gói kèm.
+- Lời gọi service chạy nền trên virtual thread; lỗi không lường trước ghi một dòng log và hiện hộp thoại "Đã có lỗi xảy ra. Vui lòng thử lại." thay vì làm treo app.
+- Chỉ một cửa sổ app chạy được một lúc: mở lần hai báo "Mini Shop đang chạy ở một cửa sổ khác." và thoát.
+- Ảnh sản phẩm mẫu chuyển sang `images/products/` (đường dẫn lưu trong DB không đổi); nguồn và giấy phép ảnh chuyển từ `credits.html` sang `images/credits.tsv`. Thay 5 ảnh sản phẩm chưa đúng chủ thể và thêm ảnh cho 2 cuốn sách.
+- `CurrentUser` là record không chứa hash mật khẩu; chỉ còn `spring-security-crypto` để băm mật khẩu.
+- Test web (MockMvc, Tomcat thật) được bỏ; các quy tắc nghiệp vụ chúng kiểm được chuyển xuống test service. CI chạy test giao diện dưới màn hình ảo `xvfb`.
 - Database duy nhất là H2 nhúng lưu ra file `data/minishop.mv.db`; dữ liệu còn sau khi tắt app. Ảnh upload chuyển vào `data/uploads/`. Biến `DATA_DIR` đổi thư mục.
-- H2 console bật ở chế độ dev tại `/h2-console` (chỉ máy chạy app mở được), vẫn tắt ở profile `public`.
 - Test chạy trên H2 trong bộ nhớ, mỗi Spring context một database; CI chỉ cần JDK.
-- README viết lại cho người mới clone: chạy thử, gợi ý dạo một vòng, phần giao diện (UI/UX), dữ liệu lưu ở đâu.
-- Chia sẻ qua Cloudflare Tunnel chuyển sang "sau MVP": hướng dẫn tạm ở `docs/deploy-cloudflare.md`, code profile `public` giữ nguyên.
+- README viết lại cho người mới clone: chạy thử, phần giao diện (UI/UX), dữ liệu lưu ở đâu.
 - `.claude/` và `CLAUDE.md` (công cụ AI lúc phát triển) không còn nằm trong git.
 - README rút gọn; kiến trúc, sơ đồ bảng, bảng ADR và cấu trúc repo chuyển sang `docs/architecture.md`; quy ước đóng góp gộp vào README.
 - Link tới đặc tả giai đoạn trong ADR và CHANGELOG trỏ tới tag `v0.8.0`.
 
 ### Bỏ
+- Giao diện web: controller, Thymeleaf, Bootstrap/WebJars, CSS/JS, trang lỗi HTTP, ảnh chụp màn hình web trong `docs/images/` (vẫn xem được ở tag `v0.8.0`).
+- Spring Security phần web (form login, CSRF, CSP, giới hạn số lần đăng nhập sai), actuator, H2 console, DevTools.
+- Chế độ `public` và chia sẻ qua Cloudflare Tunnel (`application-public.yml`, `docs/deploy-cloudflare.md`).
 - PostgreSQL, Docker Compose (`compose.yaml`), Testcontainers, profile `local` và `h2`.
 - Tài liệu quy trình theo giai đoạn (`docs/project-brief.md`, `docs/specs/`, `docs/plans/`), vẫn xem được ở tag `v0.8.0`.
 - `CONTRIBUTING.md`, template issue và PR, Dependabot.

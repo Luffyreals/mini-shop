@@ -1,0 +1,274 @@
+/*
+ * Mini Shop - theme JavaFX (ADR-0014). Hướng "soft modern": nền xám nhạt, thẻ trắng bo lớn,
+ * nút dạng viên thuốc, một màu nhấn cam.
+ *
+ * Token (docs/plans/desktop-app.md mục 4):
+ *   - Màu là "looked-up color" khai trên .root, dùng bằng tên (-ms-accent). Màn hình không viết mã màu.
+ *   - JavaFX CSS không có biến cho bo góc, bóng và cỡ chữ, nên mỗi giá trị nằm trong MỘT class dùng chung
+ *     (.card, .image-well, .pill, .text-*), kèm comment ghi tên token. Màn hình chỉ gắn class.
+ *   - Phông Plus Jakarta Sans do Theme.loadFonts() nạp trước khi gắn file này. JavaFX xếp mỗi file Medium và
+ *     SemiBold vào một family riêng, nên -fx-font-weight 500/600 KHÔNG chọn được chúng (đã đo). Dùng
+ *     family "Plus Jakarta Sans Medium" / "Plus Jakarta Sans SemiBold" với -fx-font-weight: normal; 400 và 700
+ *     dùng family "Plus Jakarta Sans" với weight normal / bold.
+ */
+
+.root {
+    /* ---- Token màu ---- */
+    -ms-bg: #F6F6F8;            /* nền cửa sổ */
+    -ms-surface: #FFFFFF;       /* thẻ, thanh trên */
+    -ms-surface-muted: #F1F1F4; /* ô ảnh trong thẻ, ô tìm kiếm, dòng giỏ */
+    -ms-ink: #16161A;           /* chữ chính, nút đen */
+    -ms-muted: #6B6B76;         /* chữ phụ */
+    -ms-accent: #FF5A1F;        /* nút chính, giá giảm, chấm logo, badge giỏ */
+    -ms-dark: #1B1B1F;          /* khối tối, nút "Thêm" */
+    -ms-success: #12A150;       /* chấm "Còn hàng" */
+    -ms-danger: #D92D20;        /* lỗi, "Hết hàng" */
+
+    /* Màu mặc định của Modena (focus, chọn) đổi sang accent */
+    -fx-accent: -ms-accent;
+    -fx-focus-color: -ms-accent;
+    -fx-faint-focus-color: transparent;
+    -fx-base: -ms-surface-muted;
+    -fx-control-inner-background: -ms-surface;
+
+    -fx-font-family: "Plus Jakarta Sans";
+    -fx-font-size: 15px;
+    -fx-text-fill: -ms-ink;
+}
+
+.window {
+    -fx-background-color: -ms-bg;
+}
+
+.label {
+    -fx-text-fill: -ms-ink;
+}
+
+/* ---- Cỡ chữ: 56 / 32 / 20 / 15 / 12 ---- */
+.text-display { -fx-font-size: 56px; -fx-font-weight: 700; }  /* display 56 */
+.text-h1      { -fx-font-size: 32px; -fx-font-weight: 700; }  /* h1 32 */
+.text-h2      { -fx-font-family: "Plus Jakarta Sans SemiBold"; -fx-font-size: 20px; -fx-font-weight: normal; }  /* h2 20 */
+.text-body    { -fx-font-size: 15px; -fx-font-weight: normal; }  /* body 15 */
+.text-caption { -fx-font-family: "Plus Jakarta Sans Medium"; -fx-font-size: 12px; -fx-font-weight: normal; }  /* caption 12 */
+.text-muted   { -fx-text-fill: -ms-muted; }
+
+/* ---- Bo góc và bóng ---- */
+/* card: thẻ bo 28, nền surface, một mức bóng rất nhẹ */
+.card {
+    -fx-background-color: -ms-surface;
+    -fx-background-radius: 28px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 24, 0, 0, 8);
+}
+
+/* image-well: ô ảnh bo 20, nền surface-muted */
+.image-well {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-radius: 20px;
+}
+
+/* pill: nút/ô dạng viên thuốc, bo 999 */
+.pill {
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+}
+
+/* ---- Ô ảnh: ô giữ chỗ khi chưa có ảnh, đang nạp hoặc nạp lỗi (ImageTile) ---- */
+.image-tile .placeholder-icon {
+    -fx-stroke: -ms-muted;
+}
+
+/* ---- Toast (Toasts): nền ink cho chữ trắng đủ tương phản; loại thông báo nằm ở biểu tượng tròn
+   có hình riêng (dấu tích / chấm than / chữ i), và accessible text bắt đầu bằng nhãn loại ---- */
+.toast-layer {
+    -fx-padding: 0 0 32px 0;   /* khoảng cách từ toast tới đáy cửa sổ */
+}
+
+.toast {
+    -fx-background-color: -ms-ink;
+    -fx-padding: 10px 22px 10px 10px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 24, 0, 0, 8);
+}
+
+.toast-text {
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-surface;
+    -fx-max-width: 440px;
+}
+
+.toast-icon {
+    -fx-background-radius: 999px;
+    -fx-min-width: 28px;
+    -fx-min-height: 28px;
+    -fx-pref-width: 28px;
+    -fx-pref-height: 28px;
+    -fx-max-width: 28px;
+    -fx-max-height: 28px;
+}
+
+.toast-icon-info    { -fx-background-color: -ms-muted; }
+.toast-icon-success { -fx-background-color: -ms-success; }
+.toast-icon-error   { -fx-background-color: -ms-danger; }
+
+.toast-glyph {
+    -fx-fill: transparent;
+    -fx-stroke: -ms-surface;
+    -fx-stroke-width: 2px;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+
+/* ---- Nút: viền trong suốt 2px để viền focus hiện ra mà không làm lệch bố cục ---- */
+.button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-padding: 8px 14px;
+    -fx-cursor: hand;
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+}
+
+.button:focused,
+.text-field:focused {
+    -fx-border-color: -ms-accent;
+}
+
+.button:disabled,
+.text-field:disabled {
+    -fx-opacity: 0.55;
+}
+
+/* ---- Thanh trên ---- */
+.top-bar {
+    -fx-padding: 10px 12px 10px 24px;
+}
+
+.logo-text {
+    -fx-font-size: 20px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -ms-ink;
+}
+
+.logo-dot {
+    -fx-background-color: -ms-accent;
+    -fx-background-radius: 999px;
+    -fx-translate-y: 5px;
+}
+
+.nav-link {
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+}
+
+.nav-link:hover {
+    -fx-background-color: -ms-surface-muted;
+}
+
+.icon-stroke {
+    -fx-fill: transparent;
+    -fx-stroke: -ms-ink;
+    -fx-stroke-width: 1.75px;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+
+/* Ô tìm kiếm */
+.search-box:disabled {
+    -fx-opacity: 0.55;
+}
+
+.search-box *:disabled {
+    -fx-opacity: 1;
+}
+
+.search-field {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-padding: 11px 20px 11px 46px;
+    -fx-prompt-text-fill: -ms-muted;
+    -fx-text-fill: -ms-ink;
+}
+
+.search-icon {
+    -fx-stroke: -ms-muted;
+}
+
+/* Nút giỏ: tròn 44px, nền ink; badge accent */
+.cart-wrap {
+    -fx-padding: 0 4px 0 4px;
+}
+
+.cart-button {
+    -fx-background-color: -ms-ink;
+    -fx-padding: 0;
+    -fx-min-width: 44px;
+    -fx-min-height: 44px;
+    -fx-pref-width: 44px;
+    -fx-pref-height: 44px;
+    -fx-max-width: 44px;
+    -fx-max-height: 44px;
+}
+
+.cart-button:hover {
+    -fx-background-color: -ms-dark;
+}
+
+.cart-icon {
+    -fx-stroke: -ms-surface;
+}
+
+.cart-badge {
+    -fx-background-color: -ms-accent;
+    -fx-min-width: 20px;
+    -fx-min-height: 20px;
+    -fx-alignment: center;
+    -fx-padding: 0 5px 0 5px;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -ms-surface;
+    -fx-translate-x: 6px;
+    -fx-translate-y: -6px;
+}
+
+.account-button {
+    -fx-background-color: -ms-surface-muted;
+    -fx-padding: 11px 20px;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+}
+
+.account-button:hover {
+    -fx-background-color: derive(-ms-surface-muted, -4%);
+}
+
+/* ---- Hộp thoại (ErrorDialog): thẻ .card trên nền trong suốt; phần đệm chừa chỗ cho bóng của thẻ ---- */
+.dialog-root {
+    -fx-background-color: transparent;
+    -fx-padding: 32px;
+}
+
+.dialog-card {
+    -fx-padding: 28px;
+}
+
+.dialog-message {
+    -fx-wrap-text: true;
+}
+
+/* button-primary: nút chính dạng pill, nền ink + chữ surface (tương phản cao; accent chỉ dùng cho viền focus) */
+.button-primary {
+    -fx-background-color: -ms-ink;
+    -fx-padding: 11px 24px;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-surface;
+}
+
+.button-primary:hover {
+    -fx-background-color: -ms-dark;
+}

@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -362,6 +362,22 @@ class ProductFormValidationTest {
         assertThat(messages(form, "description")).containsExactly(DESCRIPTION_TOO_LONG);
     }
 
+    // ---------- logging ----------
+
+    /** ADR-0014: the picked file's path is a local path of the admin and never ends up in a log line. */
+    @Test
+    void toString_doesNotPrintTheImagePath() {
+        Path picked = Path.of("C:", "Users", "an", "Pictures", "my-private-photo.jpg");
+
+        NewProductForm created = new NewProductForm("Bình nước", "2", "1250000", "30", null, true, picked);
+        EditProductForm edited = new EditProductForm("Bình nước", "2", "1250000", null, picked);
+
+        assertThat(created.toString()).doesNotContain("my-private-photo", "Pictures", "Users", "image=")
+                .contains("Bình nước");
+        assertThat(edited.toString()).doesNotContain("my-private-photo", "Pictures", "Users", "image=")
+                .contains("Bình nước");
+    }
+
     // ---------- mass assignment ----------
 
     /** AC-006-24: nothing to bind id, stock, image path or timestamps to. */
@@ -382,23 +398,6 @@ class ProductFormValidationTest {
 
     private static List<String> componentNames(Class<? extends Record> type) {
         return Arrays.stream(type.getRecordComponents()).map(c -> c.getName()).toList();
-    }
-
-    // ---------- toString ----------
-
-    @Test
-    void toString_doesNotPrintTheImage() {
-        MockMultipartFile image = new MockMultipartFile("image", "secret-photo.png", "image/png", new byte[]{1, 2, 3});
-        NewProductForm form = new NewProductForm("Bình nước", "2", "1000", "5", "mô tả riêng", true, image);
-
-        assertThat(form.toString())
-                .doesNotContain("secret-photo")
-                .doesNotContain("MockMultipartFile")
-                .doesNotContain("image=");
-        assertThat(new EditProductForm("Bình nước", "2", "1000", null, image).toString())
-                .doesNotContain("secret-photo")
-                .doesNotContain("MockMultipartFile")
-                .doesNotContain("image=");
     }
 
     // ---------- edit form ----------

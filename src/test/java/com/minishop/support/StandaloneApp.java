@@ -1,6 +1,7 @@
 package com.minishop.support;
 
 import com.minishop.MiniShopApplication;
+import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.TypeExcludeFilter;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -8,32 +9,21 @@ import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Starts the real application the way {@code spring-boot:run} does (a plain {@link SpringApplicationBuilder}, no test
- * context), for tests of startup rules and profiles (phase 8, QĐ10): {@code PublicProfileStartupTest},
- * {@code FileDatabaseTest}.
+ * context), for tests of startup rules (phase 8, QĐ10), now without a web server (ADR-0014):
+ * {@code DataDirectoryStartupTest}.
  *
  * <p><b>Isolation rules built in</b>
  * <ul>
@@ -42,7 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   and "missing" is simulated with an empty value ({@code --NAME=}), which beats the real variable too.</li>
  *   <li>Never a duplicate key: two {@code --a=1 --a=2} arguments would be joined into {@code "1,2"}. Callers add only
  *   keys that {@link #start} does not set.</li>
- *   <li>Tomcat on a random port, banner off.</li>
+ *   <li>Built with {@code .web(WebApplicationType.NONE)}: no web server and no port (ADR-0014), banner off. The
+ *   real {@code spring-boot:run} startup is a JavaFX {@code init()} that does the same.</li>
  *   <li>Classes under {@code target/test-classes} are kept out of component scanning with a {@link TypeExcludeFilter}
  *   bean (what Spring Boot's own test support does for a test context). Without it the scan would pick up
  *   test-only beans and the nested rogue {@code @Component} classes of the architecture tests.</li>
@@ -63,12 +54,21 @@ public final class StandaloneApp {
     /** Starts the application; the caller must close the returned context. */
     public static ConfigurableApplicationContext start(String... args) {
         List<String> all = new ArrayList<>(List.of(
-                "--server.port=0", "--spring.main.banner-mode=off"));
+                "--spring.main.banner-mode=off"));
         all.addAll(List.of(args));
+        return builder().run(all.toArray(String[]::new));
+    }
+
+    /**
+     * The builder behind {@link #start}: {@code web(NONE)} and test classes kept out of component scanning. Callers
+     * that must build the context themselves (the JavaFX smoke test, which overrides {@code MiniShopApp.createContext})
+     * start from this and add what they need.
+     */
+    public static SpringApplicationBuilder builder() {
         return new SpringApplicationBuilder(MiniShopApplication.class)
+                .web(WebApplicationType.NONE)
                 .initializers(context -> context.getBeanFactory().registerSingleton(
-                        "excludeTestClassesFromScanning", new ExcludeTestClasses()))
-                .run(all.toArray(String[]::new));
+                        "excludeTestClassesFromScanning", new ExcludeTestClasses()));
     }
 
     /**
@@ -96,10 +96,6 @@ public final class StandaloneApp {
             current = current.getCause();
         }
         return null;
-    }
-
-    public static int portOf(ConfigurableApplicationContext context) {
-        return context.getEnvironment().getProperty("local.server.port", Integer.class);
     }
 
     // ------------------------------------------------------------------ databases
@@ -133,96 +129,6 @@ public final class StandaloneApp {
     public static void execute(String url, String sql) throws SQLException {
         try (Connection connection = connect(url); Statement statement = connection.createStatement()) {
             statement.execute(sql);
-        }
-    }
-
-    // ------------------------------------------------------------------ a minimal browser
-
-    /**
-     * One visitor of the running server, over plain HTTP to 127.0.0.1, with cookies handled by hand: Java's
-     * {@code CookieManager} would not send a {@code Secure} cookie back over {@code http://}, which is exactly what the
-     * public profile sets (plan QĐ10).
-     */
-    public static final class Visitor {
-
-        private static final Pattern CSRF = Pattern.compile("name=\"_csrf\"\\s+value=\"([^\"]+)\"");
-        private static final Pattern SESSION_COOKIE = Pattern.compile("^JSESSIONID=([^;]+)");
-
-        private final int port;
-        private final HttpClient client = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(10)).build();
-        private String sessionCookie;
-
-        public Visitor(int port) {
-            this.port = port;
-        }
-
-        public String url(String path) {
-            return "http://127.0.0.1:" + port + path;
-        }
-
-        public HttpResponse<String> get(String path, String accept, Map<String, String> headers) throws Exception {
-            HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url(path)))
-                    .header("Accept", accept).timeout(Duration.ofSeconds(30)).GET();
-            applyHeaders(request, headers);
-            return remember(client.send(request.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)));
-        }
-
-        public HttpResponse<String> get(String path) throws Exception {
-            return get(path, "text/html", Map.of());
-        }
-
-        public HttpResponse<String> postForm(String path, Map<String, String> form, Map<String, String> headers)
-                throws Exception {
-            StringBuilder body = new StringBuilder();
-            form.forEach((k, v) -> body.append(body.isEmpty() ? "" : "&")
-                    .append(URLEncoder.encode(k, StandardCharsets.UTF_8)).append('=')
-                    .append(URLEncoder.encode(v, StandardCharsets.UTF_8)));
-            HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url(path)))
-                    .header("Content-Type", "application/x-www-form-urlencoded").header("Accept", "text/html")
-                    .timeout(Duration.ofSeconds(30)).POST(HttpRequest.BodyPublishers.ofString(body.toString()));
-            applyHeaders(request, headers);
-            return remember(client.send(request.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)));
-        }
-
-        /** Form login like a browser: GET /login for the token and the session cookie, then POST /login. */
-        public HttpResponse<String> login(String email, String password, Map<String, String> headers)
-                throws Exception {
-            HttpResponse<String> page = get("/login", "text/html", headers);
-            assertThat(page.statusCode()).as("GET /login").isEqualTo(200);
-            Matcher token = CSRF.matcher(page.body());
-            assertThat(token.find()).as("a _csrf input on the login page").isTrue();
-            Map<String, String> form = new LinkedHashMap<>();
-            form.put("email", email);
-            form.put("password", password);
-            form.put("_csrf", token.group(1));
-            return postForm("/login", form, headers);
-        }
-
-        public HttpResponse<String> login(String email, String password) throws Exception {
-            return login(email, password, Map.of());
-        }
-
-        /** Where a response sends the visitor. */
-        public static String location(HttpResponse<?> response) {
-            return response.headers().firstValue("Location").orElse("");
-        }
-
-        private void applyHeaders(HttpRequest.Builder request, Map<String, String> headers) {
-            headers.forEach(request::header);
-            if (sessionCookie != null) {
-                request.header("Cookie", "JSESSIONID=" + sessionCookie);
-            }
-        }
-
-        private HttpResponse<String> remember(HttpResponse<String> response) {
-            for (String setCookie : response.headers().allValues("Set-Cookie")) {
-                Matcher m = SESSION_COOKIE.matcher(setCookie);
-                if (m.find()) {
-                    sessionCookie = m.group(1);
-                }
-            }
-            return response;
         }
     }
 

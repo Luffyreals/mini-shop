@@ -1,6 +1,6 @@
 # ADR-0006: Giỏ hàng: session cho khách, DB cho user, gộp khi đăng nhập
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Chấp nhận; phần giỏ khách trong session bị thay thế bởi ADR-0014
 - **Ngày:** 2026-10-23
 
 ## Bối cảnh

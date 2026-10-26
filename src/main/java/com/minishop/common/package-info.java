@@ -1,6 +1,7 @@
 /**
- * Thành phần dùng chung: exception nghiệp vụ, tiện ích cho tầng web, và xử lý lỗi tập trung
- * ({@code ErrorPage}, {@code ErrorPageResolver}, {@code UnhandledExceptionResolver}, {@code NotFoundPage} +
- * {@code NotFoundPageAdvice}, {@code AccessDeniedController}). Chỉ phụ thuộc Spring, không phụ thuộc tính năng nào.
+ * Thành phần dùng chung, không phụ thuộc tính năng nào và không phụ thuộc web hay JavaFX: exception nghiệp vụ
+ * ({@code NotFoundException}), làm sạch và định dạng chuỗi ({@code FormText}, {@code VndFormatter},
+ * {@code VnDateTimeFormatter}), {@code PageNav}, {@code ConstraintViolations} và {@code SafeExceptionLog}
+ * (che thông điệp SQL của H2 trước khi ghi log, ADR-0013).
  */
 package com.minishop.common;

@@ -18,7 +18,7 @@ import java.util.Map;
  * So a plain relative value gets {@code ./} in front; anything H2 already accepts is left as it is. A blank value
  * falls back to the default {@code ./data}. Both the datasource URL and the upload directory read the result.
  *
- * <p>An {@link EnvironmentPostProcessor} like {@link StartupRequirements}, because the value must be fixed before the
+ * <p>An {@link EnvironmentPostProcessor}, because the value must be fixed before the
  * DataSource exists. Registered in {@code META-INF/spring.factories}.
  */
 public final class DataDirectory implements EnvironmentPostProcessor, Ordered {
@@ -59,7 +59,7 @@ public final class DataDirectory implements EnvironmentPostProcessor, Ordered {
                 || (path.length() >= 2 && Character.isLetter(path.charAt(0)) && path.charAt(1) == ':');
     }
 
-    /** Same slot as {@link StartupRequirements}: after the config files are read, before any bean. */
+    /** After the config files are read, before any bean. */
     @Override
     public int getOrder() {
         return Ordered.LOWEST_PRECEDENCE;

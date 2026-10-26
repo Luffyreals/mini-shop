@@ -3,7 +3,6 @@ package com.minishop.catalog;
 import com.minishop.common.NotFoundException;
 import com.minishop.support.AdminTestData;
 import com.minishop.support.AdminTestData.Outcome;
-import com.minishop.user.CurrentUser;
 import com.minishop.user.Role;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,11 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -25,29 +21,19 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.hamcrest.Matchers.containsString;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Category administration on a real PostgreSQL (AC-006-11, 13, 16, 51): create through MockMvc, the
+ * Category administration on H2 (AC-006-11, 13, 16, 51): create through the service, the
  * case-insensitive duplicate rule, the two races of QĐ4 (same name twice; delete against add-product) and the
  * category-with-count query. No @Transactional (races need real transactions); only {@link AdminTestData} rows.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 class CategoryAdminIntegrationTest {
 
     private static final int ROUNDS = 20;
 
     @Autowired
-    MockMvc mockMvc;
+    ProductService productService;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -82,10 +68,6 @@ class CategoryAdminIntegrationTest {
         data.cleanUp();
     }
 
-    private RequestPostProcessor loggedInAdmin() {
-        return user(new CurrentUser(admin.id(), admin.email(), null, admin.fullName(), Role.ADMIN));
-    }
-
     private static String unique(String base) {
         return AdminTestData.NAME_PREFIX + base + " " + UUID.randomUUID().toString().substring(0, 8);
     }
@@ -96,24 +78,23 @@ class CategoryAdminIntegrationTest {
 
     // ------------------------------------------------------ AC-006-11, 51
 
+    /**
+     * Was the web test {@code postCategory_withPaddedName…}. Stripping the padded name and turning a blank description
+     * into null is {@code admin.CategoryFormValidationTest}; here the cleaned draft is saved and the storefront filter
+     * lists the new category.
+     */
     @Test
-    void postCategory_withPaddedNameAndBlankDescription_savesTrimmedNameNullDescriptionAndShowsInStorefrontFilter()
-            throws Exception {
+    void create_withBlankDescription_savesNullDescriptionAndShowsInStorefrontFilter() {
         String name = unique("Đồ chơi");
 
-        mockMvc.perform(post("/admin/categories").with(loggedInAdmin()).with(csrf())
-                        .param("name", "  " + name + "  ").param("description", "   "))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/categories"))
-                .andExpect(flash().attribute("notice", "Đã thêm danh mục " + name + "."))
-                .andExpect(flash().attribute("noticeKind", "success"));
+        String saved = categoryAdminService.create(admin.id(), new CategoryDraft(name, "   "));
 
+        assertThat(saved).isEqualTo(name);
         assertThat(data.categoryCountByName(name)).isEqualTo(1);
         assertThat(jdbc.queryForObject("select description from categories where name = ?", String.class, name))
                 .isNull();
-        mockMvc.perform(get("/products"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString(name)));
+        assertThat(productService.search(new ProductSearchParams(null, null, null, null)).categories())
+                .extracting(CategoryOption::name).contains(name);
     }
 
     // ---------------------------------------------------------- AC-006-13

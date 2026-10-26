@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-/** Tách riêng khỏi SecurityConfig để test JPA import được encoder mà không cần dựng HttpSecurity. */
+/** Bean {@code PasswordEncoder} (bcrypt qua DelegatingPasswordEncoder); tách riêng để test JPA import được. */
 @Configuration(proxyBeanMethods = false)
 class PasswordEncoderConfig {
 

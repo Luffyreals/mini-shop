@@ -1,8 +1,7 @@
 package com.minishop.order;
 
 import com.minishop.cart.CartCheckout;
-import com.minishop.user.CurrentUser;
-import com.minishop.user.Role;
+import com.minishop.common.NotFoundException;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -11,12 +10,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.IllegalTransactionStateException;
 
 import javax.sql.DataSource;
@@ -32,33 +27,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.hamcrest.Matchers.containsString;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Đặt hàng, xem và hủy đơn trên PostgreSQL thật (QĐ14 plan GĐ5): luồng qua MockMvc, rollback giữa chừng tất
+ * Đặt hàng, xem và hủy đơn trên H2 thật (QĐ14 plan GĐ5): luồng qua {@link OrderService}, rollback giữa chừng tất
  * định, đếm truy vấn, và các cuộc đua. Không @Transactional (race cần transaction thật), không
  * @MockitoSpyBean (dùng chung context với test tích hợp khác). Chỉ dùng dữ liệu {@link OrderTestData}.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 class OrderIntegrationTest {
 
     private static final int ROUNDS = 20;
-
-    @Autowired
-    MockMvc mockMvc;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -93,25 +74,8 @@ class OrderIntegrationTest {
 
     // ---------------------------------------------------------------- helpers
 
-    private static RequestPostProcessor loggedIn(OrderTestData.TestUser u) {
-        return user(new CurrentUser(u.id(), u.email(), null, "Order Tester", Role.USER));
-    }
-
-    private static RequestPostProcessor loggedInAdmin(OrderTestData.TestUser u) {
-        return user(new CurrentUser(u.id(), u.email(), null, "Order Admin", Role.ADMIN));
-    }
-
     private static CheckoutForm form() {
         return new CheckoutForm("Người nhận", "0912345678", "12 Lê Lợi", null);
-    }
-
-    private static long idOf(String redirectUrl) {
-        return Long.parseLong(redirectUrl.substring(redirectUrl.lastIndexOf('/') + 1));
-    }
-
-    private String detailHtml(OrderTestData.TestUser u, long orderId) throws Exception {
-        return mockMvc.perform(get("/orders/" + orderId).with(loggedIn(u))).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
     }
 
     private record Outcome<T>(T value, Throwable error) {
@@ -157,22 +121,16 @@ class OrderIntegrationTest {
     // ------------------------------------------------------- AC-005-7, 10
 
     @Test
-    void postCheckout_withValidCart_createsOneOrderDecrementsStockAndClearsCart() throws Exception {
+    void placeOrder_withValidCart_createsOneOrderDecrementsStockAndClearsCart() {
         var u = data.createUser();
         long a = data.createProduct("A", 100_000, 5);
         long b = data.createProduct("B", 250_000, 1);
         data.createCart(u.id(), new long[]{a, 2}, new long[]{b, 1});
-        MockHttpSession session = new MockHttpSession();
+        CheckoutForm checkout = new CheckoutForm("Nguyễn Văn A", "0912 345 678", "12 Lê Lợi\nQuận 1",
+                "Giao giờ hành chính");
 
-        String location = mockMvc.perform(post("/checkout").with(loggedIn(u)).with(csrf()).session(session)
-                        .param("receiverName", "Nguyễn Văn A").param("phone", "0912 345 678")
-                        .param("shippingAddress", "12 Lê Lợi\nQuận 1").param("note", "Giao giờ hành chính")
-                        .param("expectedTotal", "450000"))
-                .andExpect(status().is3xxRedirection())
-                .andReturn().getResponse().getRedirectedUrl();
+        long orderId = orderService.placeOrder(u.id(), checkout, new BigDecimal("450000"));
 
-        assertThat(location).startsWith("/orders/");
-        long orderId = idOf(location);
         assertThat(data.orderIds(u.id())).containsExactly(orderId);
         Map<String, Object> row = data.orderRow(orderId);
         assertThat(row.get("status")).isEqualTo("PENDING");
@@ -198,18 +156,19 @@ class OrderIntegrationTest {
         assertThat(data.stock(b)).isZero();
         assertThat(data.cartLines(u.id())).isEmpty();
 
-        // Trang chi tiết: flash thành công, và header đã về "Giỏ hàng" (không số).
-        String html = mockMvc.perform(get(location).with(loggedIn(u)).session(session))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Đặt hàng thành công. Mã đơn của bạn là #" + orderId + ".")))
-                .andReturn().getResponse().getContentAsString();
-        assertThat(html).contains(">Giỏ hàng</a>").doesNotContain("Giỏ hàng (");
+        // The customer reads the same order back through the service.
+        OrderDetailView detail = orderService.getOrder(u.id(), orderId);
+        assertThat(detail.statusLabel()).isEqualTo("Chờ xử lý");
+        assertThat(detail.totalAmount()).isEqualByComparingTo("450000");
+        assertThat(detail.cancellable()).isTrue();
+        assertThat(detail.lines()).extracting(OrderLineView::productName)
+                .containsExactly(data.productName(a), data.productName(b));
     }
 
     // ------------------------------------------------------------ AC-005-8
 
     @Test
-    void orderDetail_afterProductPriceAndNameChange_stillShowsSnapshot() throws Exception {
+    void getOrder_afterProductPriceAndNameChange_stillShowsSnapshot() {
         var u = data.createUser();
         long a = data.createProduct("Snapshot", 100_000, 5);
         String oldName = data.productName(a);
@@ -219,9 +178,14 @@ class OrderIntegrationTest {
         data.setPrice(a, 999_000);
         data.setName(a, "Order test renamed after purchase");
 
-        String html = detailHtml(u, orderId);
-        assertThat(html).contains(oldName).contains("100.000 ₫").contains("200.000 ₫")
-                .doesNotContain("renamed after purchase").doesNotContain("999.000");
+        OrderDetailView detail = orderService.getOrder(u.id(), orderId);
+        assertThat(detail.lines()).singleElement().satisfies(line -> {
+            assertThat(line.productName()).isEqualTo(oldName);
+            assertThat(line.unitPrice()).isEqualByComparingTo("100000");
+            assertThat(line.quantity()).isEqualTo(2);
+            assertThat(line.lineTotal()).isEqualByComparingTo("200000");
+        });
+        assertThat(detail.totalAmount()).isEqualByComparingTo("200000");
     }
 
     // ----------------------------------------------- AC-005-11: rollback
@@ -363,50 +327,18 @@ class OrderIntegrationTest {
         logTime("AC-005-17 opposite-order race, " + ROUNDS + " rounds", start);
     }
 
-    // ------------------------------------------------------- AC-005-18
-
-    @Test
-    void postCheckout_withExtraParameters_ignoresThemAndUsesLoggedInUserAndDbPrices() throws Exception {
-        var u = data.createUser();
-        var other = data.createUser();
-        long a = data.createProduct("A", 100_000, 5);
-        data.createCart(u.id(), new long[]{a, 2});
-
-        String location = mockMvc.perform(post("/checkout").with(loggedIn(u)).with(csrf())
-                        .param("receiverName", "A").param("phone", "0912345678").param("shippingAddress", "B")
-                        .param("expectedTotal", "200000")
-                        .param("userId", String.valueOf(other.id())).param("status", "DELIVERED")
-                        .param("totalAmount", "1").param("unitPrice", "1").param("paymentMethod", "X")
-                        .param("id", "5"))
-                .andExpect(status().is3xxRedirection())
-                .andReturn().getResponse().getRedirectedUrl();
-
-        long orderId = idOf(location);
-        assertThat(data.orderCount(other.id())).isZero();
-        Map<String, Object> row = data.orderRow(orderId);
-        assertThat(row.get("user_id")).isEqualTo(u.id());
-        assertThat(row.get("status")).isEqualTo("PENDING");
-        assertThat(row.get("payment_method")).isEqualTo("COD");
-        assertThat((BigDecimal) row.get("total_amount")).isEqualByComparingTo("200000");
-        assertThat((BigDecimal) data.orderItems(orderId).get(0).get("unit_price")).isEqualByComparingTo("100000");
-    }
-
     // ------------------------------------------------------- AC-005-13
 
     @Test
-    void postCheckout_whenPriceChangedAfterPageWasShown_rendersAgainAndPlacesNothing() throws Exception {
+    void placeOrder_whenPriceChangedAfterPageWasShown_throwsPriceChangedWithNewTotalAndPlacesNothing() {
         var u = data.createUser();
         long a = data.createProduct("A", 100_000, 5);
         data.createCart(u.id(), new long[]{a, 2});
         data.setPrice(a, 110_000);
 
-        mockMvc.perform(post("/checkout").with(loggedIn(u)).with(csrf())
-                        .param("receiverName", "A").param("phone", "0912345678").param("shippingAddress", "B")
-                        .param("expectedTotal", "200000"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Giá sản phẩm vừa thay đổi.")))
-                .andExpect(content().string(containsString("220.000 ₫")))
-                .andExpect(content().string(containsString("value=\"220000\"")));
+        assertThatThrownBy(() -> orderService.placeOrder(u.id(), form(), new BigDecimal("200000")))
+                .isInstanceOfSatisfying(PlaceOrderException.PriceChanged.class,
+                        e -> assertThat(e.current().total()).isEqualByComparingTo("220000"));
 
         assertThat(data.orderCount(u.id())).isZero();
         assertThat(data.stock(a)).isEqualTo(5);
@@ -416,7 +348,7 @@ class OrderIntegrationTest {
     // ------------------------------------------------------- AC-005-20
 
     @Test
-    void orderList_showsOnlyOwnOrdersNewestFirst() throws Exception {
+    void listOrders_showsOnlyOwnOrdersNewestFirst() {
         var u1 = data.createUser();
         var u2 = data.createUser();
         long a = data.createProduct("A", 100_000, 50);
@@ -425,20 +357,19 @@ class OrderIntegrationTest {
         long third = data.insertOrder(u1.id(), "DELIVERED", new long[]{a, 2});
         long foreign = data.insertOrder(u2.id(), "PENDING", new long[]{a, 1});
 
-        String html = mockMvc.perform(get("/orders").with(loggedIn(u1))).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+        OrderListView list = orderService.listOrders(u1.id(), null);
 
-        Matcher m = Pattern.compile("href=\"/orders/(\\d+)\"").matcher(html);
-        List<Long> ids = new ArrayList<>();
-        while (m.find()) {
-            ids.add(Long.parseLong(m.group(1)));
-        }
-        assertThat(ids).containsExactly(third, second, first).doesNotContain(foreign);
-        assertThat(html).contains("Chờ xử lý").contains("Đã hủy").contains("Đã giao");
+        assertThat(list.orders()).extracting(OrderSummaryView::id).containsExactly(third, second, first)
+                .doesNotContain(foreign);
+        assertThat(list.orders()).extracting(OrderSummaryView::statusLabel)
+                .containsExactly("Đã giao", "Đã hủy", "Chờ xử lý");
+        assertThat(list.totalElements()).isEqualTo(3);
+        assertThat(orderService.listOrders(u2.id(), null).orders()).extracting(OrderSummaryView::id)
+                .containsExactly(foreign);
     }
 
     @Test
-    void orderList_pagination_tenPerPageAndBadPagesFallBackToFirst() throws Exception {
+    void listOrders_pagination_tenPerPageAndBadPagesFallBackToFirst() {
         var u = data.createUser();
         long a = data.createProduct("A", 100_000, 50);
         for (int i = 0; i < 11; i++) {
@@ -446,45 +377,41 @@ class OrderIntegrationTest {
         }
         List<Long> all = data.orderIds(u.id());
 
-        assertThat(listedIds(u, "/orders")).containsExactlyElementsOf(all.subList(0, 10));
-        assertThat(listedIds(u, "/orders?page=2")).containsExactly(all.get(10));
-        assertThat(listedIds(u, "/orders?page=abc")).containsExactlyElementsOf(all.subList(0, 10));
-        assertThat(listedIds(u, "/orders?page=999")).containsExactlyElementsOf(all.subList(0, 10));
+        assertThat(listedIds(u, null)).containsExactlyElementsOf(all.subList(0, 10));
+        assertThat(listedIds(u, "2")).containsExactly(all.get(10));
+        assertThat(listedIds(u, "abc")).containsExactlyElementsOf(all.subList(0, 10));
+        assertThat(listedIds(u, "999")).containsExactlyElementsOf(all.subList(0, 10));
+        assertThat(orderService.listOrders(u.id(), null).totalPages()).isEqualTo(2);
     }
 
-    private List<Long> listedIds(OrderTestData.TestUser u, String url) throws Exception {
-        String html = mockMvc.perform(get(url).with(loggedIn(u))).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        Matcher m = Pattern.compile("href=\"/orders/(\\d+)\"").matcher(html);
-        List<Long> ids = new ArrayList<>();
-        while (m.find()) {
-            ids.add(Long.parseLong(m.group(1)));
-        }
-        return ids;
+    private List<Long> listedIds(OrderTestData.TestUser u, String rawPage) {
+        return orderService.listOrders(u.id(), rawPage).orders().stream().map(OrderSummaryView::id).toList();
     }
 
     // ------------------------------------------------------- AC-005-24
 
+    /** BR-009-4 (IDOR): an order of another account, whatever its role, is simply "not found". */
     @Test
-    void otherUsersAndAdmins_cannotViewOrCancelSomeoneElsesOrder() throws Exception {
+    void otherUsersAndAdmins_cannotViewOrCancelSomeoneElsesOrder() {
         var owner = data.createUser();
         var intruder = data.createUser();
-        var admin = data.createUser();
+        var admin = data.createUser();   // the customer path has no role concept: an admin id is just another id
         long a = data.createProduct("A", 100_000, 3);
         long orderId = data.insertOrder(owner.id(), "PENDING", new long[]{a, 2});
 
-        for (RequestPostProcessor who : List.of(loggedIn(intruder), loggedInAdmin(admin))) {
-            mockMvc.perform(get("/orders/" + orderId).with(who)).andExpect(status().isNotFound())
-                    .andExpect(content().string(containsString("Không tìm thấy đơn hàng")));
-            mockMvc.perform(post("/orders/" + orderId + "/cancel").with(who).with(csrf()))
-                    .andExpect(status().isNotFound());
+        for (OrderTestData.TestUser who : List.of(intruder, admin)) {
+            assertThatThrownBy(() -> orderService.getOrder(who.id(), orderId)).isInstanceOf(NotFoundException.class);
+            assertThatThrownBy(() -> orderService.cancelByCustomer(who.id(), orderId))
+                    .isInstanceOf(NotFoundException.class);
+            assertThat(orderService.listOrders(who.id(), null).orders()).isEmpty();
         }
-        mockMvc.perform(get("/orders/999999999").with(loggedIn(owner))).andExpect(status().isNotFound());
+        assertThatThrownBy(() -> orderService.getOrder(owner.id(), 999_999_999L))
+                .isInstanceOf(NotFoundException.class);
 
         assertThat(data.orderStatus(orderId)).isEqualTo("PENDING");
         assertThat(data.stock(a)).isEqualTo(3);
-        // The owner still sees it.
-        assertThat(detailHtml(owner, orderId)).contains("Đơn hàng #" + orderId);
+        // The owner still sees it, and can cancel it.
+        assertThat(orderService.getOrder(owner.id(), orderId).id()).isEqualTo(orderId);
     }
 
     // ------------------------------------------------------- AC-005-26
@@ -541,40 +468,34 @@ class OrderIntegrationTest {
     // ------------------------------------------------------- AC-005-27
 
     @Test
-    void postCancel_onPendingOrder_cancelsRestoresStockAndRemovesButton() throws Exception {
+    void cancelByCustomer_onPendingOrder_cancelsRestoresStockAndRemovesCancelFlag() {
         var u = data.createUser();
         long a = data.createProduct("A", 100_000, 5);
         long orderId = data.insertOrder(u.id(), "PENDING", new long[]{a, 2});
         data.setStock(a, 3);   // the order already took 2 of 5
-        MockHttpSession session = new MockHttpSession();
 
-        mockMvc.perform(post("/orders/" + orderId + "/cancel").with(loggedIn(u)).with(csrf()).session(session))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/orders/" + orderId));
+        CancelResult result = orderService.cancelByCustomer(u.id(), orderId);
 
+        assertThat(result).isEqualTo(CancelResult.CANCELLED);
         assertThat(data.orderStatus(orderId)).isEqualTo("CANCELLED");
         assertThat(data.stock(a)).isEqualTo(5);
-        String html = mockMvc.perform(get("/orders/" + orderId).with(loggedIn(u)).session(session))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Đã hủy đơn hàng #" + orderId + ".")))
-                .andReturn().getResponse().getContentAsString();
-        assertThat(html).doesNotContain("Hủy đơn hàng").doesNotContain("/cancel");
+        OrderDetailView detail = orderService.getOrder(u.id(), orderId);
+        assertThat(detail.statusLabel()).isEqualTo("Đã hủy");
+        assertThat(detail.cancellable()).isFalse();
     }
 
     @Test
-    void postCancel_onNonPendingOrder_isRefusedAndStockUnchanged() throws Exception {
+    void cancelByCustomer_onNonPendingOrder_isRefusedAndStockUnchanged() {
         var u = data.createUser();
         long a = data.createProduct("A", 100_000, 3);
         long orderId = data.insertOrder(u.id(), "CONFIRMED", new long[]{a, 2});
-        MockHttpSession session = new MockHttpSession();
 
-        mockMvc.perform(post("/orders/" + orderId + "/cancel").with(loggedIn(u)).with(csrf()).session(session))
-                .andExpect(redirectedUrl("/orders/" + orderId));
+        CancelResult result = orderService.cancelByCustomer(u.id(), orderId);
 
+        assertThat(result).isEqualTo(CancelResult.NOT_CANCELLABLE);
         assertThat(data.orderStatus(orderId)).isEqualTo("CONFIRMED");
         assertThat(data.stock(a)).isEqualTo(3);
-        mockMvc.perform(get("/orders/" + orderId).with(loggedIn(u)).session(session))
-                .andExpect(content().string(containsString("Đơn hàng này không thể hủy nữa.")));
+        assertThat(orderService.getOrder(u.id(), orderId).cancellable()).isFalse();
     }
 
     // ------------------------------------------------------- AC-005-29

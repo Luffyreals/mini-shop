@@ -10,7 +10,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 /**
- * Dữ liệu riêng của test đặt hàng trên PostgreSQL thật (QĐ14 plan GĐ5): người dùng email đuôi
+ * Dữ liệu riêng của test đặt hàng trên H2 thật (QĐ14 plan GĐ5): người dùng email đuôi
  * {@code @order.test}, sản phẩm tên bắt đầu bằng {@code Order test }, danh mục lấy từ seed. Không bao giờ
  * sửa tài khoản hay sản phẩm seed. Dọn theo thứ tự order_items, orders, cart_items, carts, sản phẩm, người dùng.
  */
