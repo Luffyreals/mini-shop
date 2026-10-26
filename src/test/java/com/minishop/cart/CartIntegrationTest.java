@@ -1,18 +1,12 @@
 package com.minishop.cart;
 
-import com.minishop.user.CurrentUser;
-import com.minishop.user.Role;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
 import java.util.Map;
@@ -23,24 +17,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Giỏ hàng trên PostgreSQL thật (QĐ12): ghi/đọc qua MockMvc, truy vấn, khóa đồng thời và tồn kho không đổi.
- * Không @Transactional (race cần transaction thật), không @MockitoSpyBean (dùng chung context với LoginFlowTest).
+ * Giỏ hàng trên H2 thật (QĐ12): ghi/đọc qua {@link CartService}, truy vấn, khóa đồng thời và tồn kho không đổi.
+ * Không @Transactional (race cần transaction thật), không @MockitoSpyBean (dùng chung context với test tích hợp khác).
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 class CartIntegrationTest {
-
-    @Autowired
-    MockMvc mockMvc;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -64,62 +47,65 @@ class CartIntegrationTest {
         data.cleanUp();
     }
 
-    private static RequestPostProcessor loggedIn(CartTestData.TestUser u) {
-        return user(new CurrentUser(u.id(), u.email(), null, "Cart Tester", Role.USER));
+    private static CartOwner customer(CartTestData.TestUser u) {
+        return new CartOwner.Customer(u.id());
     }
 
-    private String productName(long id) {
-        return jdbc.queryForObject("select name from products where id = ?", String.class, id);
+    private static SessionCart guestCart(long... productIdAndQuantity) {
+        SessionCart cart = new SessionCart();
+        for (int i = 0; i < productIdAndQuantity.length; i += 2) {
+            cart.put(productIdAndQuantity[i], (int) productIdAndQuantity[i + 1]);
+        }
+        return cart;
     }
 
     // ------------------------------------------------------------------ guest
 
-    /** Spec §8: khách duyệt sản phẩm và xem giỏ trống không tạo session. */
+    /** AC-004-2: khách thêm hàng thì giỏ nằm trong store (session), không có dòng nào trong carts/cart_items. */
     @Test
-    void guest_browsingAndEmptyCart_createsNoSession() throws Exception {
-        var products = mockMvc.perform(get("/products")).andExpect(status().isOk()).andReturn();
-        var cart = mockMvc.perform(get("/cart"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Giỏ hàng của bạn đang trống.")))
-                .andReturn();
-
-        assertThat(products.getRequest().getSession(false)).isNull();
-        assertThat(cart.getRequest().getSession(false)).isNull();
-    }
-
-    /** AC-004-2 */
-    @Test
-    void guestAdd_writesNoCartRowsAndShowsNoticeAndHeader() throws Exception {
+    void guestAdd_writesNoCartRowsAndKeepsTheLinesInTheStore() {
         long a = data.createProduct("A", 100_000, 10);
         int carts = data.totalRows("carts");
         int items = data.totalRows("cart_items");
-        MockHttpSession session = new MockHttpSession();
+        InMemoryGuestCartStore store = new InMemoryGuestCartStore();
+        CartOwner guest = new CartOwner.Guest(store);
 
-        mockMvc.perform(post("/cart/items").with(csrf()).session(session)
-                        .param("productId", String.valueOf(a)).param("quantity", "2"))
-                .andExpect(status().is3xxRedirection());
+        CartChange change = cartService.add(guest, a, 2);
 
-        mockMvc.perform(get("/products/" + a).session(session))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Đã thêm vào giỏ hàng.")))
-                .andExpect(content().string(containsString("Xem giỏ hàng")))
-                .andExpect(content().string(containsString("Giỏ hàng (2)")));
+        assertThat(change).isEqualTo(new CartChange(CartChange.Outcome.OK, 2));
+        assertThat(cartService.totalQuantity(guest)).isEqualTo(2);
+        assertThat(cartService.view(guest).lines()).singleElement().satisfies(line -> {
+            assertThat(line.productId()).isEqualTo(a);
+            assertThat(line.quantity()).isEqualTo(2);
+        });
         assertThat(data.totalRows("carts")).isEqualTo(carts);
         assertThat(data.totalRows("cart_items")).isEqualTo(items);
+    }
+
+    /** Spec §8: khách xem giỏ trống không tạo giỏ trong store (không tạo session). */
+    @Test
+    void guest_viewingAndCountingAnEmptyCart_createsNothingInTheStore() {
+        InMemoryGuestCartStore store = new InMemoryGuestCartStore();
+        CartOwner guest = new CartOwner.Guest(store);
+
+        assertThat(cartService.view(guest).isEmpty()).isTrue();
+        assertThat(cartService.totalQuantity(guest)).isZero();
+
+        assertThat(store.getOrCreateCalls()).isZero();
+        assertThat(store.saveCalls()).isZero();
+        assertThat(store.find()).isEmpty();
     }
 
     // --------------------------------------------------------------- customer
 
     /** AC-004-8 */
     @Test
-    void firstAdd_forUserWithoutCart_createsExactlyOneCartAndOneItem() throws Exception {
+    void firstAdd_forUserWithoutCart_createsExactlyOneCartAndOneItem() {
         var u = data.createUser();
         long a = data.createProduct("A", 100_000, 10);
         assertThat(data.cartCount(u.id())).isZero();
 
-        mockMvc.perform(post("/cart/items").with(loggedIn(u)).with(csrf())
-                        .param("productId", String.valueOf(a)).param("quantity", "3"))
-                .andExpect(status().is3xxRedirection());
+        cartService.add(customer(u), a, 3);
 
         assertThat(data.cartCount(u.id())).isEqualTo(1);
         assertThat(data.cartLines(u.id())).containsExactly(Map.entry(a, 3));
@@ -127,31 +113,37 @@ class CartIntegrationTest {
 
     /** AC-004-13 */
     @Test
-    void cartPage_afterPriceChange_showsNewPrice() throws Exception {
+    void view_afterPriceChange_showsNewPriceAndTotal() {
         var u = data.createUser();
         long a = data.createProduct("A", 100_000, 10);
         data.createCart(u.id(), new long[]{a, 2});
 
-        mockMvc.perform(get("/cart").with(loggedIn(u)))
-                .andExpect(content().string(containsString("100.000 ₫")))
-                .andExpect(content().string(containsString("200.000 ₫")));
+        CartView before = cartService.view(customer(u));
+        assertThat(before.lines()).singleElement().satisfies(line -> {
+            assertThat(line.unitPrice()).isEqualByComparingTo("100000");
+            assertThat(line.lineTotal()).isEqualByComparingTo("200000");
+        });
+        assertThat(before.total()).isEqualByComparingTo("200000");
 
         data.setPrice(a, 120_000);
 
-        mockMvc.perform(get("/cart").with(loggedIn(u)))
-                .andExpect(content().string(containsString("120.000 ₫")))
-                .andExpect(content().string(containsString("240.000 ₫")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("100.000 ₫"))));
+        CartView after = cartService.view(customer(u));
+        assertThat(after.lines()).singleElement().satisfies(line -> {
+            assertThat(line.unitPrice()).isEqualByComparingTo("120000");
+            assertThat(line.lineTotal()).isEqualByComparingTo("240000");
+        });
+        assertThat(after.total()).isEqualByComparingTo("240000");
     }
 
-    /** AC-004-14: nhãn từng trạng thái, tổng chỉ gồm dòng mua được, và GET không sửa giỏ. */
+    /** AC-004-14: nhãn từng trạng thái, tổng chỉ gồm dòng mua được, và xem giỏ không sửa giỏ. */
     @Test
-    void cartPage_withHiddenOutOfStockAndLowStockLines_showsLabelsAndDoesNotChangeRows() throws Exception {
+    void view_withHiddenOutOfStockAndLowStockLines_labelsThemTotalsOnlyBuyableOnesAndDoesNotChangeRows() {
         var u = data.createUser();
+        long a = data.createProduct("A ok", 100_000, 10);
         long b = data.createProduct("B hidden", 70_000, 10);
         long c = data.createProduct("C soldout", 80_000, 10);
         long d = data.createProduct("D low", 100_000, 10);
-        data.createCart(u.id(), new long[]{b, 1}, new long[]{c, 1}, new long[]{d, 5});
+        data.createCart(u.id(), new long[]{a, 4}, new long[]{b, 1}, new long[]{c, 1}, new long[]{d, 5});
         data.setActive(b, false);
         data.setStock(c, 0);
         data.setStock(d, 2);
@@ -161,12 +153,19 @@ class CartIntegrationTest {
         Object updatedAtBefore = jdbc.queryForObject("select updated_at from carts where user_id = ?",
                 java.sql.Timestamp.class, u.id());
 
-        String html = mockMvc.perform(get("/cart").with(loggedIn(u)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+        CartView view = cartService.view(customer(u));
 
-        assertThat(html).contains("Sản phẩm đã ngừng bán").contains("Hết hàng").contains("Chỉ còn 2 sản phẩm");
-        assertThat(html).containsPattern("Tổng cộng</th>\\s*<td colspan=\"2\"><span class=\"price\">500\\.000 ₫");
+        assertThat(view.lines()).extracting(CartLineView::productId, CartLineView::status)
+                .containsExactly(
+                        org.assertj.core.api.Assertions.tuple(a, CartLineStatus.AVAILABLE),
+                        org.assertj.core.api.Assertions.tuple(b, CartLineStatus.DISCONTINUED),
+                        org.assertj.core.api.Assertions.tuple(c, CartLineStatus.OUT_OF_STOCK),
+                        org.assertj.core.api.Assertions.tuple(d, CartLineStatus.LOW_STOCK));
+        assertThat(view.lines()).filteredOn(l -> l.productId() == d).singleElement()
+                .satisfies(l -> assertThat(l.availableStock()).isEqualTo(2));
+        // Chỉ dòng A (4 x 100.000) và dòng D (5 x 100.000, còn mua được ở mức hiện có) tính vào tổng.
+        assertThat(view.total()).isEqualByComparingTo("900000");
+        assertThat(view.isOrderable()).isFalse();
         List<Map<String, Object>> after = jdbc.queryForList(
                 "select i.id, i.cart_id, i.product_id, i.quantity from cart_items i join carts k on k.id = i.cart_id "
                         + "where k.user_id = ? order by i.id", u.id());
@@ -175,22 +174,29 @@ class CartIntegrationTest {
                 java.sql.Timestamp.class, u.id())).isEqualTo(updatedAtBefore);
     }
 
-    /** AC-004-22 */
+    /** AC-004-22: số trên header là tổng số lượng của người dùng (cart.CartService#totalQuantity). */
     @Test
-    void header_forLoggedInUser_showsTotalQuantity() throws Exception {
+    void totalQuantity_forLoggedInUser_sumsEveryLine() {
         var u = data.createUser();
         long a = data.createProduct("A", 100_000, 10);
         long b = data.createProduct("B", 100_000, 10);
         data.createCart(u.id(), new long[]{a, 2}, new long[]{b, 3});
 
-        mockMvc.perform(get("/").with(loggedIn(u)))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Giỏ hàng (5)")));
+        assertThat(cartService.totalQuantity(customer(u))).isEqualTo(5);
+    }
+
+    /** AC-004-22: người dùng chưa có giỏ thì số lượng là 0 và không tạo giỏ. */
+    @Test
+    void totalQuantity_forUserWithoutCart_isZeroAndCreatesNoCart() {
+        var u = data.createUser();
+
+        assertThat(cartService.totalQuantity(customer(u))).isZero();
+        assertThat(data.cartCount(u.id())).isZero();
     }
 
     /** AC-004-18 */
     @Test
-    void twoUsers_cartsAreIsolated() throws Exception {
+    void twoUsers_cartsAreIsolated() {
         var u1 = data.createUser();
         var u2 = data.createUser();
         long a = data.createProduct("A", 100_000, 10);
@@ -200,19 +206,68 @@ class CartIntegrationTest {
         data.createCart(u2.id(), new long[]{b, 4}, new long[]{q, 2});
         Map<Long, Integer> u2Before = data.cartLines(u2.id());
 
-        mockMvc.perform(post("/cart/items").with(loggedIn(u1)).with(csrf())
-                .param("productId", String.valueOf(b)).param("quantity", "2"));
-        mockMvc.perform(post("/cart/items/" + a).with(loggedIn(u1)).with(csrf()).param("quantity", "7"));
-        mockMvc.perform(post("/cart/items/" + b + "/delete").with(loggedIn(u1)).with(csrf()));
-        mockMvc.perform(post("/cart/items/" + q + "/delete").with(loggedIn(u1)).with(csrf()));
-        mockMvc.perform(post("/cart/items/" + q).with(loggedIn(u1)).with(csrf()).param("quantity", "9"));
+        cartService.add(customer(u1), b, 2);
+        cartService.update(customer(u1), a, 7);
+        cartService.remove(customer(u1), b);
+        cartService.remove(customer(u1), q);                       // not in u1's cart: nothing happens
+        CartChange foreign = cartService.update(customer(u1), q, 9);
 
+        assertThat(foreign.outcome()).isEqualTo(CartChange.Outcome.NOT_IN_CART);
         assertThat(data.cartLines(u1.id())).containsExactly(Map.entry(a, 7));
         assertThat(data.cartLines(u2.id())).isEqualTo(u2Before);
-        String page = mockMvc.perform(get("/cart").with(loggedIn(u1))).andReturn().getResponse().getContentAsString();
-        assertThat(page).doesNotContain(productName(q));
-        Long u2CartId = jdbc.queryForObject("select id from carts where user_id = ?", Long.class, u2.id());
-        assertThat(page).doesNotContain("cart_id").doesNotContain("cart/" + u2CartId);
+        assertThat(cartService.view(customer(u1)).lines()).extracting(CartLineView::productId).containsExactly(a);
+        assertThat(cartService.view(customer(u2)).lines()).extracting(CartLineView::productId)
+                .containsExactly(Math.min(b, q), Math.max(b, q));
+    }
+
+    // ------------------------------------------------- merge the guest cart
+
+    /** AC-004-15: DB {A:3}, khách {A:2, B:1}, kho A = 4 thì ra {A:4, B:1}; giỏ khách không bị sửa. */
+    @Test
+    void mergeGuestCart_sumsCapsAtStockAndLeavesTheGuestCartAlone() {
+        var u = data.createUser();
+        long a = data.createProduct("A", 100_000, 4);
+        long b = data.createProduct("B", 100_000, 10);
+        data.createCart(u.id(), new long[]{a, 3});
+        SessionCart guest = guestCart(a, 2, b, 1);
+
+        cartService.mergeGuestCart(u.id(), guest);
+
+        assertThat(data.cartCount(u.id())).isEqualTo(1);
+        assertThat(data.cartLines(u.id())).containsExactly(Map.entry(Math.min(a, b), Math.min(a, b) == a ? 4 : 1),
+                Map.entry(Math.max(a, b), Math.max(a, b) == a ? 4 : 1));
+        assertThat(cartService.totalQuantity(customer(u))).isEqualTo(5);
+        assertThat(guest.lines()).containsExactly(Map.entry(a, 2), Map.entry(b, 1));
+    }
+
+    /** AC-004-16: dòng của khách đã ẩn hoặc hết hàng bị bỏ qua, các dòng còn lại vẫn được gộp. */
+    @Test
+    void mergeGuestCart_withHiddenAndOutOfStockLines_skipsThemAndMergesTheRest() {
+        var u = data.createUser();
+        long ok = data.createProduct("OK", 100_000, 10);
+        long hidden = data.createProduct("Hidden", 100_000, 10);
+        long soldOut = data.createProduct("Sold out", 100_000, 10);
+        data.setActive(hidden, false);
+        data.setStock(soldOut, 0);
+
+        cartService.mergeGuestCart(u.id(), guestCart(ok, 1, hidden, 1, soldOut, 1));
+
+        assertThat(data.cartLines(u.id())).containsExactly(Map.entry(ok, 1));
+    }
+
+    /** BR-004-6: giỏ khách rỗng, hoặc không có dòng nào gộp được, thì không tạo dòng nào trong carts. */
+    @Test
+    void mergeGuestCart_withNothingToMerge_createsNoCartRow() {
+        var u = data.createUser();
+        long hidden = data.createProduct("Hidden", 100_000, 10);
+        data.setActive(hidden, false);
+        int before = data.totalRows("carts");
+
+        cartService.mergeGuestCart(u.id(), new SessionCart());
+        cartService.mergeGuestCart(u.id(), guestCart(hidden, 2));
+
+        assertThat(data.cartCount(u.id())).isZero();
+        assertThat(data.totalRows("carts")).isEqualTo(before);
     }
 
     // ------------------------------------------------------------------- race

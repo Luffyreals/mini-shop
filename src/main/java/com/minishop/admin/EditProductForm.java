@@ -6,11 +6,13 @@ import com.minishop.common.FormText;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.file.Path;
 
 /**
  * Product edit input. Besides what {@link NewProductForm} leaves out, it has no initial stock and no active flag:
- * stock changes only through the adjust endpoint, visibility only through hide/show (AC-006-24).
+ * stock changes only through the adjust action, visibility only through hide/show (AC-006-24). {@code image} is the
+ * new file picked in the file chooser, or null to keep the current one.
  */
 record EditProductForm(
         @NotBlank(message = "Vui lòng nhập tên sản phẩm.")
@@ -28,7 +30,7 @@ record EditProductForm(
         @Size(max = 4000, message = "Mô tả tối đa 4000 ký tự.")
         String description,
 
-        MultipartFile image) {
+        Path image) {
 
     EditProductForm {
         name = FormText.clean(name, false);

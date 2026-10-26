@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.SVGPath?>
+
+<StackPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+           fx:controller="com.minishop.desktop.MainWindow" styleClass="window">
+
+    <VBox spacing="16">
+        <padding>
+            <Insets top="16" right="16" bottom="16" left="16"/>
+        </padding>
+
+        <!-- Thanh trên nổi: nền surface, bo 28, bóng theo token. minWidth="-Infinity" là USE_PREF_SIZE:
+             chữ không bị co thành "…" khi cửa sổ hẹp (1024 px), chỉ ô tìm kiếm co lại -->
+        <HBox fx:id="topBar" styleClass="card, top-bar" alignment="CENTER_LEFT" spacing="8">
+            <HBox fx:id="logo" styleClass="logo" alignment="CENTER_LEFT" spacing="4">
+                <Label text="mini shop" styleClass="logo-text" minWidth="-Infinity"/>
+                <Region styleClass="logo-dot" minWidth="8" minHeight="8" prefWidth="8" prefHeight="8"
+                        maxWidth="8" maxHeight="8"/>
+            </HBox>
+
+            <Region minWidth="12" prefWidth="12" maxWidth="12"/>
+
+            <HBox alignment="CENTER_LEFT" spacing="2">
+                <Button fx:id="navStore" text="Cửa hàng" styleClass="nav-link" minWidth="-Infinity"/>
+                <Button fx:id="navNew" text="Hàng mới" styleClass="nav-link" minWidth="-Infinity"/>
+                <Button fx:id="navCategories" text="Danh mục" styleClass="nav-link" minWidth="-Infinity"
+                        contentDisplay="RIGHT" graphicTextGap="6">
+                    <graphic>
+                        <SVGPath content="M1 1.5 L5 5.5 L9 1.5" styleClass="icon-stroke"/>
+                    </graphic>
+                </Button>
+            </HBox>
+
+            <Region HBox.hgrow="ALWAYS"/>
+
+            <!-- Ô tìm kiếm dạng pill; biểu tượng chồng lên trên ô nhập -->
+            <StackPane fx:id="searchBox" styleClass="search-box" minWidth="160" prefWidth="340"
+                       maxWidth="420">
+                <TextField fx:id="searchField" styleClass="search-field, pill"
+                           promptText="Tìm sản phẩm theo tên…" accessibleText="Tìm sản phẩm theo tên"/>
+                <SVGPath content="M9.5 2.5a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M14.5 14.5 L19 19"
+                         styleClass="icon-stroke, search-icon" mouseTransparent="true"
+                         StackPane.alignment="CENTER_LEFT">
+                    <StackPane.margin>
+                        <Insets left="16"/>
+                    </StackPane.margin>
+                </SVGPath>
+            </StackPane>
+
+            <Region HBox.hgrow="ALWAYS"/>
+
+            <!-- Nút giỏ tròn đen, badge accent ở góc trên phải -->
+            <StackPane styleClass="cart-wrap">
+                <Button fx:id="cartButton" styleClass="cart-button, pill"
+                        accessibleText="Giỏ hàng, 0 sản phẩm">
+                    <graphic>
+                        <SVGPath content="M5 8h14l-1.2 11H6.2z M9 8V7a3 3 0 0 1 6 0v1"
+                                 styleClass="icon-stroke, cart-icon"/>
+                    </graphic>
+                </Button>
+                <Label fx:id="cartBadge" text="0" styleClass="cart-badge, pill"
+                       mouseTransparent="true" StackPane.alignment="TOP_RIGHT"/>
+            </StackPane>
+
+            <Button fx:id="accountButton" text="Đăng nhập" styleClass="account-button, pill" minWidth="-Infinity"/>
+        </HBox>
+
+        <!-- Vùng nội dung; Navigator (F2) thay node ở đây -->
+        <StackPane fx:id="content" styleClass="content" VBox.vgrow="ALWAYS"/>
+    </VBox>
+
+    <!-- Lớp phủ cho toast (F2); chỉ các toast nhận chuột -->
+    <StackPane fx:id="toastLayer" styleClass="toast-layer" pickOnBounds="false"/>
+</StackPane>

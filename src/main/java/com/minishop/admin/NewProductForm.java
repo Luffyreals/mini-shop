@@ -5,13 +5,14 @@ import com.minishop.common.FormText;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.file.Path;
 
 /**
  * New product input. It deliberately has no id, stock (other than the initial one), image path or timestamp
  * component, so request parameters cannot set them (AC-006-24). All fields stay raw strings so a rejected form
  * is shown back unchanged; {@link #toDraft()} and {@link #initialStockValue()} are only called after validation.
- * The image file is never shown back (browsers do not allow it).
+ * {@code image} is the file the admin picked in the file chooser, or null; it is never shown back.
  */
 record NewProductForm(
         @NotBlank(message = "Vui lòng nhập tên sản phẩm.")
@@ -35,7 +36,7 @@ record NewProductForm(
 
         Boolean active,
 
-        MultipartFile image) {
+        Path image) {
 
     NewProductForm {
         name = FormText.clean(name, false);

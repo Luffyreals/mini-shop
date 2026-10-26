@@ -30,9 +30,19 @@ jobs:
           java-version: '25'
           cache: maven
 
-      # Chỉ cần JDK: database là H2 trong bộ nhớ, không cần Docker (ADR-0013)
+      # Test giao diện (@Tag("ui")) mở cửa sổ JavaFX thật, nên runner cần GTK 3 và
+      # một màn hình ảo (QĐ11 của docs/plans/desktop-d1.md; Monocle không có bản cho JavaFX 25).
+      # xvfb đã có sẵn trong image; liệt kê lại ở đây để không vỡ nếu image đổi.
+      # Lệnh apt không hại gì với gói đã cài.
+      - name: Install JavaFX runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0t64 libxtst6 libxxf86vm1
+
+      # Database là H2 trong bộ nhớ, không cần Docker (ADR-0013).
+      # xvfb-run -a chọn số màn hình còn trống rồi đặt DISPLAY cho Maven và JVM của test.
       - name: Build and test
-        run: ./mvnw -B -ntp verify
+        run: xvfb-run -a ./mvnw -B -ntp verify
 
       # Test bị bỏ qua không được tính là xanh (AC-001-14).
       # Cũng ghi bảng tổng chạy/fail/skipped vào job summary (AC-001-17).

@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /**
  * The single definition of the password rule; returns the first violation only.
- * Public so that {@code config.StartupRequirements} can apply the same rule to the demo passwords.
+ * Public so that other features (the login and registration screens) can apply the same rule.
  */
 public final class PasswordPolicy {
 

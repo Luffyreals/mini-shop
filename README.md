@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/Luffyreals/mini-shop/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Luffyreals/mini-shop/actions/workflows/ci.yml)
 
-Website bán hàng mini viết bằng Java / Spring Boot, render phía server bằng Thymeleaf. Đây là **dự án học tập tập trung vào UI/UX**: giao diện cửa hàng và trang quản trị được thiết kế riêng, tiếng Việt, đạt tương phản WCAG 2.1 AA. Không phải cửa hàng thật, không có thanh toán thật.
+Ứng dụng bán hàng mini chạy trên Windows, viết 100% bằng Java: giao diện JavaFX, nghiệp vụ Spring (không có web server). Đây là **dự án học tập tập trung vào UI/UX**: không phải cửa hàng thật, không có thanh toán thật.
+
+> **Đang chuyển đổi.** Đến `v0.8.0`, Mini Shop là website (Spring MVC + Thymeleaf). Từ sau đó app được làm lại thành ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)), theo từng giai đoạn D1–D6. Hiện đã xong **D1**: cửa sổ khung với thanh trên cùng, database, dữ liệu mẫu, hộp thoại lỗi. Các màn cửa hàng, giỏ hàng, đặt hàng và quản trị được làm lại ở D2–D5; bản web vẫn xem được ở tag `v0.8.0`.
 
 Clone về là chạy được, **chỉ cần JDK 25**: không cần Docker, không cần cài database. Dữ liệu lưu trong thư mục `data/` trên máy bạn, nên tắt app mở lại vẫn còn.
-
-![Danh sách sản phẩm](docs/images/products.png)
 
 ## Chạy thử
 
@@ -16,51 +16,33 @@ Clone về là chạy được, **chỉ cần JDK 25**: không cần Docker, kh�
    ```bash
    git clone https://github.com/Luffyreals/mini-shop.git
    cd mini-shop
-   ./mvnw spring-boot:run
+   ./mvnw javafx:run
    ```
 
-   Trên Windows PowerShell dùng `.\mvnw.cmd spring-boot:run`. Lần chạy đầu tự tải Maven và thư viện nên mất vài phút.
-3. Khi log có dòng `Started MiniShopApplication`, mở **http://localhost:8080**. Dừng app bằng `Ctrl+C`.
+   Trên Windows PowerShell dùng `.\mvnw.cmd javafx:run`. Lần chạy đầu tự tải Maven và thư viện nên mất vài phút; sau đó cửa sổ "Mini Shop" mở trong khoảng 10 giây. Đóng cửa sổ là tắt app.
 
-**Tài khoản demo** (tự tạo ở lần chạy đầu, cùng 5 danh mục và 22 sản phẩm mẫu):
+**Tài khoản demo** (tự tạo ở lần chạy đầu, cùng 5 danh mục và 22 sản phẩm mẫu; màn đăng nhập có ở D2):
 
 | Vai trò | Email | Mật khẩu |
 |---|---|---|
 | Quản trị | `admin@minishop.local` | `Admin@123` |
 | Khách hàng | `user@minishop.local` | `User@123` |
 
-**Gợi ý dạo một vòng:**
-1. Trang chủ: tìm, lọc theo danh mục, sắp xếp theo giá. Có sẵn sản phẩm hết hàng và sản phẩm không có ảnh.
-2. Thêm hàng vào giỏ khi chưa đăng nhập, rồi đăng nhập: giỏ được gộp vào tài khoản.
-3. Đặt hàng (thanh toán khi nhận hàng), xem "Đơn hàng của tôi", tự hủy đơn đang chờ xử lý.
-4. Đăng nhập admin, bấm "Quản trị": xử lý đơn, thêm sản phẩm có ảnh, nhập thêm tồn kho.
-5. Mở http://localhost:8080/products/999999 để xem trang lỗi; chỉ dùng `Tab` để đi hết một trang.
-
 ## Tính năng
 
-- **Khách hàng:** xem, tìm, lọc, sắp xếp sản phẩm; giỏ hàng cho cả khách chưa đăng nhập; đăng ký, đăng nhập (chặn tạm khi sai nhiều lần); đặt hàng COD, lịch sử đơn, tự hủy đơn.
-- **Quản trị (`/admin`):** dashboard (đơn theo trạng thái, doanh thu, sắp hết hàng); quản lý danh mục, sản phẩm có ảnh, tồn kho; đổi trạng thái đơn, hủy đơn tự hoàn kho.
-- **Hoàn thiện:** trang lỗi tiếng Việt cho mọi mã lỗi, không lộ stack trace; giá hiển thị kiểu `1.250.000 ₫`; dùng được bằng bàn phím và khi tắt JavaScript.
+Các tính năng của bản web được giữ nguyên ở tầng nghiệp vụ và đang được nối lại vào giao diện desktop:
 
-## Ảnh chụp
-
-| Chi tiết sản phẩm | Giỏ hàng |
-|---|---|
-| ![Chi tiết sản phẩm](docs/images/product-detail.png) | ![Giỏ hàng](docs/images/cart.png) |
-| **Thanh toán** | **Chi tiết đơn của khách** |
-| ![Thanh toán](docs/images/checkout.png) | ![Chi tiết đơn của khách](docs/images/order-detail.png) |
-| **Dashboard quản trị** | **Chi tiết đơn trong quản trị** |
-| ![Dashboard quản trị](docs/images/admin-dashboard.png) | ![Chi tiết đơn trong quản trị](docs/images/admin-order-detail.png) |
-
-Dữ liệu trong ảnh (tên, số điện thoại, địa chỉ) là dữ liệu giả.
+- **Khách hàng:** xem, tìm, lọc, sắp xếp sản phẩm; giỏ hàng cho cả khách chưa đăng nhập; đăng ký, đăng nhập; đặt hàng COD, lịch sử đơn, tự hủy đơn.
+- **Quản trị:** tổng quan (đơn theo trạng thái, doanh thu, sắp hết hàng); quản lý danh mục, sản phẩm có ảnh, tồn kho; đổi trạng thái đơn, hủy đơn tự hoàn kho.
+- **Nghiệp vụ được bảo đảm bằng test:** trừ kho nguyên tử, khóa theo thứ tự cố định khi đặt và hủy đơn, giá và tên được chụp lại trong đơn, mỗi khách chỉ thấy đơn của mình.
 
 ## Giao diện (UI/UX)
 
-- **Cửa hàng:** hướng "The specimen catalogue": mỗi sản phẩm là một "mẫu vật" trên ô màu phẳng, cùng cỡ, như bảng tra trong sách hướng dẫn. Nền màu xương, mực đen, xanh lá chỉ cho nút chính; một họ chữ Bricolage Grotesque tự host, đủ dấu tiếng Việt. Token màu, chữ, khoảng cách và lý do chọn nằm ở đầu [`static/css/app.css`](src/main/resources/static/css/app.css).
-- **Quản trị:** màn hình làm việc, dày thông tin, dễ quét ([`static/css/admin.css`](src/main/resources/static/css/admin.css)).
-- **Quy tắc chung:** Bootstrap 5.3 (qua WebJars, không CDN) ghi đè bằng token riêng; Content Security Policy chặt nên template không có script, style hay `onclick` nội tuyến (`TemplateCspComplianceTest` kiểm); link bỏ qua, focus rõ ràng, tôn trọng `prefers-reduced-motion`. Các mảnh dùng chung ở [`templates/fragments/`](src/main/resources/templates/fragments).
+- Phong cách "soft modern": nền xám rất nhạt, thẻ trắng bo góc lớn, nút dạng viên thuốc, một màu nhấn cam, phông Plus Jakarta Sans đóng gói kèm app (đủ dấu tiếng Việt). Token màu và cỡ chữ nằm ở đầu [`ui/theme.css`](src/main/resources/ui/theme.css).
+- Không gọi database trên luồng giao diện: mọi lời gọi service chạy nền, nên cửa sổ không bị "Not responding".
+- Mỗi lần chỉ chạy được một cửa sổ app (H2 chỉ cho một tiến trình mở `data/`); mở lần hai sẽ có thông báo "Mini Shop đang chạy ở một cửa sổ khác.".
 
-Ảnh sản phẩm là ảnh minh họa có giấy phép mở, không phải ảnh sản phẩm thật; tác giả và giấy phép ở trang `/credits.html` ("Nguồn ảnh" ở footer).
+Ảnh sản phẩm là ảnh minh họa có giấy phép mở; tác giả và giấy phép ở [`images/credits.tsv`](src/main/resources/images/credits.tsv), phông ở [`ui/fonts/`](src/main/resources/ui/fonts).
 
 ## Dữ liệu và lệnh thường dùng
 
@@ -68,39 +50,36 @@ App dùng **H2**, một database viết bằng Java chạy bên trong app, lưu 
 
 | Việc cần làm | Cách làm |
 |---|---|
-| Làm lại dữ liệu mẫu từ đầu | Dừng app, xóa thư mục `data/`, chạy lại |
-| Đặt dữ liệu ở thư mục khác | Biến môi trường `DATA_DIR`, đường dẫn tương đối hoặc tuyệt đối, ví dụ `DATA_DIR=data2 ./mvnw spring-boot:run` hoặc `DATA_DIR=/d/minishop-data …` |
-| Xem bảng trực tiếp | http://localhost:8080/h2-console, JDBC URL `jdbc:h2:file:./data/minishop;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH`, user `sa`, mật khẩu trống (chỉ mở được từ máy chạy app) |
-| Chạy ở cổng khác | `./mvnw spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"` |
-| Build và chạy toàn bộ test | `./mvnw verify` (test dùng H2 trong bộ nhớ, không đụng `data/`) |
-| Chạy một lớp test | `./mvnw test -Dtest=ProductControllerTest` |
+| Làm lại dữ liệu mẫu từ đầu | Đóng app, xóa thư mục `data/`, chạy lại |
+| Đặt dữ liệu ở thư mục khác | Biến môi trường `DATA_DIR`, đường dẫn tương đối hoặc tuyệt đối, ví dụ `DATA_DIR=data2 ./mvnw javafx:run` |
+| Build và chạy toàn bộ test | `./mvnw verify` (test dùng H2 trong bộ nhớ, không đụng `data/`). Vài test giao diện mở cửa sổ thật trong giây lát |
+| Bỏ qua test giao diện | `./mvnw verify -DexcludedGroups=ui` |
+| Chạy một lớp test | `./mvnw test -Dtest=OrderServiceTest` |
 
 **Xử lý sự cố:**
 - `release version 25 not supported`: máy đang dùng JDK cũ hơn; cài JDK 25 hoặc đặt `JAVA_HOME` trỏ tới nó.
-- `Port 8080 was already in use`: tắt chương trình đang dùng cổng 8080, hoặc chạy ở cổng khác.
-- `Database may be already in use`: đang có một app khác mở `data/` (thường là bản cũ chưa tắt hẳn); tắt nó rồi chạy lại.
-- "Bạn đã đăng nhập sai quá nhiều lần": đợi 15 phút, hoặc khởi động lại app.
+- "Mini Shop đang chạy ở một cửa sổ khác.": đóng cửa sổ đang mở (hoặc tiến trình `java` còn sót) rồi chạy lại.
 
 ## Tài liệu
 
-- [docs/architecture.md](docs/architecture.md): công nghệ, package và chiều phụ thuộc, các bảng, cấu trúc repo.
+- [docs/architecture.md](docs/architecture.md): công nghệ, package và chiều phụ thuộc, luồng khởi động, các bảng, cấu trúc repo.
 - [docs/adr](docs/adr/README.md): các quyết định kiến trúc và lý do.
 - [CHANGELOG.md](CHANGELOG.md): thay đổi theo từng phiên bản.
-- [docs/deploy-cloudflare.md](docs/deploy-cloudflare.md): chia sẻ app qua Cloudflare Tunnel (sau MVP).
 
 ## Lộ trình
 
-- [x] GĐ1–GĐ8 (`v0.1.0`–`v0.8.0`): nền móng, sản phẩm, đăng nhập, giỏ hàng, đặt hàng, quản trị, hoàn thiện, chế độ `public`
-- [x] Tái cấu trúc: chạy chỉ với JDK, dữ liệu lưu trong `data/`, repo gọn để public
-- [ ] Sau MVP: chia sẻ app đang chạy trên máy qua Cloudflare Tunnel (máy phải bật); quên mật khẩu; tìm đơn trong trang quản trị
+- [x] GĐ1–GĐ8 (`v0.1.0`–`v0.8.0`): bản web, gồm nền móng, sản phẩm, đăng nhập, giỏ hàng, đặt hàng, quản trị, hoàn thiện
+- [x] Tái cấu trúc: chạy chỉ với JDK, dữ liệu lưu trong `data/`
+- [x] D1: nền tảng desktop JavaFX (cửa sổ khung, chạy nền, lỗi, một cửa sổ)
+- [ ] D2: tài khoản và giỏ khách · D3: cửa hàng · D4: giỏ hàng và đặt hàng · D5: quản trị · D6: hoàn thiện và đóng gói `MiniShop.exe`
 
 ## Đóng góp
 
-- Làm trên nhánh riêng (`feat/…`, `fix/…`, `docs/…`, `chore/…`), mở Pull Request vào `main` và chọn **Squash and merge**. `./mvnw verify` phải xanh; CI chạy lại khi mở PR.
+- Làm trên nhánh riêng (`feat/…`, `fix/…`, `docs/…`, `chore/…`, `desktop/…`), mở Pull Request vào `main` và chọn **Squash and merge**. `./mvnw verify` phải xanh; CI chạy lại khi mở PR.
 - Commit message theo [Conventional Commits](https://www.conventionalcommits.org/), tiếng Anh, scope là tên tính năng: `feat(order): restore stock when an order is cancelled`.
 - Chữ hiển thị tiếng Việt, tên trong code tiếng Anh. Đổi schema thì thêm migration Flyway mới, không sửa file cũ.
 - Quyết định thay đổi kiến trúc, công nghệ hay ràng buộc nghiệp vụ thì viết ADR mới trong [docs/adr](docs/adr/README.md).
 
 ## Giấy phép
 
-Mã nguồn: [MIT](LICENSE). Ảnh sản phẩm và font theo giấy phép riêng của từng tác giả (xem `/credits.html` và `static/fonts/OFL.txt`).
+Mã nguồn: [MIT](LICENSE). Ảnh sản phẩm và phông theo giấy phép riêng của từng tác giả (xem `images/credits.tsv` và `ui/fonts/OFL.txt`).

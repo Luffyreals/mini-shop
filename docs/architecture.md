@@ -7,26 +7,36 @@ Tài liệu cho người muốn đọc code: công nghệ, cách chia package, c
 | | |
 |---|---|
 | Ngôn ngữ | Java 25 |
-| Framework | Spring Boot 4.1: Web MVC, Data JPA, Security, Validation |
-| Giao diện | Thymeleaf, Bootstrap 5.3, CSS riêng, không framework JavaScript |
+| Framework | Spring Boot 4.1 không có web server: Data JPA, Validation, `spring-security-crypto` (băm mật khẩu) |
+| Giao diện | JavaFX 25 (desktop Windows), CSS của JavaFX, phông Plus Jakarta Sans đóng gói kèm |
 | Cơ sở dữ liệu | H2 lưu ra file (chế độ tương thích PostgreSQL), Flyway |
-| Kiểm thử | JUnit 5, Mockito, AssertJ, MockMvc, ArchUnit |
+| Kiểm thử | JUnit, Mockito, AssertJ, ArchUnit, TestFX (vài smoke test mở cửa sổ thật) |
 | Build | Maven Wrapper |
 
 ## Kiến trúc
 
-Modular monolith: chia package theo tính năng (`catalog`, `cart`, `order`, `user`, `admin`…), trong mỗi tính năng phân lớp controller → service → repository. Một vài điểm thiết kế đáng chú ý:
+Ứng dụng desktop một tiến trình ([ADR-0014](adr/0014-javafx-desktop-app.md)). Modular monolith: chia package theo tính năng (`catalog`, `cart`, `order`, `user`, `admin`…); trong mỗi tính năng phân lớp màn hình JavaFX → service → repository. Màn hình nằm trong package tính năng nên service vẫn package-private. Một vài điểm thiết kế đáng chú ý:
 
 - Trừ tồn kho bằng câu `UPDATE` nguyên tử nên không bán vượt kho khi nhiều người đặt cùng lúc ([ADR-0005](adr/0005-atomic-stock-decrement.md))
 - Đơn hàng lưu lại tên và giá sản phẩm tại thời điểm mua
 - Luồng trạng thái đơn được kiểm soát chặt: `PENDING → CONFIRMED → SHIPPING → DELIVERED`, hoặc `CANCELLED`
 - Ảnh upload được kiểm cả nội dung file (magic bytes) và lưu bằng tên ngẫu nhiên ([ADR-0010](adr/0010-product-images-and-admin-stock-adjustment.md))
+- Không gọi service trên luồng JavaFX: `desktop.BackgroundTasks` chạy việc trên virtual thread rồi trả kết quả về luồng giao diện
+
+**Luồng khởi động:**
+
+1. `desktop.Launcher.main` gọi `Application.launch(MiniShopApp.class)`. `Launcher` không kế thừa `Application`, vì JavaFX nằm trên classpath sẽ báo "JavaFX runtime components are missing" nếu chạy thẳng lớp con của `Application`.
+2. `MiniShopApp.init()` (ngoài luồng giao diện) dựng Spring context: Flyway, seed. Nếu H2 báo file đang bị khóa (mã 90020), app hiện "Mini Shop đang chạy ở một cửa sổ khác." rồi thoát.
+3. `start()` nạp phông, theme và `ui/main-window.fxml`; controller FXML lấy từ Spring (`controllerFactory = context::getBean`).
+4. `stop()` đóng context: executor nền dừng, H2 nhả khóa file.
+
+Lỗi không lường trước đi qua một uncaught handler: một dòng log (thông điệp SQL đã bị lọc, vì H2 đưa cả dòng dữ liệu vào đó) và hộp thoại "Đã có lỗi xảy ra. Vui lòng thử lại.".
 
 **Các package và chiều phụ thuộc** (mũi tên = "được phép dùng"; `ArchitectureTest` làm build thất bại nếu sai):
 
 ```mermaid
 flowchart LR
-    admin["admin<br/>(chỉ tầng web)"] --> catalog
+    admin["admin<br/>(chỉ màn hình và form)"] --> catalog
     admin --> order
     admin --> storage
     admin --> user
@@ -39,6 +49,7 @@ flowchart LR
     config --> catalog
     config --> user
     admin & order & cart & catalog & user --> common
+    admin & order & cart & catalog & user --> desktop["desktop<br/>(khung cửa sổ, điều hướng, chạy nền)"]
 ```
 
 <details>
@@ -118,16 +129,17 @@ Mỗi quyết định có một ADR ghi bối cảnh, lựa chọn và phương 
 |---|---|---|
 | [0001](adr/0001-java-25-spring-boot-4.md) | Java 25, Spring Boot 4.1 | Bản LTS mới nhất; dòng Boot 3.x đã hết hỗ trợ miễn phí |
 | [0002](adr/0002-modular-monolith-package-by-feature.md) | Modular monolith, package theo tính năng | Một người, một miền nghiệp vụ nhỏ; ranh giới module được kiểm bằng ArchUnit |
-| [0003](adr/0003-server-side-rendering-thymeleaf.md) | Render phía server bằng Thymeleaf | Một dự án, session + CSRF có sẵn |
+| [0003](adr/0003-server-side-rendering-thymeleaf.md) | Render phía server bằng Thymeleaf | Bị thay thế bởi ADR-0014 |
 | [0005](adr/0005-atomic-stock-decrement.md) | Trừ kho bằng `UPDATE … WHERE stock >= :q` | Không bán vượt kho khi nhiều người đặt cùng lúc |
-| [0006](adr/0006-session-cart-merged-on-login.md) | Giỏ trong session cho khách, trong DB cho user, gộp khi đăng nhập | Khách mua được ngay, không mất giỏ khi đăng nhập |
-| [0007](adr/0007-session-form-login-current-user.md) | Đăng nhập bằng form trên session, principal riêng | Không giữ entity trong session; email luôn chữ thường |
+| [0006](adr/0006-session-cart-merged-on-login.md) | Giỏ trong session cho khách, trong DB cho user, gộp khi đăng nhập | Khách mua được ngay, không mất giỏ khi đăng nhập (giỏ khách nay nằm trong bộ nhớ, ADR-0014) |
+| [0007](adr/0007-session-form-login-current-user.md) | Đăng nhập bằng form trên session, principal riêng | Bị thay thế bởi ADR-0014 |
 | [0008](adr/0008-cart-writes-serialized-per-user.md) | Ghi giỏ DB tuần tự theo người dùng (khóa dòng `users`) | Hai tab cùng sửa giỏ không ghi đè nhau |
 | [0009](adr/0009-order-placement-and-cancel-locking.md) | Thứ tự khóa cố định khi đặt và hủy đơn | Không deadlock, kho chỉ được hoàn một lần |
 | [0010](adr/0010-product-images-and-admin-stock-adjustment.md) | Ảnh qua `StorageService`, admin chỉnh kho bằng `UPDATE` có điều kiện | File upload không thành bề mặt tấn công; không ghi đè số khách vừa mua |
-| [0011](adr/0011-centralized-error-handling.md) | Xử lý lỗi tập trung | Mọi lỗi có trang tiếng Việt đúng mã, không lộ chi tiết |
-| [0012](adr/0012-share-from-personal-machine-public-mode.md) | Chia sẻ từ máy cá nhân qua Cloudflare Quick Tunnel, chế độ `public` (sau MVP) | Miễn phí, không cần PaaS; mở ra internet một cách an toàn |
+| [0011](adr/0011-centralized-error-handling.md) | Xử lý lỗi tập trung | Bị thay thế bởi ADR-0014 |
+| [0012](adr/0012-share-from-personal-machine-public-mode.md) | Chia sẻ từ máy cá nhân qua Cloudflare Quick Tunnel, chế độ `public` (sau MVP) | Bị thay thế bởi ADR-0014 |
 | [0013](adr/0013-h2-file-database-no-docker.md) | H2 lưu ra file trong `data/`, bỏ PostgreSQL và Docker | Ai clone cũng chạy được chỉ với JDK; dữ liệu còn sau khi tắt app |
+| [0014](adr/0014-javafx-desktop-app.md) | Ứng dụng desktop JavaFX một tiến trình thay cho web | Giao diện 100% Java; giữ nguyên tầng nghiệp vụ và test |
 
 ## Cấu trúc repo
 
@@ -135,19 +147,18 @@ Mỗi quyết định có một ADR ghi bối cảnh, lựa chọn và phương 
 mini-shop/
 ├── src/main/java/com/minishop/
 │   ├── catalog/ cart/ order/ user/   Các tính năng nghiệp vụ
-│   ├── admin/                        Tầng web của khu quản trị
+│   ├── admin/                        Màn hình và form của khu quản trị
+│   ├── desktop/                      Khởi động JavaFX, khung cửa sổ, điều hướng, chạy nền, lỗi
 │   └── storage/ common/ config/      Lưu file, thành phần dùng chung, cấu hình
 ├── src/main/resources/
-│   ├── templates/       Giao diện Thymeleaf (fragments/ dùng chung, mỗi tính năng một thư mục)
-│   ├── static/          CSS, JS, font, ảnh sản phẩm mẫu, trang nguồn ảnh
+│   ├── ui/              FXML, theme.css (token), phông, biểu tượng
+│   ├── images/          Ảnh sản phẩm mẫu và credits.tsv (nguồn, giấy phép)
 │   ├── db/migration/    Schema (Flyway)
-│   └── application*.yml Cấu hình: mặc định và public (chia sẻ qua tunnel, sau MVP)
-├── src/test/            Test (JUnit, MockMvc, ArchUnit)
+│   └── application.yml  Cấu hình
+├── src/test/            Test (JUnit, ArchUnit, TestFX)
 ├── docs/
 │   ├── architecture.md  Tài liệu này
-│   ├── adr/             Các quyết định kiến trúc
-│   ├── images/          Ảnh chụp màn hình cho README
-│   └── deploy-cloudflare.md  Chia sẻ app qua Cloudflare Tunnel (sau MVP)
+│   └── adr/             Các quyết định kiến trúc
 ├── .github/             CI: build, test, kiểm không có test bị bỏ qua
 ├── pom.xml, mvnw, mvnw.cmd   Maven và Maven Wrapper (không cần cài Maven)
 ├── CHANGELOG.md

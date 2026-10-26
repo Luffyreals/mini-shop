@@ -12,7 +12,7 @@
     <artifactId>mini-shop</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>mini-shop</name>
-    <description>Website bán hàng mini - dự án học tập / portfolio</description>
+    <description>Ứng dụng desktop bán hàng mini (JavaFX) - dự án học tập / portfolio</description>
     <licenses>
         <license>
             <name>MIT</name>
@@ -22,45 +22,18 @@
 
     <properties>
         <java.version>25</java.version>
-        <!-- Không được Spring Boot BOM quản lý nên phải ghim phiên bản -->
-        <bootstrap.version>5.3.8</bootstrap.version>
         <archunit.version>1.5.1</archunit.version>
         <jacoco.version>0.8.15</jacoco.version>
+        <javafx.version>25.0.5</javafx.version>
+        <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
+        <testfx.version>4.0.18</testfx.version>
     </properties>
 
     <dependencies>
-        <!-- Web + giao diện -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webmvc</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-thymeleaf</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.thymeleaf.extras</groupId>
-            <artifactId>thymeleaf-extras-springsecurity6</artifactId>
-        </dependency>
+        <!-- Kiểm tra dữ liệu (Jakarta Validation) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.webjars.npm</groupId>
-            <artifactId>bootstrap</artifactId>
-            <version>${bootstrap.version}</version>
-        </dependency>
-        <dependency>
-            <!-- Cho phép viết /webjars/bootstrap/... không kèm số phiên bản -->
-            <groupId>org.webjars</groupId>
-            <artifactId>webjars-locator-lite</artifactId>
-        </dependency>
-
-        <!-- Bảo mật -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
         <!-- Dữ liệu -->
@@ -78,38 +51,26 @@
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <dependency>
-            <!-- /h2-console để xem dữ liệu khi học; chỉ mở cho máy này, profile public tắt -->
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-h2console</artifactId>
-            <scope>runtime</scope>
-        </dependency>
 
-        <!-- Vận hành -->
+        <!-- Giao diện desktop (ADR-0014). Không có trong Spring Boot BOM nên ghim phiên bản.
+             Classifier hệ điều hành (win/linux/mac) do pom của OpenJFX tự chọn. -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
         </dependency>
-
-        <!-- Chỉ khi phát triển -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-            <scope>runtime</scope>
-            <optional>true</optional>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <!-- Chỉ PasswordEncoder (băm mật khẩu), không kéo theo Spring Security đầy đủ. Version do BOM quản lý -->
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
         <!-- Test -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webmvc-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa-test</artifactId>
@@ -122,17 +83,7 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-thymeleaf-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -142,13 +93,38 @@
             <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- Test giao diện JavaFX trên toolkit thật (@Tag("ui")); không dùng Monocle vì không có bản cho JavaFX 22+.
+                 Không khai junit-jupiter nên dùng bản của Spring Boot BOM -->
+            <groupId>org.testfx</groupId>
+            <artifactId>testfx-junit5</artifactId>
+            <version>${testfx.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
             <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
+                <!-- Chạy bằng ./mvnw javafx:run (classpath mode, nên lớp Launcher không extends Application).
+                     Không dùng spring-boot-maven-plugin: fat jar là định dạng cho server (QĐ12). -->
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>${javafx-maven-plugin.version}</version>
+                <configuration>
+                    <mainClass>com.minishop.desktop.Launcher</mainClass>
+                    <options>
+                        <option>--enable-native-access=javafx.graphics</option>
+                    </options>
+                </configuration>
+            </plugin>
+            <plugin>
+                <!-- @{argLine} giữ agent của JaCoCo -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} --enable-native-access=ALL-UNNAMED -Dtestfx.robot=glass</argLine>
+                </configuration>
             </plugin>
             <plugin>
                 <!-- Báo cáo coverage tại target/site/jacoco; chưa đặt ngưỡng tối thiểu.
