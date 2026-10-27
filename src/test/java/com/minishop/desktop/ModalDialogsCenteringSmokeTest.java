@@ -145,8 +145,11 @@ class ModalDialogsCenteringSmokeTest {
             card.setMaxHeight(280);
             dialog.sizeToScene();
         });
-        FxTestSupport.await("the dialog to grow", () -> FxTestSupport.callOnFx(() -> dialog.getHeight()) > heightBefore);
-        FxTestSupport.flushFx();
+        // On Linux (GTK) the new size and position arrive from the window system in separate events, so for a moment
+        // y can belong to the new height while getHeight() still reports the old one. Wait for the settled state.
+        FxTestSupport.await("the dialog to grow and be centred again", () ->
+                FxTestSupport.callOnFx(() -> dialog.getHeight()) > heightBefore
+                        && Math.abs(dialogCentreY() - ownerCentreY()) <= TOLERANCE);
 
         assertCentredOnOwner();
         assertInsideVisibleBounds();
@@ -181,6 +184,7 @@ class ModalDialogsCenteringSmokeTest {
         FxTestSupport.runOnFx(() -> owner.setY(screen.getMaxY() - owner.getHeight()));
         FxTestSupport.flushFx();
         showDialog(400, 120);
+        double heightBefore = FxTestSupport.callOnFx(() -> dialog.getHeight());
 
         FxTestSupport.runOnFx(() -> {
             card.setMinHeight(420);
@@ -188,7 +192,9 @@ class ModalDialogsCenteringSmokeTest {
             card.setMaxHeight(420);
             dialog.sizeToScene();
         });
-        FxTestSupport.flushFx();
+        // Same as above: wait until the window system has applied both the new size and the new position
+        FxTestSupport.await("the dialog to grow and stay inside the screen", () -> FxTestSupport.callOnFx(() ->
+                dialog.getHeight() > heightBefore && dialog.getY() + dialog.getHeight() <= screen.getMaxY() + TOLERANCE));
 
         assertInsideVisibleBounds();
     }
