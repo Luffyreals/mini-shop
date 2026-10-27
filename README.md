@@ -97,7 +97,7 @@ App dùng **H2**, một database viết bằng Java chạy bên trong app. Chạ
 - [x] D3: cửa hàng (trang chủ, danh sách sản phẩm, chi tiết, thêm vào giỏ, đọc ảnh WebP)
 - [x] D4: giỏ hàng và đặt hàng (ngăn giỏ, thanh toán COD, đơn hàng của tôi, hủy đơn có xác nhận)
 - [x] D5: quản trị (tổng quan, danh mục, sản phẩm có ảnh, điều chỉnh tồn kho, đổi trạng thái đơn, kiểm vai trò ở service)
-- [x] D6: hoàn thiện và đóng gói (`MiniShop.exe` bằng `jpackage`, hộp thoại "Nguồn ảnh", màn lỗi có "Thử lại", job CI Windows)
+- [x] D6: hoàn thiện và đóng gói (`MiniShop.exe` bằng `jpackage`, hộp thoại "Nguồn ảnh", màn lỗi có "Thử lại", job CI Windows); D1–D6 phát hành thành `v0.9.0`
 
 ## Đóng góp
 
