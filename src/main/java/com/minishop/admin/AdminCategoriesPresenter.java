@@ -64,6 +64,7 @@ class AdminCategoriesPresenter {
 
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loaded = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final BooleanProperty empty = new SimpleBooleanProperty(false);
     private final ObservableList<Row> rows = FXCollections.observableArrayList();
     private final ObservableSet<Long> writingIds = FXCollections.observableSet();
@@ -130,6 +131,7 @@ class AdminCategoriesPresenter {
         loading.set(false);
         rows.setAll(categories.stream().map(AdminCategoriesPresenter::toRow).toList());
         empty.set(categories.isEmpty());
+        loadFailed.set(false);
         loaded.set(true);
         if (refocus) {
             refocus = false;
@@ -145,7 +147,24 @@ class AdminCategoriesPresenter {
         pending = null;
         loading.set(false);
         refocus = false;
-        failures.handle(failure);
+        boolean unexpected = failures.handle(failure);
+        // Chỉ lần nạp đầu mới thay màn bằng khối lỗi; nạp lại sau khi xóa thì giữ bảng cũ (QĐ12)
+        if (unexpected && !loaded.get()) {
+            loadFailed.set(true);
+        }
+    }
+
+    /**
+     * "Thử lại" sau lỗi lạ của lần nạp đầu (QĐ12): tắt {@code loadFailed} rồi nạp lại; xong thì focus về "Thêm danh
+     * mục" như lần nạp đầu bình thường. Bỏ qua sau {@link #dispose}, khi đang nạp hoặc khi không có lỗi nào để thử
+     * lại.
+     */
+    void retry() {
+        if (disposed || loading.get() || !loadFailed.get()) {
+            return;
+        }
+        loadFailed.set(false);
+        reload(null);
     }
 
     private static Row toRow(CategoryRow category) {
@@ -256,6 +275,11 @@ class AdminCategoriesPresenter {
     /** {@code true} từ lần nạp thành công đầu tiên. */
     ReadOnlyBooleanProperty loadedProperty() {
         return loaded;
+    }
+
+    /** {@code true} khi lần nạp đầu lỗi vì một lỗi lạ (màn hiện khối "Thử lại"); xem {@link #retry()}. */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** {@code true} khi chưa có danh mục nào ("Chưa có danh mục nào."). */

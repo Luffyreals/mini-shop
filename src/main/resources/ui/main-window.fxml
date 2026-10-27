@@ -20,10 +20,22 @@
         </padding>
 
         <!-- Thanh trên nổi: nền surface, bo 28, bóng theo token. minWidth="-Infinity" là USE_PREF_SIZE:
-             chữ không bị co thành "…" khi cửa sổ hẹp (1024 px). Ngân sách ở 1024 px (thanh trong 956 px):
-             logo + 3 nút điều hướng + giỏ + khoảng cách khoảng 519 px, nút tài khoản tối đa 136 px (CSS, tên dài
-             bị cắt bằng "…"), còn khoảng 301 px cho ô tìm kiếm (minWidth 280, prefWidth 296) để chữ gợi ý hiện đủ -->
-        <HBox fx:id="topBar" styleClass="card, top-bar" alignment="CENTER_LEFT" spacing="8">
+             chữ không bị co thành "…" khi cửa sổ hẹp. Ngân sách (QĐ15 của D6; số đo bằng FXMLLoader + theme.css,
+             phông Plus Jakarta Sans). Cửa sổ 1024 px có khung Windows chỉ còn scene ~1008 px, nên tính ở 1008 px:
+             thanh trong 940 px (1008 - 2 x 16 đệm cửa sổ - 36 đệm thanh). Cố định: logo 105 + 3 nút điều hướng 313 +
+             giỏ 52 + 6 khoảng cách 6 = 506 px. Còn 434 px cho ô tìm kiếm và nút tài khoản:
+               - nút tài khoản: "Quản trị viên" cần 126 px, "Khách hàng mẫu" cần 154 px (chữ + đệm 16 hai bên +
+                 viền 2 hai bên); CSS cho tối đa 168 px, tên dài hơn bị cắt bằng "…";
+               - ô tìm kiếm: chữ gợi ý "Tìm sản phẩm theo tên…" rộng 167,5 px + đệm 42 trái + 60 phải (chừa nhãn
+                 "Ctrl K" 48 px + lề 10) + viền 4 = 273,5 px, nên prefWidth 276 (còn 170 px cho chữ gợi ý);
+                 minWidth 268 chỉ để HBox còn chỗ co khi cửa sổ hẹp hơn.
+             Cộng lại ở scene 1008 px: 506 + 276 + 154 = 936 px so với 940 px (dư 4 px): cả hai tên demo, gợi ý và
+             "Ctrl K" hiện đủ, không ai bị co. Hẹp hơn nữa HBox chia đều phần thiếu cho nút tài khoản (min 96) và ô
+             tìm kiếm: ở scene 992 px "Khách hàng mẫu" còn 148 px và bị cắt "…" nhẹ (đọc đủ qua accessibleText).
+             Tên dài (tối đa 24 ký tự, ShellPresenter) bị cắt "…" ở 168 px; không dùng minWidth USE_PREF_SIZE cho nút
+             này vì min thắng max của CSS và nút sẽ rộng 253 px làm tràn thanh -->
+
+        <HBox fx:id="topBar" styleClass="card, top-bar" alignment="CENTER_LEFT" spacing="6">
             <HBox fx:id="logo" styleClass="logo" alignment="CENTER_LEFT" spacing="4">
                 <Label text="mini shop" styleClass="logo-text" minWidth="-Infinity"/>
                 <Region styleClass="logo-dot" minWidth="8" minHeight="8" prefWidth="8" prefHeight="8"
@@ -44,7 +56,7 @@
             <Region HBox.hgrow="ALWAYS"/>
 
             <!-- Ô tìm kiếm dạng pill; biểu tượng chồng lên trên ô nhập -->
-            <StackPane fx:id="searchBox" styleClass="search-box" minWidth="280" prefWidth="296"
+            <StackPane fx:id="searchBox" styleClass="search-box" minWidth="268" prefWidth="276"
                        maxWidth="420">
                 <TextField fx:id="searchField" styleClass="search-field, pill"
                            promptText="Tìm sản phẩm theo tên…" accessibleText="Tìm sản phẩm theo tên"
@@ -60,7 +72,7 @@
                 <Label fx:id="searchShortcut" text="Ctrl K" styleClass="search-shortcut, text-caption"
                        mouseTransparent="true" StackPane.alignment="CENTER_RIGHT">
                     <StackPane.margin>
-                        <Insets right="14"/>
+                        <Insets right="10"/>
                     </StackPane.margin>
                 </Label>
             </StackPane>

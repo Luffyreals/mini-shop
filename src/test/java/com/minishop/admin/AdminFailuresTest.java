@@ -20,7 +20,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * {@link AdminFailures}: the one place that turns a failed background task of an admin screen into a toast, a
- * navigation or an unexpected-error report (QĐ5 of the D5 plan, AC-009-9, AC-009-12, AC-009-13).
+ * navigation or an unexpected-error report (QĐ5 of the D5 plan, AC-009-9, AC-009-12, AC-009-13). Since D6 (QĐ12)
+ * {@code handle} returns {@code true} only when it reported the failure as an unexpected error, so a presenter can
+ * switch a never-loaded screen to its "Thử lại" block.
  */
 @ExtendWith(MockitoExtension.class)
 class AdminFailuresTest {
@@ -37,21 +39,23 @@ class AdminFailuresTest {
     }
 
     @Test
-    void handle_accessDenied_showsTheErrorToastAndGoesHome_withoutReporting() {
-        failures().handle(new AccessDeniedException());
+    void handle_accessDenied_showsTheErrorToastAndGoesHome_withoutReporting_andReturnsFalse() {
+        boolean unexpected = failures().handle(new AccessDeniedException());
 
+        assertThat(unexpected).isFalse();
         verify(toasts).show("Bạn không có quyền truy cập trang này.", ToastKind.ERROR);
         verify(navigator).goHome();
         verifyNoInteractions(errors);
     }
 
     @Test
-    void handle_accessDenied_ignoresTheNotFoundMessageAndCallback() {
+    void handle_accessDenied_ignoresTheNotFoundMessageAndCallback_andReturnsFalse() {
         AtomicInteger after = new AtomicInteger();
 
-        failures().handle(new AccessDeniedException(), AdminFailures.MSG_ORDER_NOT_FOUND,
+        boolean unexpected = failures().handle(new AccessDeniedException(), AdminFailures.MSG_ORDER_NOT_FOUND,
                 after::incrementAndGet);
 
+        assertThat(unexpected).isFalse();
         assertThat(after).hasValue(0);
         verify(toasts).show(AdminFailures.MSG_ACCESS_DENIED, ToastKind.ERROR);
         verify(navigator).goHome();
@@ -59,11 +63,13 @@ class AdminFailuresTest {
     }
 
     @Test
-    void handle_notFound_showsTheScreensMessageThenRunsTheFollowUpOnce() {
+    void handle_notFound_showsTheScreensMessageThenRunsTheFollowUpOnce_andReturnsFalse() {
         AtomicInteger after = new AtomicInteger();
 
-        failures().handle(new NotFoundException("gone"), "Không tìm thấy sản phẩm.", after::incrementAndGet);
+        boolean unexpected = failures().handle(new NotFoundException("gone"), "Không tìm thấy sản phẩm.",
+                after::incrementAndGet);
 
+        assertThat(unexpected).isFalse();
         verify(toasts).show("Không tìm thấy sản phẩm.", ToastKind.ERROR);
         assertThat(after).hasValue(1);
         verifyNoInteractions(errors);
@@ -71,44 +77,56 @@ class AdminFailuresTest {
     }
 
     @Test
-    void handle_notFound_withoutAFollowUp_justToasts() {
-        failures().handle(new NotFoundException("gone"), "Không tìm thấy đơn hàng.", null);
+    void handle_notFound_withoutAFollowUp_justToasts_andReturnsFalse() {
+        boolean unexpected = failures().handle(new NotFoundException("gone"), "Không tìm thấy đơn hàng.", null);
 
+        assertThat(unexpected).isFalse();
         verify(toasts).show("Không tìm thấy đơn hàng.", ToastKind.ERROR);
         verifyNoInteractions(errors, navigator);
     }
 
     @Test
-    void handle_notFound_onAScreenThatDoesNotExpectIt_isAnUnexpectedError() {
+    void handle_notFound_onAScreenThatDoesNotExpectIt_isAnUnexpectedError_andReturnsTrue() {
         NotFoundException failure = new NotFoundException("gone");
 
-        failures().handle(failure);
+        boolean unexpected = failures().handle(failure);
 
+        assertThat(unexpected).isTrue();
         verify(errors).report(failure);
         verifyNoInteractions(toasts, navigator);
     }
 
     @Test
-    void handle_notFound_withNullMessage_runsNoFollowUp_andReports() {
+    void handle_notFound_withNullMessage_runsNoFollowUp_reports_andReturnsTrue() {
         NotFoundException failure = new NotFoundException("gone");
         AtomicInteger after = new AtomicInteger();
 
-        failures().handle(failure, null, after::incrementAndGet);
+        boolean unexpected = failures().handle(failure, null, after::incrementAndGet);
 
+        assertThat(unexpected).isTrue();
         assertThat(after).hasValue(0);
         verify(errors).report(failure);
     }
 
     @Test
-    void handle_anyOtherFailure_isReportedExactlyOnce_withNoToastAndNoNavigation() {
+    void handle_anyOtherFailure_isReportedExactlyOnce_withNoToastAndNoNavigation_andReturnsTrue() {
         IllegalStateException failure = new IllegalStateException("boom");
         AtomicInteger after = new AtomicInteger();
 
-        failures().handle(failure, AdminFailures.MSG_PRODUCT_NOT_FOUND, after::incrementAndGet);
+        boolean unexpected = failures().handle(failure, AdminFailures.MSG_PRODUCT_NOT_FOUND, after::incrementAndGet);
 
+        assertThat(unexpected).isTrue();
         verify(errors).report(failure);
         assertThat(after).hasValue(0);
         verifyNoInteractions(toasts, navigator);
+    }
+
+    @Test
+    void handle_accessDeniedWithoutMessage_returnsFalse_andNeverReports() {
+        boolean unexpected = failures().handle(new AccessDeniedException(), null, null);
+
+        assertThat(unexpected).isFalse();
+        verifyNoInteractions(errors);
     }
 
     @Test

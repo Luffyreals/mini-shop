@@ -313,7 +313,7 @@
     -fx-background-insets: 0;
     -fx-border-color: transparent;
     -fx-border-width: 2px;
-    -fx-padding: 11px 72px 11px 44px;   /* trái: chừa biểu tượng; phải: chừa nhãn "Ctrl K" */
+    -fx-padding: 11px 60px 11px 42px;   /* trái: chừa biểu tượng; phải: chừa nhãn "Ctrl K" (48 px + lề 10 = 58, hở 2) */
     -fx-prompt-text-fill: -ms-muted;
     -fx-text-fill: -ms-ink;
 }
@@ -370,9 +370,10 @@
 .account-button {
     -fx-background-color: -ms-surface-muted;
     -fx-padding: 11px 16px;
-    -fx-max-width: 136px;   /* tên dài bị cắt bằng "…"; đọc đủ chữ qua accessibleText (ngân sách 1024 px ở main-window.fxml) */
+    -fx-max-width: 168px;   /* "Khách hàng mẫu" cần 154 px; tên dài hơn bị cắt bằng "…", đọc đủ chữ qua accessibleText (ngân sách 1024 px ở main-window.fxml) */
     -fx-font-family: "Plus Jakarta Sans SemiBold";
     -fx-font-weight: normal;
+    -fx-ellipsis-string: "…";   /* cùng dấu cắt với ShellPresenter (JavaFX mặc định là "...") */
 }
 
 .account-button:hover {
@@ -1137,14 +1138,6 @@
     -fx-vgap: 4px;
 }
 
-.data-table-header {
-    -fx-font-family: "Plus Jakarta Sans Medium";
-    -fx-font-size: 12px;
-    -fx-font-weight: normal;
-    -fx-text-fill: -ms-muted;
-    -fx-padding: 0 18px 8px 18px;
-}
-
 /* data-table-row: hàng bo 20; trỏ chuột nền surface-muted, focus viền accent (viền trong suốt giữ chỗ) */
 .data-table-row {
     -fx-background-color: transparent;
@@ -1158,21 +1151,8 @@
     -fx-spacing: 16px;
 }
 
-/* order-row: hàng danh sách đơn bấm được (mở chi tiết): con trỏ tay, nền khi trỏ chuột, viền focus. Hàng tĩnh
-   (dòng hàng ở chi tiết đơn) chỉ có .data-table-row nên không có hiệu ứng nào */
-.order-row {
-    -fx-cursor: hand;
-}
-
-.order-row:hover {
-    -fx-background-color: -ms-surface-muted;
-}
-
-.order-row:focused {
-    -fx-border-color: -ms-accent;
-}
-
-/* order-table: VBox hàng tiêu đề + các hàng đơn; khe 4 px để hai viền focus không dính nhau */
+/* order-table: VBox hàng tiêu đề + các hàng đơn; khe 4 px để hai viền focus không dính nhau. Hàng bấm được
+   thêm .table-row-link (cuối file); hàng tĩnh (dòng hàng ở chi tiết đơn) chỉ có .data-table-row */
 .order-table {
     -fx-spacing: 4px;
 }
@@ -1252,7 +1232,7 @@
 
 /* =====================================================================================================
    D5: khu quản trị (admin.AdminScreen và các màn con). Chỉ dùng token; không mã màu ngoài khối token ở đầu file.
-   Bảng tái dùng .data-table, .data-table-header, .data-table-row, .order-table; nhãn trạng thái đơn dùng
+   Bảng tái dùng .data-table, .table-head, .data-table-row, .order-table; nhãn trạng thái đơn dùng
    .status-pill. Khung: thanh bên 200 px (thẻ trắng bo 28) cạnh vùng màn cuộn dọc.
    ===================================================================================================== */
 
@@ -1436,16 +1416,17 @@
     -fx-background-color: -ms-accent;
 }
 
-/* admin-row-link: hàng bảng bấm được (ghép với .data-table-row): con trỏ tay, nền khi trỏ chuột, viền focus */
-.admin-row-link {
+/* table-row-link: hàng bảng bấm được (ghép với .data-table-row, desktop.Tables): con trỏ tay, nền khi trỏ chuột,
+   viền focus */
+.table-row-link {
     -fx-cursor: hand;
 }
 
-.admin-row-link:hover {
+.table-row-link:hover {
     -fx-background-color: -ms-surface-muted;
 }
 
-.admin-row-link:focused {
+.table-row-link:focused {
     -fx-border-color: -ms-accent;
 }
 
@@ -1506,14 +1487,14 @@
    D5 / F6: chỉnh theo báo cáo F2 đến F5 (bảng quản trị, trạng thái bận, ô trên nền muted, form, vòng quay)
    ===================================================================================================== */
 
-/* admin-table-head / admin-th: hàng tiêu đề bảng quản trị (AdminScreen.headerRow). Đệm ngang 18 px ở chính lưới
-   (16 đệm + 2 viền của .data-table-row), nhãn không đệm riêng, nên cột thẳng hàng với hàng dữ liệu dù cột co giãn
-   nằm ở đầu, giữa hay cuối. Khác .data-table-header (đệm 18 px trong từng ô, dùng ở bảng của order) */
-.admin-table-head {
+/* table-head / table-th: hàng tiêu đề của mọi bảng (desktop.Tables.headerRow). Đệm ngang 18 px ở chính lưới
+   (16 đệm + 2 viền của .data-table-row), nhãn không đệm riêng, nên cột thẳng hàng với hàng dữ liệu dù cột co
+   giãn nằm ở đầu, giữa hay cuối */
+.table-head {
     -fx-padding: 0 18px 8px 18px;
 }
 
-.admin-th {
+.table-th {
     -fx-font-family: "Plus Jakarta Sans Medium";
     -fx-font-size: 12px;
     -fx-font-weight: normal;
@@ -1529,6 +1510,12 @@
 
 .admin-table-card .data-table {
     -fx-hgap: 12px;
+}
+
+/* table-tight: bảng "Đơn hàng" của admin (6 cột, cột ngày giờ 140 px): khe cột 8 px để ngày giờ nằm trọn một
+   dòng ở cửa sổ 1024 px */
+.admin-table-card .data-table.table-tight {
+    -fx-hgap: 8px;
 }
 
 /* is-busy: hàng đang ghi (Ẩn/Hiện lại): mờ đi nhưng vẫn đọc được; nút không bị khóa nên focus không nhảy */
@@ -1656,4 +1643,114 @@
 .admin-busy {
     -fx-alignment: center-left;
     -fx-padding: 4px 0 0 0;
+}
+
+/* =====================================================================================================
+   D6 / F1: viết sẵn cho cả giai đoạn (trạng thái lỗi nạp, liên kết chân trang, hộp thoại "Nguồn ảnh").
+   Chỉ dùng token; F2 đến F4 gắn class, không sửa file này
+   ===================================================================================================== */
+
+/* load-error: khối lỗi nạp trong màn (desktop.LoadError); ghép với .empty-state (căn giữa, khe 12, đệm 48).
+   Câu chữ là .section-title, nút là .button-secondary; trạng thái nằm ở câu chữ, không chỉ ở màu */
+.load-error {
+    -fx-spacing: 16px;
+}
+
+/* page-footer-link: nút dạng liên kết ở chân trang ("Nguồn ảnh"), cùng cỡ chữ và màu với .page-footer (caption 12,
+   muted); gạch chân khi trỏ chuột hoặc có focus, viền focus accent từ .button:focused */
+.page-footer-link {
+    -fx-background-color: transparent;
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+    -fx-padding: 4px 10px;
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+}
+
+.page-footer-link:hover,
+.page-footer-link:focused {
+    -fx-underline: true;
+}
+
+/* Chân trang ở màn chính (HomeScreen): chữ, dấu "·" và nút liên kết; nút đã có đệm ngang 10 nên dấu "·" và chữ
+   đầu cũng đệm trái 10 để khoảng cách hai bên dấu "·" bằng nhau */
+#homeFooter > .page-footer {
+    -fx-padding: 0 0 0 10px;
+}
+
+/* ---- Hộp thoại "Nguồn ảnh và giấy phép" (desktop.CreditsDialog) ----
+   credits-dialog: thẻ hộp thoại (ghép với .card và .dialog-card); rộng cố định 640 px, các khối cách nhau 16 px */
+.credits-dialog {
+    -fx-spacing: 16px;
+    -fx-min-width: 640px;
+    -fx-pref-width: 640px;
+    -fx-max-width: 640px;
+}
+
+/* credits-section-title: tiêu đề mục ("Ảnh sản phẩm", "Phông chữ", "Biểu tượng ứng dụng"), h2 20 */
+.credits-section-title {
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-size: 20px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-padding: 8px 0 0 0;
+}
+
+/* credits-entry: khối một ảnh, phông hoặc biểu tượng (nền surface-muted bo 20 như .image-well) */
+.credits-entry {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-radius: 20px;
+    -fx-padding: 14px 18px;
+    -fx-spacing: 4px;
+}
+
+/* credits-entry-title: tên sản phẩm (hoặc tên phông) làm tiêu đề của khối, body đậm */
+.credits-entry-title {
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-size: 15px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-wrap-text: true;
+}
+
+/* credits-field: một dòng "Nhãn: giá trị" trong khối (tên ảnh, tác giả, giấy phép, nguồn); chữ xuống dòng */
+.credits-field {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-wrap-text: true;
+}
+
+/* credits-content: VBox trong vùng cuộn; đệm dưới để khối cuối không dính mép vùng nhìn thấy */
+.credits-content {
+    -fx-padding: 0 0 8px 0;
+}
+
+/* credits-link: liên kết giấy phép / nguồn (Hyperlink): chữ ink gạch chân (nhận ra là liên kết không nhờ màu),
+   cùng cỡ 15 và chữ Medium với giá trị thường (tác giả, tên ảnh) cạnh nó. Không đệm; viền focus accent vẽ ra ngoài
+   (insets âm) nên chữ thẳng hàng với các giá trị khác */
+.credits-link {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 15px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-underline: true;
+    -fx-padding: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-insets: -2px;
+    -fx-border-radius: 999px;
+    -fx-cursor: hand;
+}
+
+.credits-link:focused {
+    -fx-border-color: -ms-accent;
+    -fx-border-style: solid;   /* Modena vẽ viền focus của Hyperlink bằng nét chấm; các viền focus khác là nét liền */
+}
+
+.credits-link:visited {
+    -fx-text-fill: -ms-ink;
 }

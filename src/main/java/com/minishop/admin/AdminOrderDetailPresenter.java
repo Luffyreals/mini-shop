@@ -76,6 +76,7 @@ class AdminOrderDetailPresenter {
 
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty busy = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final StringProperty titleText = new SimpleStringProperty("");
     private final ObjectProperty<Detail> detail = new SimpleObjectProperty<>();
 
@@ -162,6 +163,7 @@ class AdminOrderDetailPresenter {
                 DATES.format(view.createdAt()), DATES.format(view.updatedAt()),
                 view.customerName() + " (" + view.customerEmail() + ")", lines,
                 MONEY.format(view.totalAmount()), List.copyOf(view.actions()), view.isFinalStatus()));
+        loadFailed.set(false);
         busy.set(false);
         loading.set(false);
     }
@@ -169,7 +171,24 @@ class AdminOrderDetailPresenter {
     private void loadFailed(Throwable failure) {
         loading.set(false);
         busy.set(false);
-        failures.handle(failure, AdminFailures.MSG_ORDER_NOT_FOUND, this::back);
+        boolean unexpected = failures.handle(failure, AdminFailures.MSG_ORDER_NOT_FOUND, this::back);
+        // Chỉ lần nạp đầu (chưa có đơn nào) mới thay màn bằng khối lỗi; nạp lại sau khi đổi trạng thái thì giữ nội
+        // dung cũ (QĐ12)
+        if (unexpected && detail.get() == null) {
+            loadFailed.set(true);
+        }
+    }
+
+    /**
+     * "Thử lại" sau lỗi lạ của lần nạp đầu (QĐ12): tắt {@code loadFailed} rồi nạp lại đúng đơn. Bỏ qua sau
+     * {@link #dispose}, khi đang nạp hoặc khi không có lỗi nào để thử lại.
+     */
+    void retry() {
+        if (disposed || route == null || loading.get() || !loadFailed.get()) {
+            return;
+        }
+        loadFailed.set(false);
+        reload();
     }
 
     private static LineRow toLine(OrderLineView line) {
@@ -271,6 +290,11 @@ class AdminOrderDetailPresenter {
     /** {@code true} từ lúc gửi lệnh đổi trạng thái tới khi đơn được nạp lại. */
     ReadOnlyBooleanProperty busyProperty() {
         return busy;
+    }
+
+    /** {@code true} khi lần nạp đầu lỗi vì một lỗi lạ (màn hiện khối "Thử lại"); xem {@link #retry()}. */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** "Đơn hàng #{id}"; có ngay từ khi nhận route. */

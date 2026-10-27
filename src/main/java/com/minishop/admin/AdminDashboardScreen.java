@@ -3,6 +3,7 @@ package com.minishop.admin;
 import com.minishop.admin.AdminDashboardPresenter.CountTile;
 import com.minishop.admin.AdminDashboardPresenter.LatestOrder;
 import com.minishop.admin.AdminDashboardPresenter.LowStockItem;
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.ScreenFactory;
 import java.util.List;
 import javafx.application.Platform;
@@ -33,10 +34,11 @@ import org.springframework.stereotype.Component;
  * doanh thu và sắp hết hàng bên phải, rộng {@value #SIDE_WIDTH} px), nhỏ hơn thì xếp chồng. Ngưỡng cao hơn
  * {@link #TWO_COLUMNS_FROM} vì bảng năm cột cần khoảng 700 px mới đủ chỗ.
  *
- * <p><b>Focus:</b> sau lần nạp đầu focus ở ô "Chờ xử lý" (ô số đầu tiên).
+ * <p><b>Focus:</b> sau lần nạp đầu focus ở ô "Chờ xử lý" (ô số đầu tiên); sau lỗi lạ của lần nạp đầu màn hiện khối
+ * lỗi (D6, QĐ12) và focus ở "Thử lại".
  *
  * <p>Id cố định cho test: {@code adminDashboardScreen}, {@code dashboardTitle}, {@code viewAllOrders},
- * {@code dashboardLoading}, {@code adminCount-{STATUS}}, {@code revenueValue}, {@code latestOrders},
+ * {@code dashboardLoading}, {@code adminDashboardLoadError}, {@code adminDashboardRetry}, {@code adminCount-{STATUS}}, {@code revenueValue}, {@code latestOrders},
  * {@code latestOrder-{id}}, {@code latestOrdersEmpty}, {@code lowStockList}, {@code lowStock-{id}},
  * {@code lowStockEmpty}; cộng các id của thanh bên ({@link AdminScreen}).
  */
@@ -59,7 +61,7 @@ final class AdminDashboardScreen extends AdminScreen {
     static final int SIDE_WIDTH = 300;
 
     private static final List<ColumnConstraints> LATEST_COLUMNS = List.of(
-            fixedColumn(64), fixedColumn(136), growingColumn(124), fixedColumn(112), fixedColumn(132));
+            fixedColumn(64), fixedColumn(140), growingColumn(124), fixedColumn(112), fixedColumn(128));
 
     private final AdminDashboardPresenter presenter;
 
@@ -70,7 +72,9 @@ final class AdminDashboardScreen extends AdminScreen {
     private final VBox latestCard = new VBox();
     private final VBox sideColumn = new VBox();
     private boolean stacked;
+    private final VBox loadError;
     private boolean pendingFocus = true;
+    private boolean retryFocusPending;
 
     AdminDashboardScreen(AdminDashboardPresenter presenter, AdminNavPresenter nav) {
         super(AdminSection.DASHBOARD, nav);
@@ -94,7 +98,16 @@ final class AdminDashboardScreen extends AdminScreen {
         show(counts, ready);
         show(columns, ready);
 
-        setBody(page(head, loadingBox, counts, columns));
+        loadError = LoadError.create("adminDashboard", presenter::retry);
+        show(loadError, presenter.loadFailedProperty());
+
+        setBody(page(head, loadingBox, loadError, counts, columns));
+        presenter.loadFailedProperty().addListener((observable, wasFailed, isFailed) -> {
+            if (isFailed) {
+                retryFocusPending = true;
+                Platform.runLater(this::tryFocus);
+            }
+        });
 
         presenter.counts().addListener((ListChangeListener<CountTile>) change -> renderCounts());
         presenter.latest().addListener((ListChangeListener<LatestOrder>) change -> renderLatest());
@@ -336,7 +349,19 @@ final class AdminDashboardScreen extends AdminScreen {
     }
 
     private void tryFocus() {
-        if (!pendingFocus || getScene() == null || !presenter.loadedProperty().get()) {
+        if (getScene() == null) {
+            return;
+        }
+        if (retryFocusPending && presenter.loadFailedProperty().get()) {
+            // Sau lỗi nạp đầu: focus vào "Thử lại" (QĐ12), đúng chỗ màn vẫn đặt focus sau khi nạp xong
+            Button retry = LoadError.retryButton(loadError);
+            if (retry.getScene() != null) {
+                retryFocusPending = false;
+                retry.requestFocus();
+            }
+            return;
+        }
+        if (!pendingFocus || !presenter.loadedProperty().get()) {
             return;
         }
         Node target = counts.getChildren().isEmpty() ? null : counts.getChildren().get(0);

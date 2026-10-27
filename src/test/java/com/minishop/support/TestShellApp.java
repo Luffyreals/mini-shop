@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * {@code FxToolkit.setupApplication(TestShellApp::new)} and stop it with {@code FxToolkit.cleanupApplication(app)},
  * which closes the Spring context (the H2 database and the background executor).
  */
-public final class TestShellApp extends MiniShopApp {
+public class TestShellApp extends MiniShopApp {
 
     private final AtomicReference<ConfigurableApplicationContext> builtContext = new AtomicReference<>();
     private final Class<?>[] extraSources;

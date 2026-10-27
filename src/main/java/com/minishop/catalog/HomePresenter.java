@@ -32,8 +32,9 @@ import java.util.List;
  * presenter mới ({@code prototype}); màn gọi {@link #load} một lần, và {@link #dispose} khi bị thay.
  *
  * <p><b>Luồng:</b> {@link ProductService#home()} chạy qua {@link BackgroundTasks}; property chỉ đổi trên luồng
- * giao diện. Lỗi lạ đi vào {@link UnexpectedErrors} và màn giữ nội dung đang có. Sau {@link #dispose} không
- * callback nào đổi property hay điều hướng nữa.
+ * giao diện. Lỗi lạ đi vào {@link UnexpectedErrors} và màn giữ nội dung đang có; nếu đó là lần nạp đầu thì
+ * {@link #loadFailedProperty()} bật và {@link #retry()} nạp lại (QĐ12). Sau {@link #dispose} không callback nào đổi
+ * property hay điều hướng nữa.
  *
  * <p><b>Câu dẫn:</b> {@link #leadText(List)} nối tên danh mục theo thứ tự {@link HomeView} cung cấp (đã sắp theo
  * Collator tiếng Việt).
@@ -60,6 +61,7 @@ class HomePresenter {
 
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loaded = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final ObjectProperty<ProductDetailView> featured = new SimpleObjectProperty<>();
     private final StringProperty featuredPriceText = new SimpleStringProperty("");
     private final ObservableList<ProductCardView> moreNew = FXCollections.observableArrayList();
@@ -106,6 +108,7 @@ class HomePresenter {
         lowStock.setAll(view.lowStock());
         hasLowStock.set(!view.lowStock().isEmpty());
         leadText.set(leadText(view.categories()));
+        loadFailed.set(false);
         loaded.set(true);
         loading.set(false);
         if (firstLoad) {
@@ -119,7 +122,22 @@ class HomePresenter {
 
     private void failed(Throwable failure) {
         loading.set(false);
+        if (!loaded.get()) {
+            loadFailed.set(true);   // lần nạp đầu lỗi: màn hiện khối lỗi thay vì để trống
+        }
         errors.report(failure);
+    }
+
+    /**
+     * "Thử lại" sau một lỗi lạ ở lần nạp đầu (QĐ12): tắt {@link #loadFailedProperty()} rồi nạp lại trang chủ. Bỏ
+     * qua khi đã {@link #dispose}, khi đang nạp hoặc khi chưa có lỗi.
+     */
+    void retry() {
+        if (disposed || loading.get() || !loadFailed.get()) {
+            return;
+        }
+        loadFailed.set(false);
+        reload();
     }
 
     /**
@@ -188,6 +206,11 @@ class HomePresenter {
 
     ReadOnlyBooleanProperty loadingProperty() {
         return loading;
+    }
+
+    /** {@code true} khi lần nạp đầu lỗi vì một lỗi lạ (màn hiện khối "Thử lại"). */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** {@code true} từ lần nạp thành công đầu tiên. */

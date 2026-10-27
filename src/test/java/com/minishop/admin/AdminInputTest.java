@@ -8,32 +8,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Raw admin request parameters never become a 500 (AC-006-5, 34; BR-006-7). */
+/** Raw text typed in the admin stock field never becomes an unexpected error (AC-006-5, 34; BR-006-7). */
 class AdminInputTest {
-
-    // ---------- id ----------
-
-    @Test
-    void id_withDigits_parsesAndStrips() {
-        assertThat(AdminInput.id("7")).contains(7L);
-        assertThat(AdminInput.id(" 7 ")).contains(7L);
-        assertThat(AdminInput.id("0")).contains(0L);
-        assertThat(AdminInput.id("999999999999999999")).contains(999_999_999_999_999_999L);
-    }
-
-    /** AC-006-5: a bad id is a 404 for the controller. */
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = {"   ", "abc", "-1", "+1", "1.5", "7a", "99999999999999999999", "1000000000000000000",
-            "٣", "0x10", "1e3", "7 7"})
-    void id_withInvalidValue_isEmpty(String raw) {
-        assertThat(AdminInput.id(raw)).isEmpty();
-    }
-
-    @Test
-    void id_withTwentyDigits_isEmptyNotAnOverflow() {
-        assertThat(AdminInput.id("1".repeat(20))).isEmpty();
-    }
 
     // ---------- stockDelta ----------
 
@@ -61,37 +37,46 @@ class AdminInputTest {
         assertThat(AdminInput.stockDelta(" -2 ")).contains(-2);
     }
 
+    /** D6 B2: a pasted special space no longer makes a valid number fail (FormText.clean first). */
+    @Test
+    void stockDelta_withNoBreakSpaceAfterTheNumber_parses() {
+        assertThat(AdminInput.stockDelta("5\u00A0")).contains(5);
+    }
+
+    @Test
+    void stockDelta_withNarrowNoBreakSpaceBeforeTheNumber_parses() {
+        assertThat(AdminInput.stockDelta("\u202F-2")).contains(-2);
+    }
+
+    @Test
+    void stockDelta_withFigureSpaceAroundASignedNumber_parses() {
+        assertThat(AdminInput.stockDelta("\u2007+5")).contains(5);
+        assertThat(AdminInput.stockDelta("+5\u2007")).contains(5);
+    }
+
+    @Test
+    void stockDelta_withInvisibleCharacterInTheMiddle_dropsItAndParses() {
+        assertThat(AdminInput.stockDelta("5\u200B0")).contains(50);
+    }
+
+    @Test
+    void stockDelta_withSpecialSpaceInsideTheNumber_isStillRejected() {
+        // a special space becomes a plain space, and a space inside the digits is not a separator we accept
+        assertThat(AdminInput.stockDelta("5\u00A05")).isEmpty();
+    }
+
+    @Test
+    void stockDelta_rejectsThousandsSeparators() {
+        assertThat(AdminInput.stockDelta("1.000")).isEmpty();
+        assertThat(AdminInput.stockDelta("1 000")).isEmpty();
+        assertThat(AdminInput.stockDelta("1\u00A0000")).isEmpty();
+    }
+
     @Test
     void stockDelta_rejectsTheValuesJustOutsideTheBoundary() {
         assertThat(AdminInput.stockDelta("100000")).isPresent();
         assertThat(AdminInput.stockDelta("100001")).isEmpty();
         assertThat(AdminInput.stockDelta("-100000")).isPresent();
         assertThat(AdminInput.stockDelta("-100001")).isEmpty();
-    }
-
-    // ---------- page ----------
-
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = {"abc", "0", "-3", "1.5", "99999999999999999999", "   ", "+2", "١"})
-    void page_withInvalidValue_isOne(String raw) {
-        assertThat(AdminInput.page(raw)).isEqualTo(1);
-    }
-
-    @Test
-    void page_withValidValue_isParsedAndClampedBetweenOneAndTenThousand() {
-        assertThat(AdminInput.page("1")).isEqualTo(1);
-        assertThat(AdminInput.page("2")).isEqualTo(2);
-        assertThat(AdminInput.page(" 3 ")).isEqualTo(3);
-        assertThat(AdminInput.page("9999")).isEqualTo(9_999);
-        assertThat(AdminInput.page("10000")).isEqualTo(10_000);
-        assertThat(AdminInput.page("10001")).isEqualTo(10_000);
-        assertThat(AdminInput.page("999999")).isEqualTo(10_000);
-        assertThat(AdminInput.page("999999999")).isEqualTo(10_000);
-    }
-
-    @Test
-    void page_withTenDigits_isPageOneNotAnOverflow() {
-        assertThat(AdminInput.page("1000000000")).isEqualTo(1);
     }
 }

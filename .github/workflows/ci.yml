@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Chạy tay từ tab Actions (job package-windows cần khi muốn thử bản đóng gói trên nhánh bất kỳ)
+  workflow_dispatch:
 
 # Token mặc định chỉ được đọc repo
 permissions:
@@ -66,4 +68,145 @@ jobs:
           path: |
             target/surefire-reports/
             target/failsafe-reports/
+          retention-days: 7
+
+  # Phát hiện PR có đổi những file ảnh hưởng tới bản đóng gói hay không (D6, QĐ8, câu hỏi 5b).
+  # `on: pull_request` không lọc được theo đường dẫn cho từng job riêng, nên job này tự so file bằng git
+  # (không dùng action bên thứ ba). Push lên main và chạy tay (workflow_dispatch) luôn cần job Windows.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      package: ${{ steps.filter.outputs.package }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Decide whether the Windows package job is needed
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "package=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Ba chấm: chỉ phần PR đổi so với chỗ nó tách khỏi nhánh đích
+          changed="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+          echo "Changed files:"
+          echo "$changed"
+          if echo "$changed" | grep -Eq '^(pom\.xml|src/packaging/|\.github/workflows/)'; then
+            echo "package=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "package=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Build thư mục app Windows bằng jpackage, khởi động thử rồi đưa lên làm artifact (D6, QĐ8).
+  # Không chạy test: job `build` đã chạy đủ `verify`. Chỉ app-image, không MSI (câu hỏi 5a, QĐ9).
+  package-windows:
+    needs: changes
+    if: needs.changes.outputs.package == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build the app image (jpackage)
+        run: .\mvnw.cmd -B -ntp -Pjpackage -DskipTests package
+
+      # Tên artifact lấy từ version trong pom.xml, nên không phải sửa tay mỗi lần lên phiên bản
+      - name: Read the project version
+        id: version
+        run: |
+          $version = ([xml](Get-Content -Raw pom.xml)).project.version
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'Cannot read the project version from pom.xml' }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      # Chạy MiniShop.exe thật với thư mục dữ liệu riêng, chờ dòng "Main window shown" của logger MiniShopApp trong
+      # file log (bản đóng gói không có console, QĐ5), không chấp nhận dòng ERROR, và LUÔN dừng tiến trình ở cuối.
+      # Chữ "Main window shown" lấy từ MiniShopApp.MAIN_WINDOW_SHOWN (ghi ngay sau stage.show()): nếu đổi hằng đó
+      # thì phải đổi cả ở đây. Dòng này chứng tỏ cửa sổ chính đã hiện, chắc hơn "Started MiniShopApplication"
+      # (chỉ báo Spring đã dựng xong, trước khi JavaFX mở cửa sổ).
+      # File log không chứa dữ liệu cá nhân hay thông điệp SQL (quy tắc D1-D5), nên in đuôi file khi lỗi là an toàn.
+      - name: Start-up check
+        run: |
+          $dataDir = Join-Path $env:RUNNER_TEMP 'ms-data'
+          $log = Join-Path $dataDir 'logs\mini-shop.log'
+          $env:DATA_DIR = $dataDir
+          $exe = Join-Path $PWD 'target\dist\MiniShop\MiniShop.exe'
+          if (-not (Test-Path $exe)) { throw "Missing $exe" }
+
+          # Đọc log khi app còn đang ghi: mở với chia sẻ đọc/ghi để không bị khóa file
+          function Read-Log {
+            if (-not (Test-Path $log)) { return '' }
+            $stream = [System.IO.File]::Open($log, 'Open', 'Read', 'ReadWrite')
+            try { return (New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::UTF8)).ReadToEnd() }
+            finally { $stream.Dispose() }
+          }
+
+          # Kết quả quyết định sau try/finally: exit trong catch rồi finally đặt lại LASTEXITCODE thì không chắc
+          # bước còn đỏ, nên chỉ ghi $ok trong try và thoát ở cuối
+          $ok = $false
+          $proc = Start-Process -FilePath $exe -PassThru
+          try {
+            $started = $false
+            $deadline = (Get-Date).AddSeconds(90)
+            while ((Get-Date) -lt $deadline) {
+              if ($proc.HasExited) { throw "MiniShop.exe exited early with code $($proc.ExitCode)" }
+              if ((Read-Log) -match 'MiniShopApp\s*:\s*Main window shown') { $started = $true; break }
+              Start-Sleep -Seconds 2
+            }
+            if (-not $started) { throw 'Timed out after 90 s waiting for "Main window shown" (MiniShopApp) in the log' }
+
+            # Chờ thêm để bắt cả lỗi của việc nền chạy sau khi cửa sổ hiện (nạp trang chủ, ImageLoader.warmUp)
+            Start-Sleep -Seconds 5
+            if ($proc.HasExited) { throw "MiniShop.exe exited after start-up with code $($proc.ExitCode)" }
+            $errors = (Read-Log) -split "`r?`n" | Where-Object { $_ -match '\sERROR\s' }
+            if ($errors) { throw "The log contains ERROR lines:`n$($errors -join "`n")" }
+            Write-Host 'Start-up check passed: the app started and the log has no ERROR lines.'
+            $ok = $true
+          }
+          catch {
+            Write-Host "::error::$($_.Exception.Message)"
+            Write-Host '----- last lines of mini-shop.log -----'
+            (Read-Log) -split "`r?`n" | Select-Object -Last 80 | ForEach-Object { Write-Host $_ }
+          }
+          finally {
+            # /T dừng cả cây tiến trình, /F ép dừng; lỗi "không còn tiến trình" bị bỏ qua
+            if ($proc -and -not $proc.HasExited) { & taskkill /PID $proc.Id /T /F | Out-Null }
+          }
+          if (-not $ok) { exit 1 }
+          # Mã thoát của taskkill không được làm đỏ bước (GitHub thêm "exit $LASTEXITCODE" vào cuối script)
+          $global:LASTEXITCODE = 0
+
+      - name: Upload the app image
+        uses: actions/upload-artifact@v7
+        with:
+          name: MiniShop-${{ steps.version.outputs.value }}-windows
+          path: target/dist/MiniShop
+          if-no-files-found: error
+          retention-days: 7
+
+      # Khi khởi động thử lỗi, file log là thứ duy nhất cho biết vì sao
+      - name: Upload the start-up log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: startup-log
+          path: ${{ runner.temp }}\ms-data\logs\
+          if-no-files-found: ignore
           retention-days: 7

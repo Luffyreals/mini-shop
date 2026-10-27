@@ -29,7 +29,8 @@ import java.util.Objects;
  * <p><b>Luồng:</b> {@code ProductService.getDetail} chạy qua {@link BackgroundTasks}; property chỉ đổi trên luồng
  * giao diện. Sản phẩm không còn (lúc nạp hoặc lúc thêm vào giỏ) thì báo "Không tìm thấy sản phẩm." và về
  * {@link ProductDetailRoute#back()} (AC-009-13); lỗi lạ đi vào {@link UnexpectedErrors} và màn giữ nội dung đang
- * có. Sau {@link #dispose} không callback nào đổi property hay điều hướng nữa.
+ * có; nếu đó là lần nạp đầu thì {@link #loadFailedProperty()} bật và {@link #retry()} nạp lại (QĐ12). Sau
+ * {@link #dispose} không callback nào đổi property hay điều hướng nữa.
  *
  * <p><b>Số lượng:</b> {@link #quantityTextProperty()} giữ chữ người dùng gõ, nguyên văn; {@link AddToCart} phân
  * tích và báo "Số lượng không hợp lệ." (AC-004-7). Presenter không tự kẹp hay sửa số.
@@ -55,6 +56,7 @@ class ProductDetailPresenter {
     private final UnexpectedErrors errors;
 
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final ObjectProperty<ProductDetailView> product = new SimpleObjectProperty<>();
     private final StringProperty priceText = new SimpleStringProperty("");
     private final StringProperty stockText = new SimpleStringProperty("");
@@ -96,6 +98,7 @@ class ProductDetailPresenter {
         stockText.set(view.inStock() ? STOCK_IN : STOCK_OUT);
         inStock.set(view.inStock());
         product.set(view);
+        loadFailed.set(false);
         loading.set(false);
     }
 
@@ -105,7 +108,22 @@ class ProductDetailPresenter {
             return;
         }
         loading.set(false);
+        if (product.get() == null) {
+            loadFailed.set(true);   // lần nạp đầu lỗi: màn hiện khối lỗi thay vì để trống
+        }
         errors.report(failure);
+    }
+
+    /**
+     * "Thử lại" sau một lỗi lạ ở lần nạp đầu (QĐ12): tắt {@link #loadFailedProperty()} rồi nạp lại đúng route. Bỏ
+     * qua khi đã {@link #dispose}, khi đang nạp hoặc khi chưa có lỗi.
+     */
+    void retry() {
+        if (disposed || route == null || loading.get() || !loadFailed.get()) {
+            return;
+        }
+        loadFailed.set(false);
+        reload();
     }
 
     /** Sản phẩm không còn: báo rồi về danh sách (AC-009-13). */
@@ -159,6 +177,11 @@ class ProductDetailPresenter {
 
     ReadOnlyBooleanProperty loadingProperty() {
         return loading;
+    }
+
+    /** {@code true} khi lần nạp đầu của route này lỗi vì một lỗi lạ (màn hiện khối "Thử lại"). */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** Sản phẩm đang hiện; {@code null} tới lần nạp thành công đầu tiên. */

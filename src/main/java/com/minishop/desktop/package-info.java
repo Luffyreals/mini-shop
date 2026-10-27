@@ -31,6 +31,13 @@
  *       (hủy đơn, xóa); focus bắt đầu ở nút từ chối, Enter không xác nhận thay người dùng.</li>
  *   <li>{@link com.minishop.desktop.ToastAction} (D4): nút hành động trong toast
  *       ({@code Toasts.show(text, kind, action)}), ví dụ "Xem giỏ hàng".</li>
+ *   <li>{@link com.minishop.desktop.StatusPill}, {@link com.minishop.desktop.Tables} (D6): nhãn trạng thái đơn và
+ *       bộ dựng bảng {@code GridPane} (cột cố định/co giãn, hàng tiêu đề, hàng dữ liệu, hàng bấm được) mà màn của
+ *       khách ({@code order}) và màn quản trị ({@code admin}) dùng chung.</li>
+ *   <li>{@link com.minishop.desktop.LoadError} (D6): khối "Đã có lỗi xảy ra. Vui lòng thử lại." với nút "Thử lại",
+ *       để màn không bị trống sau một lỗi lạ khi nạp lần đầu.</li>
+ *   <li>{@link com.minishop.desktop.ModalDialogs} căn hộp thoại giữa cửa sổ chủ (D6), kẹp vào vùng nhìn thấy của
+ *       màn hình; không có cửa sổ chủ thì căn giữa màn hình.</li>
  * </ul>
  * <p>
  * <b>Luật JavaFX:</b> chỉ {@code desktop..} và các lớp {@code *Screen}, {@code *Drawer}, {@code *Dialog}

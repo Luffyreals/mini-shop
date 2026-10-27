@@ -1,26 +1,24 @@
 package com.minishop.order;
 
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.PageBar;
 import com.minishop.desktop.ScreenFactory;
+import com.minishop.desktop.StatusPill;
+import com.minishop.desktop.Tables;
 import com.minishop.order.OrderHistoryPresenter.OrderRow;
+import java.util.List;
 import javafx.application.Platform;
 import javafx.beans.value.ObservableBooleanValue;
 import javafx.collections.ListChangeListener;
-import javafx.geometry.HPos;
 import javafx.geometry.Pos;
-import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import org.springframework.beans.factory.ObjectProvider;
@@ -32,15 +30,18 @@ import org.springframework.stereotype.Component;
  * chưa có đơn hàng nào." với "Bắt đầu mua sắm". Chỉ dựng node và gắn vào {@link OrderHistoryPresenter}; không gọi
  * service.
  *
- * <p><b>Bảng:</b> mỗi hàng là một {@code GridPane} focus được (Tab, Enter hoặc Space hoặc bấm chuột mở chi tiết) có
- * chữ cho trình đọc màn hình "Đơn hàng #{id}, {ngày đặt}, {tổng tiền}, {trạng thái}". Hàng tiêu đề và hàng dữ liệu
- * dùng cùng chiều rộng cột cố định (cột cuối co giãn) nên các cột thẳng hàng; không dùng {@code TableView}.
+ * <p><b>Bảng:</b> dựng bằng {@link Tables} (D6, QĐ13): mỗi hàng là một {@code GridPane} focus được (Tab, Enter hoặc
+ * Space hoặc bấm chuột mở chi tiết) có chữ cho trình đọc màn hình "Đơn hàng #{id}, {ngày đặt}, {tổng tiền},
+ * {trạng thái}". Hàng tiêu đề và hàng dữ liệu dùng cùng danh sách cột (cột cuối co giãn) nên các cột thẳng hàng;
+ * không dùng {@code TableView}.
  *
  * <p><b>Focus:</b> sau lần nạp đầu tiên focus ở hàng đầu (hoặc nút "Bắt đầu mua sắm" khi rỗng), nên sau đổi trang
- * người dùng bàn phím ở ngay đầu danh sách mới.
+ * người dùng bàn phím ở ngay đầu danh sách mới. Khi lần nạp đầu lỗi (QĐ12) focus ở "Thử lại", và sau khi thử lại
+ * thành công về hàng đầu như trên.
  *
  * <p>Id cố định cho test: {@code ordersScreen}, {@code ordersTitle}, {@code orderRows} (bảng), {@code orderRow-{id}},
- * {@code ordersEmpty}, {@code startShopping}, {@code pageBar}, {@code ordersLoading}.
+ * {@code ordersEmpty}, {@code startShopping}, {@code pageBar}, {@code ordersLoading}, {@code ordersLoadError},
+ * {@code ordersRetry}.
  */
 final class OrderHistoryScreen extends ScrollPane {
 
@@ -58,6 +59,9 @@ final class OrderHistoryScreen extends ScrollPane {
     private static final double TOTAL_WIDTH = 160;
     private static final double STATUS_MIN_WIDTH = 160;
 
+    private static final List<ColumnConstraints> COLUMNS = List.of(Tables.fixedColumn(ID_WIDTH),
+            Tables.fixedColumn(DATE_WIDTH), Tables.fixedColumn(TOTAL_WIDTH), Tables.growingColumn(STATUS_MIN_WIDTH));
+
     private final OrderHistoryPresenter presenter;
 
     private final VBox table = new VBox();
@@ -65,6 +69,7 @@ final class OrderHistoryScreen extends ScrollPane {
     private final Button startShopping = new Button(START_SHOPPING_TEXT);
     private final VBox emptyState = new VBox();
     private final VBox tableBox = new VBox();
+    private final VBox loadError;
     private boolean pendingFocus = true;
 
     OrderHistoryScreen(OrderHistoryPresenter presenter) {
@@ -84,18 +89,33 @@ final class OrderHistoryScreen extends ScrollPane {
         buildTable();
         buildEmptyState();
 
-        VBox page = new VBox(title, loadingBox, tableBox, pageBar, emptyState);
+        loadError = LoadError.create("orders", presenter::retry);
+
+        VBox page = new VBox(title, loadingBox, loadError, tableBox, pageBar, emptyState);
         page.getStyleClass().add("page-root");
         setContent(page);
+        // Nội dung của ScrollPane chỉ vào Scene khi skin được dựng (ở pulse đầu sau khi màn được gắn). Lỗi nạp đến
+        // trước lúc đó thì tryFocus thấy "Thử lại" chưa có Scene và bỏ qua, nên thử lại khi trang vào Scene
+        page.sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                Platform.runLater(this::tryFocus);
+            }
+        });
 
         ObservableBooleanValue hasRows = presenter.loadedProperty().and(presenter.emptyProperty().not());
-        show(tableBox, hasRows);
-        show(emptyState, presenter.loadedProperty().and(presenter.emptyProperty()));
+        Tables.showWhen(tableBox, hasRows);
+        Tables.showWhen(emptyState, presenter.loadedProperty().and(presenter.emptyProperty()));
+        Tables.showWhen(loadError, presenter.loadFailedProperty());
 
         presenter.rows().addListener((ListChangeListener<OrderRow>) change -> render());
         presenter.pageNavProperty().addListener((observable, oldNav, newNav) -> renderPages());
         presenter.loadedProperty().addListener((observable, wasLoaded, isLoaded) -> {
             if (isLoaded) {
+                Platform.runLater(this::tryFocus);
+            }
+        });
+        presenter.loadFailedProperty().addListener((observable, wasFailed, isFailed) -> {
+            if (isFailed) {
                 Platform.runLater(this::tryFocus);
             }
         });
@@ -119,8 +139,8 @@ final class OrderHistoryScreen extends ScrollPane {
         HBox box = new HBox(indicator);
         box.getStyleClass().add("loading");
         ObservableBooleanValue waiting = presenter.loadingProperty().and(presenter.loadedProperty().not());
-        show(box, waiting);
-        show(indicator, waiting);
+        Tables.showWhen(box, waiting);
+        Tables.showWhen(indicator, waiting);
         return box;
     }
 
@@ -164,98 +184,35 @@ final class OrderHistoryScreen extends ScrollPane {
     }
 
     private static GridPane headerRow() {
-        GridPane header = baseGrid();
-        header.getStyleClass().add("data-table");
-        String[] names = {COLUMN_ID, COLUMN_DATE, COLUMN_TOTAL, COLUMN_STATUS};
-        for (int column = 0; column < names.length; column++) {
-            Label label = new Label(names[column]);
-            label.getStyleClass().add("data-table-header");
-            header.add(label, column, 0);
-        }
-        return header;
+        return Tables.headerRow(COLUMNS, COLUMN_ID, COLUMN_DATE, COLUMN_TOTAL, COLUMN_STATUS);
     }
 
     private GridPane dataRow(OrderRow row) {
-        GridPane grid = baseGrid();
-        grid.getStyleClass().addAll("data-table", "data-table-row", "order-row");
+        GridPane grid = Tables.dataRow(COLUMNS, true);
         grid.setId("orderRow-" + row.id());
-        grid.setFocusTraversable(true);
-        grid.setAccessibleRole(AccessibleRole.BUTTON);
-        grid.setAccessibleText(row.accessibleText());
-
-        Label id = cell(row.idText(), "text-body");
-        Label date = cell(row.dateText(), "text-body");
-        Label total = cell(row.totalText(), "text-body");
-        grid.add(id, 0, 0);
-        grid.add(date, 1, 0);
-        grid.add(total, 2, 0);
-        Label status = statusPill(row.statusLabel(), row.statusKey());
-        grid.add(status, 3, 0);
-        GridPane.setHalignment(status, HPos.LEFT);
-        GridPane.setFillWidth(status, false);
-
-        Runnable open = () -> presenter.openOrder(row.id());
-        grid.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
-            grid.requestFocus();
-            open.run();
-        });
-        grid.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) {
-                event.consume();
-                open.run();
-            }
-        });
+        Tables.put(grid, Tables.cell(row.idText(), "text-body"), 0);
+        Tables.put(grid, Tables.cell(row.dateText(), "text-body"), 1);
+        Tables.put(grid, Tables.cell(row.totalText(), "text-body"), 2);
+        Tables.put(grid, StatusPill.create(row.statusLabel(), row.statusKey()), 3);
+        Tables.activatable(grid, row.accessibleText(), () -> presenter.openOrder(row.id()));
         return grid;
-    }
-
-    private static Label cell(String text, String styleClass) {
-        Label label = new Label(text);
-        label.getStyleClass().add(styleClass);
-        return label;
-    }
-
-    private static GridPane baseGrid() {
-        GridPane grid = new GridPane();
-        grid.getColumnConstraints().addAll(fixed(ID_WIDTH), fixed(DATE_WIDTH), fixed(TOTAL_WIDTH), growing());
-        return grid;
-    }
-
-    private static ColumnConstraints fixed(double width) {
-        ColumnConstraints column = new ColumnConstraints(width, width, width);
-        column.setHgrow(Priority.NEVER);
-        return column;
-    }
-
-    private static ColumnConstraints growing() {
-        ColumnConstraints column = new ColumnConstraints(STATUS_MIN_WIDTH, STATUS_MIN_WIDTH, Double.MAX_VALUE);
-        column.setHgrow(Priority.ALWAYS);
-        return column;
-    }
-
-    /**
-     * Nhãn trạng thái đơn: viên thuốc chữ ink kèm chấm màu; chữ luôn là tên trạng thái nên không chỉ dựa vào màu.
-     * Dùng chung với màn chi tiết đơn.
-     */
-    static Label statusPill(String statusLabel, String statusKey) {
-        Label pill = new Label(statusLabel);
-        pill.getStyleClass().addAll("status-pill", "status-" + statusKey);
-        Region dot = new Region();
-        dot.getStyleClass().add("status-dot");
-        pill.setGraphic(dot);
-        pill.setAccessibleText(statusLabel);
-        return pill;
-    }
-
-    /** Gắn {@code visible} và {@code managed} của {@code node} vào {@code condition}. */
-    private static void show(Node node, ObservableBooleanValue condition) {
-        node.visibleProperty().bind(condition);
-        node.managedProperty().bind(node.visibleProperty());
     }
 
     // ------------------------------------------------------------------ focus
 
     private void tryFocus() {
-        if (!pendingFocus || getScene() == null || !presenter.loadedProperty().get()) {
+        if (!pendingFocus || getScene() == null) {
+            return;
+        }
+        if (presenter.loadFailedProperty().get()) {
+            // Khối lỗi: focus ở "Thử lại"; pendingFocus còn đó để khi thử lại thành công focus về hàng đầu
+            Button retry = LoadError.retryButton(loadError);
+            if (retry.getScene() != null && !searchFieldFocused()) {
+                retry.requestFocus();
+            }
+            return;
+        }
+        if (!presenter.loadedProperty().get()) {
             return;
         }
         Node target = null;
@@ -268,6 +225,12 @@ final class OrderHistoryScreen extends ScrollPane {
             pendingFocus = false;
             target.requestFocus();
         }
+    }
+
+    /** Người dùng đang gõ ở ô tìm kiếm trên thanh trên: không giành focus của họ. */
+    private boolean searchFieldFocused() {
+        Node owner = getScene().getFocusOwner();
+        return owner != null && "searchField".equals(owner.getId());
     }
 
     // ------------------------------------------------------------------ factory

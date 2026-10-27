@@ -1,7 +1,10 @@
 package com.minishop.desktop;
 
 import com.minishop.catalog.ProductRepository;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.minishop.support.FxTestSupport;
+import com.minishop.support.LogCapture;
 import com.minishop.support.TestShellApp;
 import javafx.application.Application;
 import javafx.scene.Node;
@@ -13,7 +16,10 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.Pane;
+import javafx.scene.image.Image;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.text.Text;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -24,6 +30,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.testfx.api.FxToolkit;
 
@@ -45,13 +52,23 @@ class ShellSmokeTest {
 
     private static Thread.UncaughtExceptionHandler previousHandler;
     private static TestShellApp app;
+    private static LogCapture startupLog;
     private static Stage stage;
 
     @BeforeAll
     static void startApp() throws Exception {
         Stage primary = FxTestSupport.startToolkit();
         previousHandler = Thread.getDefaultUncaughtExceptionHandler();
-        app = (TestShellApp) FxToolkit.setupApplication(TestShellApp::new);
+        // Boot re-initialises Logback while the context starts, which drops appenders added earlier: attach the capture
+        // as soon as the context is built, before start() shows the window and logs "Main window shown"
+        app = (TestShellApp) FxToolkit.setupApplication(() -> new TestShellApp() {
+            @Override
+            protected ConfigurableApplicationContext createContext(String[] args) {
+                ConfigurableApplicationContext built = super.createContext(args);
+                startupLog = LogCapture.of(LoggerFactory.getLogger(MiniShopApp.class));
+                return built;
+            }
+        });
         stage = primary;
         FxTestSupport.await("the main window", () -> primary.isShowing());
     }
@@ -59,6 +76,9 @@ class ShellSmokeTest {
     @AfterAll
     static void cleanUp() throws Exception {
         Thread.setDefaultUncaughtExceptionHandler(previousHandler);
+        if (startupLog != null) {
+            startupLog.close();
+        }
         if (app != null && app.context() != null && app.context().isActive()) {
             FxToolkit.cleanupApplication(app);
         }
@@ -303,6 +323,85 @@ class ShellSmokeTest {
         javafx.geometry.Point2D local = centreOfInto("cartButton", layer);
         assertThat(FxTestSupport.callOnFx(() -> layer.contains(local)))
                 .as("after closing, #drawerLayer does not contain the centre of #cartButton").isFalse();
+    }
+
+    @Test
+    @Order(2)
+    void start_logsMainWindowShownOnceAndAddsTheFourWindowIcons() {
+        assertThat(startupLog.events(Level.INFO)).extracting(ILoggingEvent::getFormattedMessage)
+                .filteredOn(MiniShopApp.MAIN_WINDOW_SHOWN::equals).hasSize(1);
+        assertThat(startupLog.events(Level.WARN)).as("no window icon warning").extracting(ILoggingEvent::getFormattedMessage)
+                .noneMatch(message -> message.startsWith("Window icon"));
+
+        // TestFX hands every test class the same primary stage, so a class that ran earlier in this JVM may have left
+        // its own four icons there: look at the last four, which this start added, in the order MiniShopApp adds them
+        List<Image> icons = FxTestSupport.callOnFx(() -> List.copyOf(stage.getIcons()));
+        assertThat(icons).hasSizeGreaterThanOrEqualTo(4).noneMatch(Image::isError);
+        assertThat(icons.subList(icons.size() - 4, icons.size())).extracting(image -> (int) image.getWidth())
+                .containsExactly(16, 32, 48, 256);
+    }
+
+    /** Applies CSS and layout, then reads what the account button really draws (the text of its inner label). */
+    private static String drawnAccountText() {
+        return FxTestSupport.callOnFx(() -> {
+            Node root = stage.getScene().getRoot();
+            root.applyCss();
+            ((Region) root).layout();
+            Node button = root.lookup("#accountButton");
+            Node inner = button.lookup(".text");
+            return inner instanceof Text text ? text.getText() : null;
+        });
+    }
+
+    @Test
+    @Order(10)
+    void accountLabel_atTheMinimumWindowWidth_showsBothDemoNamesInFullAndKeepsTheSearchBoxWide() {
+        ShellPresenter shell = app.context().getBean(ShellPresenter.class);
+        double oldWidth = FxTestSupport.callOnFx(stage::getWidth);
+        double oldHeight = FxTestSupport.callOnFx(stage::getHeight);
+        Region searchBox = (Region) lookup("searchBox");
+        try {
+            FxTestSupport.runOnFx(() -> stage.setWidth(1024));
+            FxTestSupport.await("the window to be 1024 px wide", () -> FxTestSupport.callOnFx(() -> stage.getWidth()) <= 1024.5);
+
+            for (String name : List.of("Quản trị viên", "Khách hàng mẫu")) {
+                FxTestSupport.runOnFx(() -> shell.setAccountLabel(name));
+                FxTestSupport.flushFx();
+
+                assertThat(drawnAccountText()).as("the text drawn in the account button").isEqualTo(name);
+                assertThat(FxTestSupport.<Double>callOnFx(() -> ((Region) lookup("accountButton")).getWidth()))
+                        .as("the account button is not wider than its cap").isLessThanOrEqualTo(168.0);
+                assertThat(FxTestSupport.<Double>callOnFx(searchBox::getMinWidth)).isEqualTo(268.0);
+                assertThat(FxTestSupport.<Double>callOnFx(searchBox::getWidth))
+                        .as("the search box is not narrower than its minWidth with " + name)
+                        .isGreaterThanOrEqualTo(268.0);
+            }
+        } finally {
+            FxTestSupport.runOnFx(() -> {
+                shell.setAccountLabel(null);
+                stage.setWidth(oldWidth);
+                stage.setHeight(oldHeight);
+            });
+            FxTestSupport.flushFx();
+        }
+    }
+
+    @Test
+    @Order(10)
+    void accountLabel_longName_isCutWithAnEllipsisAndTheButtonStaysWithinItsCap() {
+        ShellPresenter shell = app.context().getBean(ShellPresenter.class);
+        try {
+            FxTestSupport.runOnFx(() -> shell.setAccountLabel("Nguyễn Thị Phương Thảo Trần Văn"));
+            FxTestSupport.flushFx();
+
+            assertThat(drawnAccountText()).as("the button's -fx-ellipsis-string is the single character")
+                    .matches(".+…");
+            assertThat(FxTestSupport.<Double>callOnFx(() -> ((Region) lookup("accountButton")).getWidth()))
+                    .isLessThanOrEqualTo(168.0);
+        } finally {
+            FxTestSupport.runOnFx(() -> shell.setAccountLabel(null));
+            FxTestSupport.flushFx();
+        }
     }
 
     @Test

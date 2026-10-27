@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Mini Shop">
-  <rect width="32" height="32" fill="#f2c21a"/>
-  <path fill="#1a1a1a" d="M6 25V7h4.5L16 16.5 21.5 7H26v18h-4.5V15L16 24.5 10.5 15v10z"/>
+  <rect width="32" height="32" rx="7" fill="#1b1b1f"/>
+  <path fill="#ffffff" d="M4 24.1V7.9h4.05L13 16.45 17.95 7.9H22v16.2h-4.05V15.1L13 23.65 8.05 15.1v9z"/>
+  <circle cx="25.8" cy="21.5" r="2.6" fill="#ff5a1f"/>
 </svg>

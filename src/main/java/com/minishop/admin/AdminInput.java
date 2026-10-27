@@ -1,51 +1,31 @@
 package com.minishop.admin;
 
+import com.minishop.common.FormText;
+
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/** Parses raw request parameters for the admin endpoints; a bad value must never become a 500. */
+/** Parses raw text typed in the admin screens; a bad value must never become an unexpected error. */
 final class AdminInput {
 
-    static final int MAX_PAGE = 10_000;
     static final int MAX_DELTA = 100_000;
 
-    private static final Pattern ID = Pattern.compile("[0-9]{1,18}");
-    private static final Pattern PAGE = Pattern.compile("[0-9]{1,9}");
     private static final Pattern DELTA = Pattern.compile("[+-]?[0-9]{1,6}");
 
     private AdminInput() {
     }
 
-    static Optional<Long> id(String raw) {
-        if (raw == null) {
-            return Optional.empty();
-        }
-        String s = raw.strip();
-        return ID.matcher(s).matches() ? Optional.of(Long.valueOf(s)) : Optional.empty();
-    }
-
-    /** A stock adjustment: optional sign, 1-6 digits, not zero, at most 100.000 in absolute value. */
+    /**
+     * A stock adjustment: optional sign, 1-6 digits, not zero, at most 100.000 in absolute value. The text is cleaned
+     * first (special spaces become spaces, invisible characters are dropped, then strip), so a pasted non-breaking
+     * space does not make a valid number fail. Thousands separators are not accepted.
+     */
     static Optional<Integer> stockDelta(String raw) {
-        if (raw == null) {
-            return Optional.empty();
-        }
-        String s = raw.strip();
-        if (!DELTA.matcher(s).matches()) {
+        String s = FormText.clean(raw, false);
+        if (s == null || !DELTA.matcher(s).matches()) {
             return Optional.empty();
         }
         int delta = Integer.parseInt(s); // parseInt accepts a leading '+'
         return delta == 0 || Math.abs(delta) > MAX_DELTA ? Optional.empty() : Optional.of(delta);
-    }
-
-    /** 1-based page, clamped to 1..{@link #MAX_PAGE}; anything invalid is page 1. */
-    static int page(String raw) {
-        if (raw == null) {
-            return 1;
-        }
-        String s = raw.strip();
-        if (!PAGE.matcher(s).matches()) {
-            return 1;
-        }
-        return Math.max(1, Math.min(MAX_PAGE, Integer.parseInt(s)));
     }
 }

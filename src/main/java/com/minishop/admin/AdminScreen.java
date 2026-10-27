@@ -1,5 +1,7 @@
 package com.minishop.admin;
 
+import com.minishop.desktop.StatusPill;
+import com.minishop.desktop.Tables;
 import java.util.List;
 import java.util.Objects;
 import javafx.application.Platform;
@@ -7,9 +9,7 @@ import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableBooleanValue;
 import javafx.geometry.Bounds;
-import javafx.geometry.HPos;
 import javafx.geometry.Pos;
-import javafx.geometry.VPos;
 import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -19,7 +19,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -288,126 +287,53 @@ abstract class AdminScreen extends HBox {
         return box;
     }
 
-    /** Gắn {@code visible} và {@code managed} của {@code node} vào {@code condition}. */
+    // ------------------------------------------------------------------ lớp mỏng gọi desktop (D6, QĐ13)
+    // Mỗi hàm dưới đây chỉ chuyển một dòng sang desktop.Tables / desktop.StatusPill; logic chỉ có một bản, ở desktop.
+
+    /** Gắn {@code visible} và {@code managed} của {@code node} vào {@code condition} ({@link Tables#showWhen}). */
     protected static void show(Node node, ObservableBooleanValue condition) {
-        node.visibleProperty().bind(condition);
-        node.managedProperty().bind(node.visibleProperty());
+        Tables.showWhen(node, condition);
     }
 
-    /**
-     * Nhãn trạng thái đơn: viên thuốc chữ ink kèm chấm màu; chữ luôn là tên trạng thái nên không chỉ dựa vào màu.
-     * Chép từ {@code OrderHistoryScreen.statusPill} (package-private trong {@code order}); D6 chuyển sang
-     * {@code desktop}.
-     *
-     * @param statusKey khóa chữ thường: {@code pending}, {@code confirmed}, {@code shipping}, {@code delivered},
-     *                  {@code cancelled}
-     */
+    /** Nhãn trạng thái đơn ({@link StatusPill#create}). */
     protected static Label statusPill(String statusLabel, String statusKey) {
-        Label pill = new Label(statusLabel);
-        pill.getStyleClass().addAll("status-pill", "status-" + statusKey);
-        Region dot = new Region();
-        dot.getStyleClass().add("status-dot");
-        pill.setGraphic(dot);
-        pill.setAccessibleText(statusLabel);
-        return pill;
+        return StatusPill.create(statusLabel, statusKey);
     }
 
-    /**
-     * Biến một node (hàng, ô số, dòng danh sách) thành điều khiển bấm được: nhận focus bàn phím, đọc là nút với
-     * {@code accessibleText}, chạy {@code action} khi bấm chuột, Enter hoặc Space. Ở nút bên trong node (nếu có)
-     * lớp con tự lo việc không kích hoạt hai lần.
-     */
+    /** Biến một node thành điều khiển bấm được ({@link Tables#activatable}). */
     protected static void makeActivatable(Node node, String accessibleText, Runnable action) {
-        node.setFocusTraversable(true);
-        node.setAccessibleRole(AccessibleRole.BUTTON);
-        node.setAccessibleText(accessibleText);
-        node.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
-            node.requestFocus();
-            action.run();
-        });
-        node.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) {
-                event.consume();
-                action.run();
-            }
-        });
+        Tables.activatable(node, accessibleText, action);
     }
 
-    // ------------------------------------------------------------------ bảng
+    // ------------------------------------------------------------------ bảng (desktop.Tables)
 
-    /** Cột chiều rộng cố định. */
+    /** Cột chiều rộng cố định ({@link Tables#fixedColumn}). */
     protected static ColumnConstraints fixedColumn(double width) {
-        ColumnConstraints column = new ColumnConstraints(width, width, width);
-        column.setHgrow(Priority.NEVER);
-        return column;
+        return Tables.fixedColumn(width);
     }
 
-    /** Cột co giãn (nhận chỗ còn lại), rộng tối thiểu {@code minWidth}; chữ trong cột xuống dòng. */
+    /** Cột co giãn ({@link Tables#growingColumn}). */
     protected static ColumnConstraints growingColumn(double minWidth) {
-        ColumnConstraints column = new ColumnConstraints(minWidth, minWidth, Double.MAX_VALUE);
-        column.setHgrow(Priority.ALWAYS);
-        return column;
+        return Tables.growingColumn(minWidth);
     }
 
-    /**
-     * Hàng tiêu đề của bảng ({@code .data-table .admin-table-head}, nhãn {@code .admin-th}); {@code names} có
-     * bao nhiêu tên thì bấy nhiêu ô đầu. Đệm ngang 18 px (16 px đệm cộng 2 px viền của {@code .data-table-row})
-     * nằm ở chính lưới, giống hàng dữ liệu, nên các cột thẳng hàng dù cột co giãn nằm ở đâu. Không dùng
-     * {@code .data-table-header} (đệm 18 px mỗi bên trong từng ô, hợp với bảng của {@code order} có cột co giãn
-     * ở cuối nhưng lệch 36 px ở chỗ khác).
-     */
+    /** Hàng tiêu đề của bảng, class {@code table-head} và {@code table-th} ({@link Tables#headerRow}). */
     protected static GridPane headerRow(List<ColumnConstraints> columns, String... names) {
-        GridPane header = baseGrid(columns);
-        header.getStyleClass().addAll("data-table", "admin-table-head");
-        for (int column = 0; column < names.length; column++) {
-            Label label = new Label(names[column]);
-            label.getStyleClass().add("admin-th");
-            label.setWrapText(true);
-            label.setMinHeight(Region.USE_PREF_SIZE);
-            header.add(label, column, 0);
-        }
-        return header;
+        return Tables.headerRow(columns, names);
     }
 
-    /**
-     * Hàng dữ liệu rỗng ({@code .data-table .data-table-row}); thêm ô bằng {@link #put}. {@code clickable} bật
-     * kiểu hàng bấm được ({@code .admin-row-link}: con trỏ tay, nền khi trỏ chuột, viền focus); khi đó gọi thêm
-     * {@link #makeActivatable}.
-     */
+    /** Hàng dữ liệu rỗng; {@code clickable} thêm {@code table-row-link} ({@link Tables#dataRow}). */
     protected static GridPane dataRow(List<ColumnConstraints> columns, boolean clickable) {
-        GridPane grid = baseGrid(columns);
-        grid.getStyleClass().addAll("data-table", "data-table-row");
-        if (clickable) {
-            grid.getStyleClass().add("admin-row-link");
-        }
-        return grid;
+        return Tables.dataRow(columns, clickable);
     }
 
-    /** Ô chữ của bảng: xuống dòng, không bị cắt "…" khi hiện lần đầu. */
+    /** Ô chữ của bảng ({@link Tables#cell}). */
     protected static Label cell(String text, String styleClass) {
-        Label label = new Label(text);
-        label.getStyleClass().add(styleClass);
-        label.setWrapText(true);
-        label.setMinHeight(Region.USE_PREF_SIZE);
-        return label;
+        return Tables.cell(text, styleClass);
     }
 
-    /** Đặt {@code node} vào cột {@code column} của hàng {@code row}, canh giữa theo chiều dọc, sát trái. */
+    /** Đặt {@code node} vào cột {@code column} của hàng {@code row} ({@link Tables#put}). */
     protected static void put(GridPane row, Node node, int column) {
-        row.add(node, column, 0);
-        GridPane.setValignment(node, VPos.CENTER);
-        GridPane.setHalignment(node, HPos.LEFT);
-    }
-
-    private static GridPane baseGrid(List<ColumnConstraints> columns) {
-        GridPane grid = new GridPane();
-        for (ColumnConstraints shared : columns) {
-            // Mỗi GridPane giữ bản sao riêng: một ColumnConstraints không nên dùng chung cho nhiều GridPane
-            ColumnConstraints copy = new ColumnConstraints(shared.getMinWidth(), shared.getPrefWidth(),
-                    shared.getMaxWidth());
-            copy.setHgrow(shared.getHgrow());
-            grid.getColumnConstraints().add(copy);
-        }
-        return grid;
+        Tables.put(row, node, column);
     }
 }

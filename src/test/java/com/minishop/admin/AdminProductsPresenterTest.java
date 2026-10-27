@@ -513,4 +513,131 @@ class AdminProductsPresenterTest {
         verifyNoInteractions(navigator);
         verify(service, never()).setActive(anyLong(), anyBoolean());
     }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    @Test
+    void load_firstLoadFailsUnexpectedly_setsLoadFailed_reportsOnce_andStopsLoading() {
+        IllegalStateException failure = new IllegalStateException("database is down");
+        when(service.list(any(), any())).thenThrow(failure);
+
+        AdminProductsPresenter presenter = loaded(new AdminProductsRoute("bàn", 2));
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+        assertThat(presenter.rows()).isEmpty();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(toasts, navigator);
+    }
+
+    @Test
+    void load_asANonAdmin_keepsTheOldPath_andLoadFailedStaysFalse() {
+        when(service.list(any(), any())).thenThrow(new AccessDeniedException());
+
+        AdminProductsPresenter presenter = loaded(AdminProductsRoute.first());
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verify(toasts).show("Bạn không có quyền truy cập trang này.", ToastKind.ERROR);
+        verify(navigator).goHome();
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void load_whenTheServiceThrowsNotFound_isUnexpectedOnThisScreen_andReportedOnce() {
+        // The list screen has no "not found" path (handle(failure) without a message), so it counts as unexpected.
+        NotFoundException failure = new NotFoundException("gone");
+        when(service.list(any(), any())).thenThrow(failure);
+
+        AdminProductsPresenter presenter = loaded(AdminProductsRoute.first());
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        verify(errors, times(1)).report(failure);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsTheSameRouteAgain_clearsLoadFailed_andShowsTheRows() {
+        when(service.list("bàn", "2")).thenThrow(new IllegalStateException("down"))
+                .thenReturn(page(List.of(KEYBOARD), "bàn", 2, 3, 25));
+        AdminProductsPresenter presenter = loaded(new AdminProductsRoute("bàn", 2));
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.rows()).hasSize(1);
+        verify(service, times(2)).list("bàn", "2");
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        IllegalStateException failure = new IllegalStateException("down");
+        when(service.list(any(), any())).thenThrow(failure);
+        AdminProductsPresenter presenter = loaded(AdminProductsRoute.first());
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(service.list(any(), any())).thenThrow(new IllegalStateException("down"))
+                .thenReturn(page(List.of(KEYBOARD), null, 1, 1, 1));
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        AdminProductsPresenter presenter = presenter(manual);
+        presenter.load(AdminProductsRoute.first());
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(service.list(any(), any())).thenThrow(new IllegalStateException("down"));
+        AdminProductsPresenter presenter = loaded(AdminProductsRoute.first());
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(service, times(1)).list(any(), any());
+        assertThat(presenter.loadedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_beforeAnyLoad_orWhenNothingFailed_doesNothing() {
+        presenter(direct).retry();
+        verifyNoInteractions(service);
+
+        AdminProductsPresenter presenter = loaded(AdminProductsRoute.first());
+        presenter.retry();
+
+        verify(service, times(1)).list(any(), any());
+    }
+
+    @Test
+    void reload_failsAfterAHide_keepsTheRows_andLoadFailedStaysFalse() {
+        IllegalStateException failure = new IllegalStateException("down");
+        when(service.setActive(5L, false)).thenReturn("Bàn phím cơ");
+        AdminProductsPresenter presenter = loaded(AdminProductsRoute.first());
+        when(service.list(any(), any())).thenThrow(failure);
+
+        presenter.hide(5L);
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.rows()).hasSize(2);
+        assertThat(presenter.writingIds()).isEmpty();
+        verify(errors, times(1)).report(failure);
+    }
 }

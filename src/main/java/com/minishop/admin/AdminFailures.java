@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Chỗ duy nhất xử lý lỗi chung của các màn quản trị (QĐ5 của D5): mọi {@code onFailure} của presenter quản trị đi
- * qua {@link #handle}, sau khi tự xử lý các lỗi nghiệp vụ riêng của nó (ví dụ {@code CategoryNameTakenException},
+ * qua {@link #handle} (trả {@code true} khi đã báo như lỗi lạ), sau khi tự xử lý các lỗi nghiệp vụ riêng của nó (ví dụ {@code CategoryNameTakenException},
  * {@code InvalidImageException}).
  *
  * <ul>
@@ -57,23 +57,34 @@ class AdminFailures {
      * @param notFoundMessage câu toast khi là {@link NotFoundException}; {@code null} nghĩa là màn không mong đợi
      *                        lỗi này, nó thành lỗi lạ
      * @param afterNotFound   việc làm sau toast "không tìm thấy" (về danh sách, nạp lại); có thể {@code null}
+     * @return {@code true} khi lỗi đã được báo như lỗi lạ ({@link UnexpectedErrors#report}: dòng log và hộp thoại
+     *         lỗi chung); {@code false} khi là {@link AccessDeniedException} hoặc {@link NotFoundException} đã được
+     *         xử lý theo đường riêng. Presenter dùng giá trị này để bật {@code loadFailed} (D6, QĐ12) sau lỗi của
+     *         lần nạp đầu.
      */
-    void handle(Throwable failure, String notFoundMessage, Runnable afterNotFound) {
+    boolean handle(Throwable failure, String notFoundMessage, Runnable afterNotFound) {
         if (isAccessDenied(failure)) {
             toasts.show(MSG_ACCESS_DENIED, ToastKind.ERROR);
             navigator.goHome();
-        } else if (failure instanceof NotFoundException && notFoundMessage != null) {
+            return false;
+        }
+        if (failure instanceof NotFoundException && notFoundMessage != null) {
             toasts.show(notFoundMessage, ToastKind.ERROR);
             if (afterNotFound != null) {
                 afterNotFound.run();
             }
-        } else {
-            errors.report(failure);
+            return false;
         }
+        errors.report(failure);
+        return true;
     }
 
-    /** Như {@link #handle(Throwable, String, Runnable)} cho màn không có lỗi "không tìm thấy" (ví dụ Tổng quan). */
-    void handle(Throwable failure) {
-        handle(failure, null, null);
+    /**
+     * Như {@link #handle(Throwable, String, Runnable)} cho màn không có lỗi "không tìm thấy" (ví dụ Tổng quan).
+     *
+     * @return {@code true} khi đã báo như lỗi lạ
+     */
+    boolean handle(Throwable failure) {
+        return handle(failure, null, null);
     }
 }

@@ -644,4 +644,115 @@ class CatalogPresenterTest {
 
         verify(storefront, times(2)).updateCategories(CATEGORIES);
     }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    private static final CatalogRoute SEARCH_ROUTE = new CatalogRoute("áo", 3L, "price_asc", 2);
+    private static final ProductSearchParams SEARCH_PARAMS = new ProductSearchParams("áo", "3", "price_asc", "2");
+
+    @Test
+    void load_firstLoadFails_setsLoadFailed_reportsOnce_andStopsLoading() {
+        RuntimeException failure = new IllegalStateException("database is down");
+        when(productService.search(any())).thenThrow(failure);
+        CatalogPresenter presenter = presenter(direct);
+
+        presenter.load(SEARCH_ROUTE);
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+        assertThat(presenter.cards()).isEmpty();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(toasts, navigator);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsTheSameRouteAgain_clearsLoadFailed_andShowsTheContent() {
+        when(productService.search(any())).thenThrow(new IllegalStateException("down"))
+                .thenReturn(listOf(2, 21L, 2, "áo", 2));
+        CatalogPresenter presenter = presenter(direct);
+        presenter.load(SEARCH_ROUTE);
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.cards()).hasSize(2);
+        assertThat(presenter.route()).isEqualTo(SEARCH_ROUTE);
+        verify(productService, times(2)).search(SEARCH_PARAMS);
+        verify(errors, times(1)).report(any());
+        assertThat(shell.searchTextProperty().get()).isEqualTo("áo");
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        RuntimeException failure = new IllegalStateException("down");
+        when(productService.search(any())).thenThrow(failure);
+        CatalogPresenter presenter = presenter(direct);
+        presenter.load(SEARCH_ROUTE);
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(productService.search(any())).thenThrow(new IllegalStateException("down"))
+                .thenReturn(listOf(2, 21L, 2, null, 1));
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        CatalogPresenter presenter = presenter(manual);
+        presenter.load(SEARCH_ROUTE);
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(productService.search(any())).thenThrow(new IllegalStateException("down"));
+        CatalogPresenter presenter = presenter(direct);
+        presenter.load(SEARCH_ROUTE);
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(productService, times(1)).search(any());
+        assertThat(presenter.loadedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_whenNothingFailed_doesNothing() {
+        CatalogPresenter presenter = loaded(CatalogRoute.all());
+
+        presenter.retry();
+
+        verify(productService, times(1)).search(any());
+        assertThat(presenter.contentVersionProperty().get()).isEqualTo(1);
+    }
+
+    @Test
+    void reload_failsAfterContentWasShown_keepsTheContent_andLoadFailedStaysFalse() {
+        CatalogPresenter presenter = loaded(CatalogRoute.all());
+        presenter.add(5L);
+        RuntimeException failure = new IllegalStateException("down");
+        when(productService.search(any())).thenThrow(failure);
+
+        captureAddCallback(5L).accept(AddToCartResult.OUT_OF_STOCK);
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.cards()).hasSize(2);
+        verify(errors, times(1)).report(failure);
+        presenter.retry();
+        verify(productService, times(2)).search(any());
+    }
 }

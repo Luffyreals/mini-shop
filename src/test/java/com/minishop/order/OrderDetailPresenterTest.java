@@ -590,4 +590,141 @@ class OrderDetailPresenterTest {
 
         assertThat(presenter.lines()).hasSize(2);
     }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    @Test
+    void load_firstLoadFails_setsLoadFailed_reportsOnce_andStopsLoading() {
+        RuntimeException failure = new IllegalStateException("database is down");
+        when(orders.getOrder(USER_ID, ORDER_ID)).thenThrow(failure);
+        OrderDetailPresenter presenter = presenter();
+
+        presenter.load(route(false));
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.busyProperty().get()).isFalse();
+        assertThat(presenter.orderProperty().get()).isNull();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(toasts, navigator);
+    }
+
+    @Test
+    void load_whenTheOrderIsNotFound_loadFailedStaysFalse() {
+        when(orders.getOrder(USER_ID, ORDER_ID)).thenThrow(new NotFoundException("Order not found"));
+        OrderDetailPresenter presenter = presenter();
+
+        presenter.load(route(false));
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsTheSameOrderAgain_clearsLoadFailed_andShowsIt() {
+        when(orders.getOrder(USER_ID, ORDER_ID)).thenThrow(new IllegalStateException("down"))
+                .thenReturn(pending(null));
+        OrderDetailPresenter presenter = presenter();
+        presenter.load(route(true));
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.orderProperty().get()).isNotNull();
+        assertThat(presenter.titleTextProperty().get()).isEqualTo("Đơn hàng #42");
+        assertThat(presenter.bannerTextProperty().get()).as("the banner of a just placed order survives a retry")
+                .isEqualTo("Đặt hàng thành công. Mã đơn của bạn là #42.");
+        verify(orders, times(2)).getOrder(USER_ID, ORDER_ID);
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryIsNotFound_toastsAndGoesBack_loadFailedStaysFalse() {
+        when(orders.getOrder(USER_ID, ORDER_ID)).thenThrow(new IllegalStateException("down"))
+                .thenThrow(new NotFoundException("Order not found"));
+        OrderDetailPresenter presenter = presenter();
+        presenter.load(route(false));
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verify(toasts).show("Không tìm thấy đơn hàng.", ToastKind.ERROR);
+        verify(navigator).navigateTo(BACK_TO_PAGE_TWO);
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        RuntimeException failure = new IllegalStateException("down");
+        when(orders.getOrder(USER_ID, ORDER_ID)).thenThrow(failure);
+        OrderDetailPresenter presenter = presenter();
+        presenter.load(route(false));
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(orders.getOrder(USER_ID, ORDER_ID)).thenThrow(new IllegalStateException("down"))
+                .thenReturn(pending(null));
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        OrderDetailPresenter presenter = presenter(manual);
+        presenter.load(route(false));
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(orders.getOrder(USER_ID, ORDER_ID)).thenThrow(new IllegalStateException("down"));
+        OrderDetailPresenter presenter = presenter();
+        presenter.load(route(false));
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(orders, times(1)).getOrder(USER_ID, ORDER_ID);
+        assertThat(presenter.orderProperty().get()).isNull();
+    }
+
+    @Test
+    void retry_beforeAnyLoad_orWhenNothingFailed_doesNothing() {
+        presenter().retry();
+        verifyNoInteractions(orders);
+
+        OrderDetailPresenter presenter = loaded(pending(null), false);
+        presenter.retry();
+
+        verify(orders, times(1)).getOrder(USER_ID, ORDER_ID);
+    }
+
+    @Test
+    void reload_failsAfterTheOrderWasShown_keepsIt_andLoadFailedStaysFalse() {
+        OrderDetailPresenter presenter = loaded(pending(null), false);
+        RuntimeException failure = new IllegalStateException("down");
+        when(orders.getOrder(USER_ID, ORDER_ID)).thenThrow(failure);
+        when(orders.cancelByCustomer(USER_ID, ORDER_ID)).thenReturn(CancelResult.CANCELLED);
+
+        confirmedAction(presenter).run();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.orderProperty().get()).isNotNull();
+        assertThat(presenter.lines()).hasSize(2);
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.busyProperty().get()).isFalse();
+        verify(errors, times(1)).report(failure);
+        presenter.retry();
+        verify(orders, times(2)).getOrder(USER_ID, ORDER_ID);
+    }
 }

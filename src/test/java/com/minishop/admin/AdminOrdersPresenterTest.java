@@ -395,4 +395,124 @@ class AdminOrdersPresenterTest {
         verifyNoInteractions(navigator);
         verify(service, times(1)).listOrders(any(), any());
     }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    private AdminOrdersPresenter presenter(ManualBackgroundTasks manual) {
+        return new AdminOrdersPresenter(service, manual, navigator, new AdminFailures(toasts, navigator, errors));
+    }
+
+    @Test
+    void load_firstLoadFailsUnexpectedly_setsLoadFailed_reportsOnce_andStopsLoading() {
+        IllegalStateException failure = new IllegalStateException("database is down");
+        when(service.listOrders(any(), any())).thenThrow(failure);
+        AdminOrdersPresenter presenter = presenter();
+
+        presenter.load(new AdminOrdersRoute("PENDING", 2));
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(toasts, navigator);
+    }
+
+    @Test
+    void load_asANonAdmin_keepsTheOldPath_andLoadFailedStaysFalse() {
+        when(service.listOrders(any(), any())).thenThrow(new AccessDeniedException());
+        AdminOrdersPresenter presenter = presenter();
+
+        presenter.load(AdminOrdersRoute.all());
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verify(toasts).show("Bạn không có quyền truy cập trang này.", ToastKind.ERROR);
+        verify(navigator).goHome();
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsTheRequestedRouteAgain_clearsLoadFailed_andShowsTheRows() {
+        when(service.listOrders("PENDING", "2")).thenThrow(new IllegalStateException("down"))
+                .thenReturn(page("PENDING", "Chờ xử lý", 2, 3, 25, List.of(order(12, "Chờ xử lý", "pending"))));
+        AdminOrdersPresenter presenter = presenter();
+        presenter.load(new AdminOrdersRoute("PENDING", 2));
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.rows()).hasSize(1);
+        verify(service, times(2)).listOrders("PENDING", "2");
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        IllegalStateException failure = new IllegalStateException("down");
+        when(service.listOrders(any(), any())).thenThrow(failure);
+        AdminOrdersPresenter presenter = presenter();
+        presenter.load(AdminOrdersRoute.all());
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(service.listOrders(any(), any())).thenThrow(new IllegalStateException("down"))
+                .thenReturn(page(null, "Tất cả", 1, 1, 0, List.of()));
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        AdminOrdersPresenter presenter = presenter(manual);
+        presenter.load(AdminOrdersRoute.all());
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(service.listOrders(any(), any())).thenThrow(new IllegalStateException("down"));
+        AdminOrdersPresenter presenter = presenter();
+        presenter.load(AdminOrdersRoute.all());
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(service, times(1)).listOrders(any(), any());
+        assertThat(presenter.loadedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_beforeAnyLoad_orWhenNothingFailed_doesNothing() {
+        presenter().retry();
+        verifyNoInteractions(service);
+
+        AdminOrdersPresenter presenter = loaded(AdminOrdersRoute.all());
+        presenter.retry();
+
+        verify(service, times(1)).listOrders(any(), any());
+    }
+
+    @Test
+    void load_failsAfterRowsWereShown_keepsThem_andLoadFailedStaysFalse() {
+        AdminOrdersPresenter presenter = loaded(AdminOrdersRoute.all());
+        IllegalStateException failure = new IllegalStateException("down");
+        when(service.listOrders(any(), any())).thenThrow(failure);
+
+        presenter.load(new AdminOrdersRoute("PENDING", 1));
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.rows()).hasSize(2);
+        verify(errors, times(1)).report(failure);
+    }
 }

@@ -26,9 +26,10 @@ logging:
     org.hibernate.orm.jdbc.error: off
 
 app:
-  # Thư mục dữ liệu (database H2 và ảnh upload). Đường dẫn tương đối như data2 được DataDirectory đổi thành ./data2
-  # vì H2 không nhận đường dẫn tương đối ngầm, xem ADR-0013
-  data-dir: ${DATA_DIR:./data}
+  # Thư mục dữ liệu (database H2 và ảnh upload). Thứ tự ưu tiên do DataDirectory quyết định khi để trống:
+  # DATA_DIR > %LOCALAPPDATA%\MiniShop (khi chạy bản đóng gói, -Dapp.packaged=true) > ./data. Đường dẫn tương đối như data2
+  # được đổi thành ./data2 vì H2 không nhận đường dẫn tương đối ngầm, xem ADR-0013 và BR-009-6
+  data-dir: ${DATA_DIR:}
   seed:
     # Mật khẩu demo chỉ dùng để học và trình diễn (BR-001-2)
     admin-password: ${SEED_ADMIN_PASSWORD:Admin@123}

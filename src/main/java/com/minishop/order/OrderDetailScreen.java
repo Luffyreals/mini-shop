@@ -1,7 +1,11 @@
 package com.minishop.order;
 
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.ScreenFactory;
+import com.minishop.desktop.StatusPill;
+import com.minishop.desktop.Tables;
 import com.minishop.order.OrderDetailPresenter.LineRow;
+import java.util.List;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableBooleanValue;
@@ -37,12 +41,13 @@ import org.springframework.stereotype.Component;
  * tự xuống dòng kể cả chuỗi dài không có dấu cách, nên không tràn ngang ở 1024 px (AC-005-33).
  *
  * <p><b>Focus:</b> sau lần nạp đầu tiên focus ở "Quay lại danh sách đơn". Hủy đơn xong (nút hủy biến mất) focus
- * cũng về nút đó; nếu việc hủy lỗi và nút còn thì focus trả về nút hủy.
+ * cũng về nút đó; nếu việc hủy lỗi và nút còn thì focus trả về nút hủy. Khi lần nạp đầu lỗi (QĐ12) focus ở
+ * "Thử lại" (nút "Quay lại danh sách đơn" vẫn dùng được), và sau khi thử lại thành công về nút "Quay lại".
  *
  * <p>Id cố định cho test: {@code orderDetailScreen}, {@code orderTitle}, {@code orderBanner}, {@code orderDate},
  * {@code orderStatus}, {@code orderReceiver}, {@code orderPhone}, {@code orderAddress}, {@code orderNote},
  * {@code orderPayment}, {@code orderLines} (bảng), {@code orderTotal}, {@code backToOrders}, {@code cancelOrder},
- * {@code orderLoading}.
+ * {@code orderLoading}, {@code orderDetailLoadError}, {@code orderDetailRetry}.
  */
 final class OrderDetailScreen extends ScrollPane {
 
@@ -69,7 +74,11 @@ final class OrderDetailScreen extends ScrollPane {
     private static final double LINE_TOTAL_WIDTH = 140;
     private static final double PRODUCT_MIN_WIDTH = 120;
 
+    private static final List<ColumnConstraints> LINE_COLUMNS = List.of(Tables.growingColumn(PRODUCT_MIN_WIDTH),
+            Tables.fixedColumn(UNIT_WIDTH), Tables.fixedColumn(QUANTITY_WIDTH), Tables.fixedColumn(LINE_TOTAL_WIDTH));
+
     private final OrderDetailPresenter presenter;
+    private final VBox loadError;
 
     private final Button back = new Button(BACK_TEXT);
     private final Button cancel = new Button(CANCEL_TEXT);
@@ -107,16 +116,24 @@ final class OrderDetailScreen extends ScrollPane {
         Label banner = buildBanner();
         HBox loadingBox = buildLoading();
 
+        loadError = LoadError.create("orderDetail", presenter::retry);
+        Tables.showWhen(loadError, presenter.loadFailedProperty());
+
         VBox infoCard = buildInfoCard();
         VBox linesCard = buildLinesCard();
-        show(infoCard, presenter.orderProperty().isNotNull());
-        show(linesCard, presenter.orderProperty().isNotNull());
+        Tables.showWhen(infoCard, presenter.orderProperty().isNotNull());
+        Tables.showWhen(linesCard, presenter.orderProperty().isNotNull());
 
-        VBox page = new VBox(back, title, banner, loadingBox, infoCard, linesCard);
+        VBox page = new VBox(back, title, banner, loadingBox, loadError, infoCard, linesCard);
         page.getStyleClass().add("page-root");
         setContent(page);
 
         presenter.orderProperty().addListener((observable, oldView, view) -> render());
+        presenter.loadFailedProperty().addListener((observable, wasFailed, isFailed) -> {
+            if (isFailed) {
+                Platform.runLater(this::tryFocus);
+            }
+        });
         presenter.lines().addListener((ListChangeListener<LineRow>) change -> renderLines());
         // Nút hủy biến mất (đơn đã hủy): JavaFX đẩy focus đi chỗ khác, nên đưa về "Quay lại danh sách đơn"
         presenter.cancellableProperty().addListener((observable, was, now) -> {
@@ -165,8 +182,8 @@ final class OrderDetailScreen extends ScrollPane {
         HBox box = new HBox(indicator);
         box.getStyleClass().add("loading");
         ObservableBooleanValue waiting = presenter.loadingProperty().and(presenter.orderProperty().isNull());
-        show(box, waiting);
-        show(indicator, waiting);
+        Tables.showWhen(box, waiting);
+        Tables.showWhen(indicator, waiting);
         return box;
     }
 
@@ -221,7 +238,7 @@ final class OrderDetailScreen extends ScrollPane {
         });
         HBox actions = new HBox(cancel);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        show(actions, presenter.cancellableProperty());
+        Tables.showWhen(actions, presenter.cancellableProperty());
 
         VBox card = new VBox(lines, totalRow, actions);
         card.getStyleClass().add("summary-card");
@@ -267,12 +284,6 @@ final class OrderDetailScreen extends ScrollPane {
         return label;
     }
 
-    /** Gắn {@code visible} và {@code managed} của {@code node} vào {@code condition}. */
-    private static void show(Node node, ObservableBooleanValue condition) {
-        node.visibleProperty().bind(condition);
-        node.managedProperty().bind(node.visibleProperty());
-    }
-
     // ------------------------------------------------------------------ nội dung theo đơn
 
     /** Điền các trường của đơn hiện tại (ngày, tổng và dòng hàng đã gắn qua presenter). */
@@ -297,54 +308,34 @@ final class OrderDetailScreen extends ScrollPane {
     }
 
     private static Label statusPillWithId(OrderDetailView view) {
-        Label pill = OrderHistoryScreen.statusPill(view.statusLabel(), view.statusKey());
+        Label pill = StatusPill.create(view.statusLabel(), view.statusKey());
         pill.setId("orderStatus");
         return pill;
     }
 
     private void renderLines() {
         lines.getChildren().clear();
-        GridPane header = lineGrid();
-        header.getStyleClass().add("data-table");
-        addLineCells(header, true, COLUMN_PRODUCT, COLUMN_UNIT_PRICE, COLUMN_QUANTITY, COLUMN_LINE_TOTAL);
+        GridPane header = Tables.headerRow(LINE_COLUMNS, COLUMN_PRODUCT, COLUMN_UNIT_PRICE, COLUMN_QUANTITY,
+                COLUMN_LINE_TOTAL);
+        for (Node label : header.getChildren()) {
+            if (GridPane.getColumnIndex(label) != null && GridPane.getColumnIndex(label) > 0) {
+                GridPane.setHalignment(label, HPos.RIGHT);   // cột số canh phải, cùng hàng dữ liệu
+            }
+        }
         lines.getChildren().add(header);
         for (LineRow row : presenter.lines()) {
-            GridPane grid = lineGrid();
-            grid.getStyleClass().addAll("data-table", "data-table-row");
-            addLineCells(grid, false, row.productName(), row.unitPriceText(), row.quantityText(),
-                    row.lineTotalText());
-            lines.getChildren().add(grid);
-        }
-    }
-
-    private static GridPane lineGrid() {
-        GridPane grid = new GridPane();
-        ColumnConstraints product = new ColumnConstraints(PRODUCT_MIN_WIDTH, 200, Double.MAX_VALUE);
-        product.setHgrow(Priority.ALWAYS);
-        grid.getColumnConstraints().addAll(product, fixed(UNIT_WIDTH), fixed(QUANTITY_WIDTH),
-                fixed(LINE_TOTAL_WIDTH));
-        return grid;
-    }
-
-    private static ColumnConstraints fixed(double width) {
-        ColumnConstraints column = new ColumnConstraints(width, width, width);
-        column.setHgrow(Priority.NEVER);
-        return column;
-    }
-
-    private static void addLineCells(GridPane grid, boolean header, String... texts) {
-        for (int column = 0; column < texts.length; column++) {
-            Label label = new Label(texts[column]);
-            label.getStyleClass().add(header ? "data-table-header" : "text-body");
-            if (column == 0) {
-                label.setWrapText(true);
-                label.setMinHeight(Region.USE_PREF_SIZE);
-                label.setMinWidth(0);
-                label.setMaxWidth(Double.MAX_VALUE);
-            } else {
-                GridPane.setHalignment(label, HPos.RIGHT);
+            GridPane grid = Tables.dataRow(LINE_COLUMNS, false);
+            Label product = Tables.cell(row.productName(), "text-body");
+            product.setMinWidth(0);   // tên dài không có dấu cách xuống dòng thay vì đẩy tràn ngang
+            product.setMaxWidth(Double.MAX_VALUE);
+            Tables.put(grid, product, 0);
+            String[] numbers = {row.unitPriceText(), row.quantityText(), row.lineTotalText()};
+            for (int index = 0; index < numbers.length; index++) {
+                Label number = Tables.cell(numbers[index], "text-body");
+                Tables.put(grid, number, index + 1);
+                GridPane.setHalignment(number, HPos.RIGHT);
             }
-            grid.add(label, column, 0);
+            lines.getChildren().add(grid);
         }
     }
 
@@ -377,11 +368,28 @@ final class OrderDetailScreen extends ScrollPane {
     }
 
     private void tryFocus() {
-        if (!pendingFocus || back.getScene() == null || presenter.orderProperty().get() == null) {
+        if (!pendingFocus || back.getScene() == null) {
+            return;
+        }
+        if (presenter.loadFailedProperty().get()) {
+            // Khối lỗi: focus ở "Thử lại"; pendingFocus còn đó để khi thử lại thành công focus về "Quay lại"
+            Button retry = LoadError.retryButton(loadError);
+            if (retry.getScene() != null && !searchFieldFocused()) {
+                retry.requestFocus();
+            }
+            return;
+        }
+        if (presenter.orderProperty().get() == null) {
             return;
         }
         pendingFocus = false;
         back.requestFocus();
+    }
+
+    /** Người dùng đang gõ ở ô tìm kiếm trên thanh trên: không giành focus của họ. */
+    private boolean searchFieldFocused() {
+        Node owner = back.getScene().getFocusOwner();
+        return owner != null && "searchField".equals(owner.getId());
     }
 
     // ------------------------------------------------------------------ factory

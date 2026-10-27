@@ -3,6 +3,7 @@ package com.minishop.cart;
 import com.minishop.desktop.DrawerHost;
 import com.minishop.desktop.ImageLoader;
 import com.minishop.desktop.ImageTile;
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.ShellContributor;
 import com.minishop.desktop.ShellPresenter;
 import com.minishop.desktop.ShellPresenter.ShellAction;
@@ -49,7 +50,11 @@ import java.util.Objects;
  * {@code cartLine-{id}}, {@code lineLink-{id}}, {@code lineLabel-{id}}, {@code qtyMinus-{id}},
  * {@code qtyField-{id}}, {@code qtyPlus-{id}}, {@code removeLine-{id}}, {@code lineTotal-{id}}, {@code cartTotal},
  * {@code checkoutButton}, {@code cartNotOrderable}, {@code cartEmpty}, {@code continueShopping},
- * {@code cartLoading}.
+ * {@code cartLoading}, {@code cartLoadError}, {@code cartRetry}.
+ *
+ * <p><b>Lỗi nạp lần đầu (QĐ12):</b> thân hiện khối "Đã có lỗi xảy ra. Vui lòng thử lại." với "Thử lại"; đầu drawer
+ * và "Đóng" vẫn dùng được, chân ẩn. Focus không dời: drawer đặt focus ở "Đóng" lúc mở, nên không có chỗ nào "sau khi
+ * nạp xong" để chuyển sang "Thử lại".
  */
 final class CartDrawer extends VBox {
 
@@ -160,7 +165,12 @@ final class CartDrawer extends VBox {
         scroll.setFocusTraversable(false);
         show(scroll, presenter.loadedProperty().and(presenter.emptyProperty().not()));
 
-        StackPane body = new StackPane(loadingBox, emptyState, scroll);
+        // Lần nạp đầu lỗi (QĐ12): khối lỗi nằm trong thân; đầu drawer và "Đóng" vẫn dùng được. Focus vẫn ở "Đóng"
+        // (drawer đặt focus lúc mở, không phải sau khi nạp), nên khối lỗi không giành focus
+        VBox loadError = LoadError.create("cart", presenter::retry);
+        show(loadError, presenter.loadFailedProperty());
+
+        StackPane body = new StackPane(loadingBox, emptyState, scroll, loadError);
         VBox.setVgrow(body, Priority.ALWAYS);
         return body;
     }

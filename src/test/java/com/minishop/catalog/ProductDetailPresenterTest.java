@@ -404,4 +404,133 @@ class ProductDetailPresenterTest {
 
         verifyNoInteractions(addToCart, navigator);
     }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    @Test
+    void load_firstLoadFails_setsLoadFailed_reportsOnce_andStopsLoading() {
+        RuntimeException failure = new IllegalStateException("database is down");
+        when(productService.getDetail(7L)).thenThrow(failure);
+        ProductDetailPresenter presenter = presenter(direct);
+
+        presenter.load(ROUTE);
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.productProperty().get()).isNull();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(toasts, navigator);
+    }
+
+    @Test
+    void load_whenTheProductIsNotFound_loadFailedStaysFalse() {
+        when(productService.getDetail(7L)).thenThrow(new NotFoundException("Product 7"));
+        ProductDetailPresenter presenter = presenter(direct);
+
+        presenter.load(ROUTE);
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsTheSameProductAgain_clearsLoadFailed_andShowsIt() {
+        when(productService.getDetail(7L)).thenThrow(new IllegalStateException("down")).thenReturn(IN_STOCK);
+        ProductDetailPresenter presenter = presenter(direct);
+        presenter.load(ROUTE);
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.productProperty().get()).isEqualTo(IN_STOCK);
+        assertThat(presenter.priceTextProperty().get()).isEqualTo("1.250.000 ₫");
+        verify(productService, times(2)).getDetail(7L);
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryIsNotFound_goesBackWithAToast_andLoadFailedStaysFalse() {
+        when(productService.getDetail(7L)).thenThrow(new IllegalStateException("down"))
+                .thenThrow(new NotFoundException("Product 7"));
+        ProductDetailPresenter presenter = presenter(direct);
+        presenter.load(ROUTE);
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verify(toasts).show("Không tìm thấy sản phẩm.", ToastKind.ERROR);
+        verify(navigator).navigateTo(BACK);
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        RuntimeException failure = new IllegalStateException("down");
+        when(productService.getDetail(7L)).thenThrow(failure);
+        ProductDetailPresenter presenter = presenter(direct);
+        presenter.load(ROUTE);
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(productService.getDetail(7L)).thenThrow(new IllegalStateException("down")).thenReturn(IN_STOCK);
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        ProductDetailPresenter presenter = presenter(manual);
+        presenter.load(ROUTE);
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(productService.getDetail(7L)).thenThrow(new IllegalStateException("down"));
+        ProductDetailPresenter presenter = presenter(direct);
+        presenter.load(ROUTE);
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(productService, times(1)).getDetail(7L);
+        assertThat(presenter.productProperty().get()).isNull();
+    }
+
+    @Test
+    void retry_beforeAnyLoad_orWhenNothingFailed_doesNothing() {
+        presenter(direct).retry();
+        verifyNoInteractions(productService);
+
+        ProductDetailPresenter presenter = loaded();
+        presenter.retry();
+
+        verify(productService, times(1)).getDetail(7L);
+    }
+
+    @Test
+    void reload_failsAfterTheProductWasShown_keepsIt_andLoadFailedStaysFalse() {
+        ProductDetailPresenter presenter = loaded();
+        presenter.addToCart();
+        RuntimeException failure = new IllegalStateException("down");
+        when(productService.getDetail(7L)).thenThrow(failure);
+
+        captureAddCallback("1").accept(AddToCartResult.OUT_OF_STOCK);
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.productProperty().get()).isEqualTo(IN_STOCK);
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(1)).report(failure);
+        presenter.retry();
+        verify(productService, times(2)).getDetail(7L);
+    }
 }

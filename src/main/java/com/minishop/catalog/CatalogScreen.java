@@ -4,6 +4,7 @@ import com.minishop.common.VndFormatter;
 import com.minishop.desktop.EvenRows;
 import com.minishop.desktop.ImageLoader;
 import com.minishop.desktop.ImageTile;
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.Navigator;
 import com.minishop.desktop.PageBar;
 import com.minishop.desktop.Route;
@@ -57,10 +58,14 @@ import java.util.function.LongConsumer;
  * {@link Factory} so route mới với route trước: chỉ đổi trang thì focus thẻ đầu tiên, đổi danh mục hoặc sắp xếp
  * thì focus lại đúng điều khiển đó. Focus được đặt một lần, sau lần nạp thành công đầu tiên.
  *
+ * <p><b>Lỗi nạp lần đầu (QĐ12):</b> khối "Thử lại" ({@code #catalogLoadError}) thay cho lưới; nếu màn có một
+ * {@link FocusTarget} chờ thì focus vào "Thử lại" (và vẫn giữ {@link FocusTarget} cho lần thử lại thành công), còn
+ * không (ví dụ vừa tìm bằng ô tìm kiếm) thì không giành focus.
+ *
  * <p>Id cố định cho test: {@code catalogScreen}, {@code catalogTitle}, {@code categoryPills},
  * {@code categoryPill-all}, {@code categoryPill-{id}}, {@code sortBox}, {@code resultCount}, {@code productGrid},
  * {@code productCard-{id}}, {@code addButton-{id}}, {@code pageBar}, {@code emptyState}, {@code clearFilters},
- * {@code catalogLoading}.
+ * {@code catalogLoading}, {@code catalogLoadError}, {@code catalogRetry}.
  */
 final class CatalogScreen extends ScrollPane {
 
@@ -97,6 +102,8 @@ final class CatalogScreen extends ScrollPane {
     private final EvenRows grid = new EvenRows();
     private final PageBar pageBar = new PageBar(PAGINATION_LABEL);
     private final List<ProductCard> cardNodes = new ArrayList<>();
+    private final VBox loadError;
+    private boolean waitingForRetryScene;
     private ToggleButton selectedPill;
     private int columns;
     private FocusTarget pendingFocus;
@@ -131,13 +138,21 @@ final class CatalogScreen extends ScrollPane {
         footer.setMaxWidth(Double.MAX_VALUE);
         footer.setAlignment(Pos.CENTER);
 
-        VBox page = new VBox(title, pills, toolbar, loadingBox, grid, pageBar, emptyState, footer);
+        loadError = LoadError.create("catalog", presenter::retry);
+
+        VBox page = new VBox(title, pills, toolbar, loadingBox, loadError, grid, pageBar, emptyState, footer);
         page.getStyleClass().add("page-root");
         setContent(page);
 
         ObservableBooleanValue hasList = presenter.loadedProperty().and(presenter.emptyProperty().not());
         show(grid, hasList);
         show(emptyState, presenter.loadedProperty().and(presenter.emptyProperty()));
+        show(loadError, presenter.loadFailedProperty());
+        presenter.loadFailedProperty().addListener((observable, wasFailed, isFailed) -> {
+            if (isFailed) {
+                Platform.runLater(this::tryFocus);
+            }
+        });
 
         widthProperty().addListener((observable, oldWidth, newWidth) -> updateColumns(newWidth.doubleValue()));
         presenter.contentVersionProperty().addListener((observable, oldValue, newValue) -> render());
@@ -212,6 +227,7 @@ final class CatalogScreen extends ScrollPane {
         Label message = new Label(EMPTY_TEXT);
         message.getStyleClass().add("section-title");
         message.setWrapText(true);
+        message.setMinHeight(Region.USE_PREF_SIZE);   // nhãn xuống dòng không bị cắt "…" khi hiện lần đầu
         message.setAlignment(Pos.CENTER);
         Button clear = new Button(CLEAR_FILTERS_TEXT);
         clear.setId("clearFilters");
@@ -318,7 +334,14 @@ final class CatalogScreen extends ScrollPane {
     // ------------------------------------------------------------------ focus
 
     private void tryFocus() {
-        if (pendingFocus == FocusTarget.NONE || !presenter.loadedProperty().get()) {
+        if (pendingFocus == FocusTarget.NONE) {
+            return;
+        }
+        if (presenter.loadFailedProperty().get()) {
+            focusRetry();   // pendingFocus còn đó: thử lại thành công thì focus đi theo đường thường
+            return;
+        }
+        if (!presenter.loadedProperty().get()) {
             return;
         }
         Node target = switch (pendingFocus) {
@@ -348,6 +371,34 @@ final class CatalogScreen extends ScrollPane {
         pendingFocus = FocusTarget.NONE;
         // Đợi một nhịp để điều khiển đã có kích thước và nhận focus được
         Platform.runLater(target::requestFocus);
+    }
+
+    /**
+     * Lần nạp đầu lỗi (QĐ12): màn vốn đặt focus sau khi nạp xong (đổi trang, danh mục, sắp xếp) thì đặt vào "Thử lại".
+     * Ô tìm kiếm ở thanh trên đang giữ focus (người dùng đang gõ) thì không giành.
+     */
+    private void focusRetry() {
+        Button retry = LoadError.retryButton(loadError);
+        if (retry.getScene() == null) {
+            if (!waitingForRetryScene) {
+                waitingForRetryScene = true;
+                retry.sceneProperty().addListener(new ChangeListener<Scene>() {
+                    @Override
+                    public void changed(ObservableValue<? extends Scene> observable, Scene oldScene, Scene newScene) {
+                        if (newScene != null) {
+                            observable.removeListener(this);
+                            waitingForRetryScene = false;
+                            Platform.runLater(CatalogScreen.this::tryFocus);
+                        }
+                    }
+                });
+            }
+            return;
+        }
+        Node owner = retry.getScene().getFocusOwner();
+        if (owner == null || !"searchField".equals(owner.getId())) {
+            Platform.runLater(retry::requestFocus);
+        }
     }
 
     /** Id sản phẩm của thẻ đang giữ focus (hoặc có nút con giữ focus), {@code null} nếu không có. */

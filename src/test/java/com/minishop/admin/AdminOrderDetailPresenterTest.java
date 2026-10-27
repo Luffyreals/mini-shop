@@ -654,4 +654,142 @@ class AdminOrderDetailPresenterTest {
         verifyNoInteractions(navigator, confirmDialog);
         verify(service, never()).changeStatus(anyLong(), anyString());
     }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    @Test
+    void load_firstLoadFailsUnexpectedly_setsLoadFailed_reportsOnce_andStopsLoading() {
+        IllegalStateException failure = new IllegalStateException("database is down");
+        when(service.getOrder(ORDER_ID)).thenThrow(failure);
+
+        AdminOrderDetailPresenter presenter = loaded();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.busyProperty().get()).isFalse();
+        assertThat(presenter.detailProperty().get()).isNull();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(toasts, navigator);
+    }
+
+    @Test
+    void load_whenTheOrderIsGone_keepsTheOldPath_andLoadFailedStaysFalse() {
+        when(service.getOrder(ORDER_ID)).thenThrow(new NotFoundException("gone"));
+
+        assertThat(loaded().loadFailedProperty().get()).isFalse();
+
+        verify(navigator).navigateTo(BACK);
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void load_asANonAdmin_keepsTheOldPath_andLoadFailedStaysFalse() {
+        when(service.getOrder(ORDER_ID)).thenThrow(new AccessDeniedException());
+
+        assertThat(loaded().loadFailedProperty().get()).isFalse();
+
+        verify(navigator).goHome();
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsTheSameOrderAgain_clearsLoadFailed_andShowsIt() {
+        when(service.getOrder(ORDER_ID)).thenThrow(new IllegalStateException("down"))
+                .thenReturn(detail("Đang giao", "shipping", null, List.of(DELIVER, CANCEL)));
+        AdminOrderDetailPresenter presenter = loaded();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.detailProperty().get()).isNotNull();
+        assertThat(presenter.detailProperty().get().statusLabel()).isEqualTo("Đang giao");
+        verify(service, times(2)).getOrder(ORDER_ID);
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFindsTheOrderGone_toastsAndGoesBack_loadFailedStaysFalse() {
+        when(service.getOrder(ORDER_ID)).thenThrow(new IllegalStateException("down"))
+                .thenThrow(new NotFoundException("gone"));
+        AdminOrderDetailPresenter presenter = loaded();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verify(toasts).show("Không tìm thấy đơn hàng.", ToastKind.ERROR);
+        verify(navigator, times(1)).navigateTo(BACK);
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        IllegalStateException failure = new IllegalStateException("down");
+        when(service.getOrder(ORDER_ID)).thenThrow(failure);
+        AdminOrderDetailPresenter presenter = loaded();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(service.getOrder(ORDER_ID)).thenThrow(new IllegalStateException("down"))
+                .thenReturn(detail("Đang giao", "shipping", null, List.of(DELIVER)));
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        AdminOrderDetailPresenter presenter = presenter(manual);
+        presenter.load(ROUTE);
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(service.getOrder(ORDER_ID)).thenThrow(new IllegalStateException("down"));
+        AdminOrderDetailPresenter presenter = loaded();
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(service, times(1)).getOrder(ORDER_ID);
+        assertThat(presenter.detailProperty().get()).isNull();
+    }
+
+    @Test
+    void retry_beforeAnyLoad_orWhenNothingFailed_doesNothing() {
+        presenter(direct).retry();
+        verifyNoInteractions(service);
+
+        AdminOrderDetailPresenter presenter = loaded();
+        presenter.retry();
+
+        verify(service, times(1)).getOrder(ORDER_ID);
+    }
+
+    @Test
+    void reload_failsAfterAStatusChange_keepsTheDetail_andLoadFailedStaysFalse() {
+        IllegalStateException failure = new IllegalStateException("down");
+        when(service.getOrder(ORDER_ID)).thenReturn(detail("Chờ xử lý", "pending", null, List.of(CONFIRM, CANCEL)))
+                .thenThrow(failure);
+        when(service.changeStatus(ORDER_ID, "CONFIRMED")).thenReturn(new StatusChangeResult.Changed("Đã xác nhận"));
+        AdminOrderDetailPresenter presenter = loaded();
+
+        presenter.runAction(CONFIRM);
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.detailProperty().get()).isNotNull();
+        assertThat(presenter.detailProperty().get().statusLabel()).isEqualTo("Chờ xử lý");
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.busyProperty().get()).isFalse();
+        verify(errors, times(1)).report(failure);
+    }
 }
