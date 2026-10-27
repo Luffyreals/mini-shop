@@ -150,6 +150,13 @@ final class CheckoutScreen extends ScrollPane {
                 Platform.runLater(this::focusFirstEmpty);
             }
         });
+        // Nội dung của ScrollPane chỉ vào Scene khi skin được dựng; dữ liệu có thể về trước lúc đó, và requestFocus
+        // trên node chưa có scene thì không làm gì. Nên thử lại khi ô đầu tiên vào scene.
+        receiverName.sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                Platform.runLater(this::focusFirstEmpty);
+            }
+        });
         // Đặt hàng hỏng thì form mở lại; đưa focus về nút xác nhận (nút luôn giữ focus được, nên thường đã ở đó)
         presenter.busyProperty().addListener((observable, wasBusy, isBusy) -> {
             if (wasBusy && !isBusy) {
@@ -437,9 +444,12 @@ final class CheckoutScreen extends ScrollPane {
 
     // ------------------------------------------------------------------ focus
 
-    /** Sau lần nạp đầu: focus vào ô trống đầu tiên (họ tên đã điền sẵn thì tới số điện thoại). */
+    /**
+     * Sau lần nạp đầu: focus vào ô trống đầu tiên (họ tên đã điền sẵn thì tới số điện thoại). Chỉ chạy một lần, khi
+     * đã có dữ liệu và các ô đã nằm trong scene (gọi từ cả hai sự kiện, cái nào tới sau thì làm).
+     */
     private void focusFirstEmpty() {
-        if (!pendingFocus || getScene() == null) {
+        if (!pendingFocus || !presenter.readyProperty().get() || receiverName.getScene() == null) {
             return;
         }
         pendingFocus = false;
