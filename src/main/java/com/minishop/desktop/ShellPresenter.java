@@ -28,7 +28,10 @@ import org.springframework.stereotype.Component;
  * <p>
  * Nút tài khoản có thể có thêm menu ({@link #accountMenuEntries()}): khi đã có mục thì bấm nút mở menu, khi
  * menu rỗng thì bấm nút chạy hành động {@link ShellAction#ACCOUNT}. Nút được bật khi có hành động
- * <b>hoặc</b> menu có mục. Tính năng gắn những thứ này trong {@link ShellContributor#contribute}.
+ * <b>hoặc</b> menu có mục. Nút "Danh mục" làm giống vậy với {@link #categoriesMenuEntries()}. Tính năng gắn
+ * những thứ này trong {@link ShellContributor#contribute}.
+ * <p>
+ * Chữ trong ô tìm kiếm là {@link #searchTextProperty()}: màn danh sách đặt lại nó theo từ khóa đã chuẩn hóa.
  */
 @Component
 public class ShellPresenter {
@@ -52,6 +55,8 @@ public class ShellPresenter {
                 return text == null || text.isBlank() ? accountLabel.get() : text;
             }, accountAccessibleText, accountLabel);
     private final ObservableList<ShellMenuEntry> accountMenu = FXCollections.observableArrayList();
+    private final ObservableList<ShellMenuEntry> categoriesMenu = FXCollections.observableArrayList();
+    private final StringProperty searchText = new SimpleStringProperty("");
     private final StringBinding cartBadgeText = Bindings.createStringBinding(
             () -> badgeText(cartCount.get()), cartCount);
     private final StringBinding cartAccessibleText = Bindings.createStringBinding(
@@ -70,6 +75,8 @@ public class ShellPresenter {
         }
         enabled.put(ShellAction.ACCOUNT,
                 handlers.get(ShellAction.ACCOUNT).isNotNull().or(Bindings.isNotEmpty(accountMenu)));
+        enabled.put(ShellAction.CATEGORIES,
+                handlers.get(ShellAction.CATEGORIES).isNotNull().or(Bindings.isNotEmpty(categoriesMenu)));
     }
 
     /** Cắt nhãn dài (theo code point) và thêm "…"; nhãn ngắn giữ nguyên. */
@@ -141,6 +148,19 @@ public class ShellPresenter {
         accountMenu.setAll(entries == null ? List.of() : List.copyOf(entries));
     }
 
+    /**
+     * Các mục của menu "Danh mục", theo thứ tự hiện. Rỗng nghĩa là nút chạy thẳng hành động
+     * {@link ShellAction#CATEGORIES}. Chỉ đọc nội dung trên luồng giao diện; đổi bằng {@link #setCategoriesMenu}.
+     */
+    public ObservableList<ShellMenuEntry> categoriesMenuEntries() {
+        return categoriesMenu;
+    }
+
+    /** Thay toàn bộ menu danh mục; {@code null} hoặc rỗng thì gỡ menu. */
+    public void setCategoriesMenu(List<ShellMenuEntry> entries) {
+        categoriesMenu.setAll(entries == null ? List.of() : List.copyOf(entries));
+    }
+
     /** Gắn (hoặc gỡ, khi {@code null}) hành động của một nút. Có hành động thì nút được bật. */
     public void setAction(ShellAction action, Runnable handler) {
         handlers.get(action).set(handler);
@@ -161,6 +181,16 @@ public class ShellPresenter {
     /** Gắn (hoặc gỡ) hàm nhận từ khóa khi người dùng nhấn Enter trong ô tìm kiếm. */
     public void setSearchHandler(Consumer<String> handler) {
         searchHandler.set(handler);
+    }
+
+    /** Chữ trong ô tìm kiếm, gắn hai chiều với ô nhập; không bao giờ {@code null}. Chỉ đổi trên luồng giao diện. */
+    public StringProperty searchTextProperty() {
+        return searchText;
+    }
+
+    /** Đặt chữ trong ô tìm kiếm (ví dụ từ khóa đã chuẩn hóa của màn danh sách); {@code null} thành rỗng. */
+    public void setSearchText(String text) {
+        searchText.set(text == null ? "" : text);
     }
 
     public BooleanBinding searchEnabledBinding() {

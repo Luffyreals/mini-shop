@@ -15,8 +15,10 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -270,5 +272,191 @@ class ProductServiceTest {
 
         assertThat(view).isEqualTo(new ProductDetailView(null, "Truyện", "Sách", new BigDecimal("90000"),
                 "Mô tả", false, null));
+    }
+
+    // ---- home (QĐ5, AC-009-1, AC-002-18)
+
+    private static final Category HOME_CATEGORY = new Category("Thời trang", null);
+
+    private static Product homeProduct(long id, String name, int stock, String imagePath) {
+        Product p = new Product(HOME_CATEGORY, name, "Mô tả " + name, BigDecimal.valueOf(1000L * id), stock);
+        ReflectionTestUtils.setField(p, "id", id);
+        p.setImagePath(imagePath);
+        return p;
+    }
+
+    private void stubHome(List<Product> newest, List<Product> lowStock, List<Category> allCategories) {
+        when(productRepository.findTop3ByActiveTrueOrderByCreatedAtDescIdDesc()).thenReturn(newest);
+        when(productRepository.findTop3ByActiveTrueAndStockBetweenOrderByStockAscIdAsc(1, 5)).thenReturn(lowStock);
+        when(categoryRepository.findAll()).thenReturn(allCategories);
+    }
+
+    @Test
+    void home_whenNoProducts_hasNoFeaturedAndEmptyLists() {
+        stubHome(List.of(), List.of(), List.of());
+
+        HomeView view = service.home();
+
+        assertThat(view.featured()).isNull();
+        assertThat(view.moreNew()).isEmpty();
+        assertThat(view.lowStock()).isEmpty();
+        assertThat(view.categories()).isEmpty();
+    }
+
+    @Test
+    void home_whenOneProduct_featuredIsItAndMoreNewIsEmpty() {
+        stubHome(List.of(homeProduct(1, "Áo", 3, null)), List.of(), List.of());
+
+        HomeView view = service.home();
+
+        assertThat(view.featured()).isEqualTo(new ProductDetailView(1L, "Áo", "Thời trang",
+                BigDecimal.valueOf(1000), "Mô tả Áo", true, null));
+        assertThat(view.moreNew()).isEmpty();
+    }
+
+    @Test
+    void home_whenTwoProducts_featuredIsFirstAndMoreNewIsSecond() {
+        stubHome(List.of(homeProduct(2, "Mới nhất", 3, null), homeProduct(1, "Cũ hơn", 0, null)),
+                List.of(), List.of());
+
+        HomeView view = service.home();
+
+        assertThat(view.featured().name()).isEqualTo("Mới nhất");
+        assertThat(view.moreNew()).containsExactly(new ProductCardView(1L, "Cũ hơn", "Thời trang",
+                BigDecimal.valueOf(1000), false, null));
+    }
+
+    @Test
+    void home_whenThreeProducts_featuredIsFirstAndMoreNewIsSecondAndThirdInOrder() {
+        stubHome(List.of(homeProduct(3, "A", 1, null), homeProduct(2, "B", 1, null), homeProduct(1, "C", 1, null)),
+                List.of(), List.of());
+
+        HomeView view = service.home();
+
+        assertThat(view.featured().id()).isEqualTo(3L);
+        assertThat(view.moreNew()).extracting(ProductCardView::id).containsExactly(2L, 1L);
+        assertThat(view.moreNew()).extracting(ProductCardView::name).containsExactly("B", "C");
+    }
+
+    @Test
+    void home_queriesLowStockBetweenOneAndThresholdFive() {
+        stubHome(List.of(), List.of(), List.of());
+
+        service.home();
+
+        assertThat(ProductAdminService.LOW_STOCK_THRESHOLD).isEqualTo(5);
+        verify(productRepository).findTop3ByActiveTrueAndStockBetweenOrderByStockAscIdAsc(1, 5);
+    }
+
+    @Test
+    void home_mapsLowStockRowsKeepingRepositoryOrder() {
+        stubHome(List.of(), List.of(homeProduct(7, "Gần hết", 1, "/images/products/a.jpg"),
+                homeProduct(4, "Còn ít", 3, null)), List.of());
+
+        HomeView view = service.home();
+
+        assertThat(view.lowStock()).containsExactly(
+                new LowStockCardView(7L, "Gần hết", 1, "/images/products/a.jpg"),
+                new LowStockCardView(4L, "Còn ít", 3, null));
+    }
+
+    @Test
+    void home_buildsEveryImageUrlThroughProductImages() {
+        StorageService storage = org.mockito.Mockito.mock(StorageService.class);
+        lenient().when(storage.toUrl(any())).thenAnswer(inv -> {
+            String path = inv.getArgument(0);
+            return path == null ? null : "file:///resolved" + path;
+        });
+        ProductService withResolver = new ProductService(productRepository, categoryRepository,
+                new ProductImages(storage));
+        stubHome(List.of(homeProduct(3, "A", 1, "/x/a.jpg"), homeProduct(2, "B", 1, "/x/b.jpg"),
+                        homeProduct(1, "C", 1, null)),
+                List.of(homeProduct(9, "D", 2, "/x/d.jpg")), List.of());
+
+        HomeView view = withResolver.home();
+
+        assertThat(view.featured().imageUrl()).isEqualTo("file:///resolved/x/a.jpg");
+        assertThat(view.moreNew()).extracting(ProductCardView::imageUrl)
+                .containsExactly("file:///resolved/x/b.jpg", null);
+        assertThat(view.lowStock()).extracting(LowStockCardView::imageUrl).containsExactly("file:///resolved/x/d.jpg");
+    }
+
+    @Test
+    void home_whenImagePathBlank_imageUrlIsNull() {
+        stubHome(List.of(homeProduct(2, "A", 1, " ")), List.of(homeProduct(9, "D", 2, "")), List.of());
+
+        HomeView view = service.home();
+
+        assertThat(view.featured().imageUrl()).isNull();
+        assertThat(view.lowStock().get(0).imageUrl()).isNull();
+    }
+
+    @Test
+    void home_sortsCategoriesWithVietnameseCollation() {
+        stubHome(List.of(), List.of(), List.of(
+                new Category("Thời trang", null), new Category("Điện tử", null),
+                new Category("Sách", null), new Category("Nhà cửa", null)));
+
+        HomeView view = service.home();
+
+        assertThat(view.categories()).extracting(CategoryOption::name)
+                .containsExactly("Điện tử", "Nhà cửa", "Sách", "Thời trang");
+    }
+
+    @Test
+    void home_returnsListsThatCannotBeModified() {
+        stubHome(List.of(homeProduct(2, "A", 1, null), homeProduct(1, "B", 1, null)),
+                List.of(homeProduct(9, "D", 2, null)), List.of(new Category("Sách", null)));
+
+        HomeView view = service.home();
+
+        assertThatThrownBy(() -> view.moreNew().add(view.moreNew().get(0)))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> view.lowStock().add(view.lowStock().get(0)))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> view.categories().add(view.categories().get(0)))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void homeView_copiesItsListsSoLaterChangesToTheSourceDoNotShowThrough() {
+        List<ProductCardView> moreNew = new ArrayList<>();
+        List<LowStockCardView> lowStock = new ArrayList<>();
+        List<CategoryOption> categories = new ArrayList<>();
+
+        HomeView view = new HomeView(null, moreNew, lowStock, categories);
+        moreNew.add(new ProductCardView(1L, "A", "C", BigDecimal.ONE, true, null));
+        lowStock.add(new LowStockCardView(1L, "A", 1, null));
+        categories.add(new CategoryOption(1L, "C"));
+
+        assertThat(view.featured()).isNull();
+        assertThat(view.moreNew()).isEmpty();
+        assertThat(view.lowStock()).isEmpty();
+        assertThat(view.categories()).isEmpty();
+    }
+
+    // ---- categories() for the top-bar menu
+
+    @Test
+    void categories_sortsWithVietnameseCollationAndKeepsIds() {
+        Category dienTu = new Category("Điện tử", null);
+        ReflectionTestUtils.setField(dienTu, "id", 8L);
+        Category sach = new Category("Sách", null);
+        ReflectionTestUtils.setField(sach, "id", 3L);
+        Category nhaCua = new Category("Nhà cửa", null);
+        ReflectionTestUtils.setField(nhaCua, "id", 5L);
+        when(categoryRepository.findAll()).thenReturn(List.of(sach, dienTu, nhaCua));
+
+        List<CategoryOption> options = service.categories();
+
+        assertThat(options).containsExactly(new CategoryOption(8L, "Điện tử"), new CategoryOption(5L, "Nhà cửa"),
+                new CategoryOption(3L, "Sách"));
+    }
+
+    @Test
+    void categories_whenNone_isEmpty() {
+        when(categoryRepository.findAll()).thenReturn(List.of());
+
+        assertThat(service.categories()).isEmpty();
     }
 }

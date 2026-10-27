@@ -9,6 +9,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -26,6 +27,8 @@ class LocalStorageService implements StorageService {
     private static final String URL_PREFIX = "/uploads/";
     private static final Pattern STORED_PATH = Pattern.compile(
             "^/uploads/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(jpg|png|webp)$");
+
+    private static final Pattern SEED_PATH = Pattern.compile("^/images/products/[a-z0-9-]+\\.(jpg|png)$");
 
     private final Path root;
 
@@ -95,7 +98,21 @@ class LocalStorageService implements StorageService {
 
     @Override
     public String toUrl(String imagePath) {
-        return imagePath == null || imagePath.isBlank() ? null : imagePath;
+        if (imagePath != null) {
+            if (SEED_PATH.matcher(imagePath).matches()) {
+                URL resource = LocalStorageService.class.getResource(imagePath);
+                return resource == null ? null : resource.toExternalForm();
+            }
+            if (STORED_PATH.matcher(imagePath).matches()) {
+                Path target = root.resolve(imagePath.substring(URL_PREFIX.length())).normalize();
+                if (root.equals(target.getParent())) {
+                    // The file is not checked: a missing file shows the placeholder.
+                    return target.toUri().toString();
+                }
+            }
+        }
+        log.debug("Ignoring an image path that is neither a seed image nor an upload");
+        return null;
     }
 
     private static void deleteQuietly(Path file) {

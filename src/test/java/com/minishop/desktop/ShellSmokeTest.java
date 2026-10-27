@@ -9,6 +9,9 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.text.Font;
@@ -109,12 +112,86 @@ class ShellSmokeTest {
 
     @Test
     @Order(4)
-    void start_leavesEveryActionDisabledUntilAFeatureAttachesIt() {
-        // The account button is not in this list: the login (D2) attaches its action, see the test below.
-        for (String id : List.of("navStore", "navNew", "navCategories", "cartButton")) {
-            assertThat(isDisabled(id)).as("#" + id + " is disabled").isTrue();
+    void start_leavesTheCartButtonDisabledUntilAFeatureAttachesIt() {
+        // The account button is not checked here: the login (D2) attaches its action, see the test below.
+        assertThat(isDisabled("cartButton")).as("#cartButton is disabled (D4 attaches it)").isTrue();
+    }
+
+    @Test
+    @Order(4)
+    void start_enablesTheStoreButtonsAndTheSearchBoxBecauseTheStorefrontAttachedThem() {
+        for (String id : List.of("navStore", "navNew", "navCategories", "searchField")) {
+            assertThat(isDisabled(id)).as("#" + id + " is disabled").isFalse();
         }
-        assertThat(isDisabled("searchBox")).as("the search box is disabled").isTrue();
+        assertThat(isDisabled("cartButton")).as("#cartButton stays disabled until D4").isTrue();
+    }
+
+    @Test
+    @Order(4)
+    void searchShortcutLabel_showsCtrlK() {
+        assertThat(((Label) lookup("searchShortcut")).getText()).isEqualTo("Ctrl K");
+    }
+
+    @Test
+    @Order(4)
+    void ctrlKAccelerator_isRegisteredOnTheSceneAndFocusesTheSearchField() {
+        KeyCodeCombination ctrlK = new KeyCodeCombination(KeyCode.K, KeyCombination.SHORTCUT_DOWN);
+        Scene scene = FxTestSupport.callOnFx(stage::getScene);
+        Node searchField = lookup("searchField");
+        Runnable action = FxTestSupport.callOnFx(() -> scene.getAccelerators().get(ctrlK));
+        assertThat(action).as("the Ctrl+K accelerator").isNotNull();
+
+        try {
+            FxTestSupport.runOnFx(() -> {
+                scene.getRoot().requestFocus();
+                action.run();
+            });
+
+            assertThat(FxTestSupport.callOnFx(scene::getFocusOwner)).isSameAs(searchField);
+        } finally {
+            FxTestSupport.runOnFx(() -> scene.getRoot().requestFocus());
+        }
+    }
+
+    @Test
+    @Order(4)
+    void searchText_setByAScreen_putsTheCaretAtTheEndNotAtTheStart() {
+        ShellPresenter shell = app.context().getBean(ShellPresenter.class);
+        TextField searchField = (TextField) lookup("searchField");
+        try {
+            FxTestSupport.runOnFx(() -> {
+                searchField.setText("  áo THUN ");
+                searchField.positionCaret(searchField.getLength());
+                shell.setSearchText("áo THUN");
+            });
+            FxTestSupport.flushFx();
+
+            assertThat(FxTestSupport.<String>callOnFx(searchField::getText)).isEqualTo("áo THUN");
+            assertThat(FxTestSupport.<Integer>callOnFx(searchField::getCaretPosition)).isEqualTo("áo THUN".length());
+        } finally {
+            FxTestSupport.runOnFx(() -> shell.setSearchText(""));
+            FxTestSupport.flushFx();
+        }
+    }
+
+    @Test
+    @Order(4)
+    void searchText_typedByTheUser_keepsTheCaretWhereTheUserPutIt() {
+        TextField searchField = (TextField) lookup("searchField");
+        try {
+            FxTestSupport.runOnFx(() -> {
+                searchField.setText("áo thun");
+                searchField.positionCaret(2);
+                searchField.insertText(2, "x");
+            });
+            FxTestSupport.flushFx();
+
+            assertThat(FxTestSupport.<String>callOnFx(searchField::getText)).isEqualTo("áox thun");
+            assertThat(FxTestSupport.<Integer>callOnFx(searchField::getCaretPosition)).isEqualTo(3);
+        } finally {
+            FxTestSupport.runOnFx(() -> searchField.setText(""));
+            FxTestSupport.flushFx();
+        }
     }
 
     @Test

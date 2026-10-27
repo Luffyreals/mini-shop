@@ -8,7 +8,7 @@ Tài liệu cho người muốn đọc code: công nghệ, cách chia package, c
 |---|---|
 | Ngôn ngữ | Java 25 |
 | Framework | Spring Boot 4.1 không có web server: Data JPA, Validation, `spring-security-crypto` (băm mật khẩu) |
-| Giao diện | JavaFX 25 (desktop Windows), CSS của JavaFX, phông Plus Jakarta Sans đóng gói kèm |
+| Giao diện | JavaFX 25 (desktop Windows), CSS của JavaFX, phông Plus Jakarta Sans đóng gói kèm; đọc ảnh WebP bằng TwelveMonkeys `imageio-webp` |
 | Cơ sở dữ liệu | H2 lưu ra file (chế độ tương thích PostgreSQL), Flyway |
 | Kiểm thử | JUnit, Mockito, AssertJ, ArchUnit, TestFX (vài smoke test mở cửa sổ thật) |
 | Build | Maven Wrapper |
@@ -23,6 +23,9 @@ Tài liệu cho người muốn đọc code: công nghệ, cách chia package, c
 - Ảnh upload được kiểm cả nội dung file (magic bytes) và lưu bằng tên ngẫu nhiên ([ADR-0010](adr/0010-product-images-and-admin-stock-adjustment.md))
 - Không gọi service trên luồng JavaFX: `desktop.BackgroundTasks` chạy việc trên virtual thread rồi trả kết quả về luồng giao diện
 - Phiên đăng nhập là bean `user.AppSession` (một `CurrentUser` bất biến, chỉ đổi trên luồng giao diện). `AuthService.login` chạy ngoài giao dịch; việc gộp giỏ khách cắm vào qua `user.LoginHook` (do `cart` cài đặt) nên `user` không phụ thuộc `cart`, và gộp lỗi không làm hỏng đăng nhập
+- Mỗi màn là một `Route` bất biến (`catalog.CatalogRoute` mang từ khóa, danh mục, sắp xếp, trang, như URL của bản web); đổi bộ lọc là điều hướng tới route mới, nên kết quả cũ không đè được kết quả mới. Mỗi `XScreen` có lớp lồng `XScreen.Factory` dựng màn và một `XPresenter` mới
+- Nút "Thêm vào giỏ" nằm trong màn của `catalog`, nhưng `catalog` không được phụ thuộc `cart`: `catalog` khai báo interface `AddToCart`, `cart.AddToCartPresenter` cài đặt nó (cùng cách đảo phụ thuộc như `LoginHook`)
+- JavaFX không đọc được WebP: `desktop.WebpDecoder` đọc bằng `javax.imageio` với thư viện TwelveMonkeys `imageio-webp` (scope `runtime`), ngoài luồng giao diện, từ chối ảnh trên 24 triệu điểm ảnh
 
 **Luồng khởi động:**
 

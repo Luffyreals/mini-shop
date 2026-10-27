@@ -18,6 +18,11 @@ public interface StorageService {
      */
     void deleteAfterCommit(String imagePath);
 
-    /** @return URL hiển thị của ảnh, hoặc {@code null} khi chưa có ảnh (null hoặc trống) */
+    /**
+     * Đổi {@code image_path} thành URL có scheme ({@code file:} hoặc {@code jar:}) mà JavaFX nạp được. Chỉ nhận ảnh
+     * seed ({@code /images/products/...}) và ảnh do {@link #store} tạo; không kiểm file upload có tồn tại.
+     *
+     * @return URL của ảnh, hoặc {@code null} khi không có ảnh hoặc giá trị không do ứng dụng tạo ra
+     */
     String toUrl(String imagePath);
 }

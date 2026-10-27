@@ -296,6 +296,93 @@ class ShellPresenterTest {
         assertThat(presenter.accountLabelProperty().get()).isEqualTo("a".repeat(24));
     }
 
+    // ------------------------------------------------------------------ categories menu and search text (QĐ6 of D3)
+
+    @Test
+    void categoriesMenu_startsEmptyAndTheButtonIsDisabled() {
+        assertThat(presenter.categoriesMenuEntries()).isEmpty();
+        assertThat(presenter.enabledBinding(ShellAction.CATEGORIES).get()).isFalse();
+    }
+
+    @Test
+    void categoriesButton_withMenuEntriesButNoAction_isEnabled() {
+        presenter.setCategoriesMenu(List.of(entry("categoryMenuAll", "Tất cả danh mục")));
+
+        assertThat(presenter.enabledBinding(ShellAction.CATEGORIES).get()).isTrue();
+    }
+
+    @Test
+    void categoriesButton_whenTheMenuIsRemovedAndThereIsNoAction_isDisabledAgain() {
+        presenter.setCategoriesMenu(List.of(entry("a", "A")));
+
+        presenter.setCategoriesMenu(List.of());
+
+        assertThat(presenter.enabledBinding(ShellAction.CATEGORIES).get()).isFalse();
+    }
+
+    @Test
+    void categoriesButton_whenTheMenuIsRemovedButThereIsAnAction_staysEnabled() {
+        presenter.setAction(ShellAction.CATEGORIES, () -> { });
+        presenter.setCategoriesMenu(List.of(entry("a", "A")));
+
+        presenter.setCategoriesMenu(null);
+
+        assertThat(presenter.enabledBinding(ShellAction.CATEGORIES).get()).isTrue();
+    }
+
+    @Test
+    void setCategoriesMenu_withNullOrEmpty_clearsTheMenu() {
+        presenter.setCategoriesMenu(List.of(entry("a", "A")));
+        presenter.setCategoriesMenu(null);
+        assertThat(presenter.categoriesMenuEntries()).isEmpty();
+
+        presenter.setCategoriesMenu(List.of(entry("a", "A")));
+        presenter.setCategoriesMenu(List.of());
+        assertThat(presenter.categoriesMenuEntries()).isEmpty();
+    }
+
+    @Test
+    void setCategoriesMenu_replacesTheWholeListAndCopiesIt() {
+        List<ShellMenuEntry> entries = new ArrayList<>(List.of(entry("a", "A"), entry("b", "B")));
+        presenter.setCategoriesMenu(entries);
+        entries.add(entry("c", "C"));
+
+        assertThat(presenter.categoriesMenuEntries()).extracting(ShellMenuEntry::id).containsExactly("a", "b");
+
+        presenter.setCategoriesMenu(List.of(entry("d", "D")));
+
+        assertThat(presenter.categoriesMenuEntries()).extracting(ShellMenuEntry::id).containsExactly("d");
+    }
+
+    @Test
+    void categoriesMenu_doesNotEnableTheAccountButton() {
+        presenter.setCategoriesMenu(List.of(entry("a", "A")));
+
+        assertThat(presenter.enabledBinding(ShellAction.ACCOUNT).get()).isFalse();
+    }
+
+    @Test
+    void searchText_startsEmpty() {
+        assertThat(presenter.searchTextProperty().get()).isEmpty();
+    }
+
+    @Test
+    void setSearchText_setsTheText_andNullBecomesEmpty() {
+        presenter.setSearchText("áo thun");
+        assertThat(presenter.searchTextProperty().get()).isEqualTo("áo thun");
+
+        presenter.setSearchText(null);
+
+        assertThat(presenter.searchTextProperty().get()).isEmpty();
+    }
+
+    @Test
+    void setSearchText_keepsScriptTextVerbatim() {
+        presenter.setSearchText("<script>alert(1)</script>");
+
+        assertThat(presenter.searchTextProperty().get()).isEqualTo("<script>alert(1)</script>");
+    }
+
     @Test
     void shellMenuEntry_rejectsNullOrBlankParts() {
         assertThatNullPointerException().isThrownBy(() -> new ShellMenuEntry(null, "A", () -> { }));

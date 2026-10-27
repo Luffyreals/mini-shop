@@ -7,6 +7,9 @@
  * chủ giỏ trước tiên (ADR-0008).
  * <p>API công khai hẹp cho {@code order}: {@code CartCheckout}, {@code CheckoutLine} (đọc giỏ DB sau khi khóa,
  * xóa giỏ). Phần còn lại package-private.
+ * <p>{@code AddToCartPresenter} cài đặt {@code catalog.AddToCart} ("Thêm vào giỏ" của màn hình cửa hàng): {@code catalog}
+ * định nghĩa giao diện, {@code cart} cài đặt, cùng kiểu đảo phụ thuộc với {@code LoginHook}, nên phụ thuộc vẫn là
+ * {@code cart -> catalog}.
  * <p>Được phép dùng: {@code catalog}, {@code user}, {@code common}, và {@code desktop} (cho presenter của giỏ).
  */
 package com.minishop.cart;

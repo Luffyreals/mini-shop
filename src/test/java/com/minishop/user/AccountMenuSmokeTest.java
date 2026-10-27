@@ -1,5 +1,7 @@
 package com.minishop.user;
 
+import com.minishop.catalog.CatalogRoute;
+import com.minishop.desktop.Navigator;
 import com.minishop.support.FxTestSupport;
 import com.minishop.support.TestShellApp;
 import javafx.application.Application;
@@ -9,7 +11,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
-import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.junit.jupiter.api.AfterAll;
@@ -125,6 +126,10 @@ class AccountMenuSmokeTest {
         return FxTestSupport.callOnFx(() -> menu.getItems().stream().map(MenuItem::getText).toList());
     }
 
+    private static boolean homeScreenShowing() {
+        return FxTestSupport.callOnFx(() -> mainStage.getScene().lookup("#content").lookup("#homeScreen") != null);
+    }
+
     private static boolean authDialogShowing() {
         return FxTestSupport.callOnFx(() -> Window.getWindows().stream()
                 .anyMatch(window -> window.isShowing() && window.getScene() != null
@@ -178,8 +183,11 @@ class AccountMenuSmokeTest {
     }
 
     @Test
-    void firingTheLogoutItem_returnsToAGuestWithAnEmptyContentAndAToast() {
+    void firingTheLogoutItem_returnsToAGuestWithTheLoginLabelAndAToast() {
         signInAs(DemoAccounts.USER_EMAIL);
+        // Leave the home screen first, so the check after the logout proves that it goes back there
+        FxTestSupport.runOnFx(() -> app.context().getBean(Navigator.class).navigateTo(CatalogRoute.all()));
+        FxTestSupport.await("the catalog screen", () -> !homeScreenShowing());
         ContextMenu menu = openAccountMenu();
         MenuItem logout = FxTestSupport.callOnFx(() -> menu.getItems().get(0));
 
@@ -188,8 +196,8 @@ class AccountMenuSmokeTest {
 
         assertThat(FxTestSupport.callOnFx(() -> accountButton().getText())).isEqualTo("Đăng nhập");
         assertThat(session().isLoggedIn()).isFalse();
-        assertThat(FxTestSupport.callOnFx(() -> ((StackPane) mainStage.getScene().lookup("#content"))
-                .getChildren().size())).as("the content area is empty (the D2 home)").isZero();
+        // AC-009-10: logging out goes back to the home screen
+        FxTestSupport.await("the home screen after the logout", AccountMenuSmokeTest::homeScreenShowing);
         List<String> toasts = FxTestSupport.callOnFx(() -> mainStage.getScene().getRoot().lookupAll(".toast-text").stream()
                 .map(node -> ((Label) node).getText()).toList());
         assertThat(toasts).contains("Bạn đã đăng xuất.");

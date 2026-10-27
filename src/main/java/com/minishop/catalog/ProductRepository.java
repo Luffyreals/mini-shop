@@ -65,4 +65,19 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     /** Sản phẩm đang bán sắp hết hàng, ít nhất trước, tối đa 10 dòng (một câu SQL có LIMIT). */
     List<Product> findTop10ByActiveTrueAndStockLessThanEqualOrderByStockAscIdAsc(int maxStock);
+
+    /**
+     * Trang chủ (QĐ5, D3): 3 sản phẩm đang bán mới nhất, cùng thứ tự với sắp xếp "Mới nhất" của danh sách
+     * ({@code createdAt} giảm, {@code id} giảm làm tie-breaker). Phần tử đầu là thẻ lớn, hai phần tử sau là
+     * "hàng mới". Một câu SQL có LIMIT; {@code @EntityGraph} nạp danh mục cùng lúc nên không có N+1.
+     */
+    @EntityGraph(attributePaths = "category")
+    List<Product> findTop3ByActiveTrueOrderByCreatedAtDescIdDesc();
+
+    /**
+     * Trang chủ (QĐ5, D3): tối đa 3 sản phẩm đang bán có tồn kho trong khoảng {@code [minStock, maxStock]},
+     * ít nhất trước, rồi theo {@code id}. Người gọi truyền {@code (1, LOW_STOCK_THRESHOLD)}: tồn 0 là "Hết hàng",
+     * không phải "sắp hết". Không nạp danh mục vì khối này chỉ hiện tên và số lượng còn lại.
+     */
+    List<Product> findTop3ByActiveTrueAndStockBetweenOrderByStockAscIdAsc(int minStock, int maxStock);
 }

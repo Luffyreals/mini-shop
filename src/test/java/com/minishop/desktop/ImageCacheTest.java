@@ -34,6 +34,22 @@ class ImageCacheTest {
                 .hasSameHashCodeAs(ImageKey.of("u", 100, 100));
     }
 
+    @Test
+    void imageKey_coverAndFitKeysOfTheSameUrlAndSizeAreDifferent() {
+        assertThat(ImageKey.cover("u", 100, 100)).isNotEqualTo(ImageKey.of("u", 100, 100));
+        assertThat(ImageKey.cover("u", 100, 100).cover()).isTrue();
+        assertThat(ImageKey.of("u", 100, 100).cover()).isFalse();
+        assertThat(new ImageKey("u", 100, 100)).isEqualTo(new ImageKey("u", 100, 100, false))
+                .isNotEqualTo(new ImageKey("u", 100, 100, true));
+    }
+
+    @Test
+    void imageKey_twoCoverKeysRoundTheSameWayAndAreEqual() {
+        assertThat(ImageKey.cover("u", 99.5, 50.2)).isEqualTo(ImageKey.cover("u", 100, 51))
+                .hasSameHashCodeAs(ImageKey.cover("u", 100, 51));
+        assertThat(ImageKey.cover("u", 0, Double.NaN)).isEqualTo(new ImageKey("u", 0, 0, true));
+    }
+
     // ------------------------------------------------------------------ LruCache
 
     @Test

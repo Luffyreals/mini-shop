@@ -50,12 +50,39 @@ class ProductService {
     ProductDetailView getDetail(Long id) {
         Product p = productRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new NotFoundException("Product not found: " + id));
-        return new ProductDetailView(p.getId(), p.getName(), p.getCategory().getName(), p.getPrice(),
-                p.getDescription(), p.getStock() > 0, productImages.toUrl(p.getImagePath()));
+        return toDetail(p);
+    }
+
+    /**
+     * Trang chủ (QĐ5): đúng ba câu SQL, không N+1. Sản phẩm mới nhất làm thẻ lớn, hai sản phẩm kế tiếp làm
+     * "hàng mới", và tối đa 3 sản phẩm đang bán có 1 ≤ tồn ≤ ngưỡng sắp hết.
+     */
+    HomeView home() {
+        List<Product> newest = productRepository.findTop3ByActiveTrueOrderByCreatedAtDescIdDesc();
+        List<Product> lowStock = productRepository.findTop3ByActiveTrueAndStockBetweenOrderByStockAscIdAsc(
+                1, ProductAdminService.LOW_STOCK_THRESHOLD);
+
+        ProductDetailView featured = newest.isEmpty() ? null : toDetail(newest.get(0));
+        List<ProductCardView> moreNew = newest.stream().skip(1).map(this::toCard).toList();
+        List<LowStockCardView> lowStockCards = lowStock.stream()
+                .map(p -> new LowStockCardView(p.getId(), p.getName(), p.getStock(),
+                        productImages.toUrl(p.getImagePath())))
+                .toList();
+        return new HomeView(featured, moreNew, lowStockCards, categoryOptions());
+    }
+
+    /** Danh mục cho menu, sắp theo tên tiếng Việt (cùng danh sách với bộ lọc). */
+    List<CategoryOption> categories() {
+        return categoryOptions();
     }
 
     private List<CategoryOption> categoryOptions() {
         return CategoryOptions.sortedByName(categoryRepository.findAll());
+    }
+
+    private ProductDetailView toDetail(Product p) {
+        return new ProductDetailView(p.getId(), p.getName(), p.getCategory().getName(), p.getPrice(),
+                p.getDescription(), p.getStock() > 0, productImages.toUrl(p.getImagePath()));
     }
 
     private ProductCardView toCard(Product p) {
