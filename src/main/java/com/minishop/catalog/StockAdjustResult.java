@@ -1,6 +1,6 @@
 package com.minishop.catalog;
 
-/** Kết quả điều chỉnh tồn kho: controller {@code switch} theo pattern. Chỉ nhánh đầu có ghi dữ liệu. */
+/** Kết quả điều chỉnh tồn kho: màn hình {@code switch} theo pattern. Chỉ nhánh đầu có ghi dữ liệu. */
 public sealed interface StockAdjustResult {
 
     /** Đã đổi; {@code stock} là tồn kho hiện tại, chắc chắn là kết quả của chính câu UPDATE vừa rồi. */

@@ -1,5 +1,6 @@
 package com.minishop.catalog;
 
+import com.minishop.common.AdminAccess;
 import com.minishop.common.NotFoundException;
 import com.minishop.storage.ImageUpload;
 import com.minishop.storage.StorageService;
@@ -55,6 +56,9 @@ class ProductAdminServiceTest {
     @Mock
     StorageService storage;
 
+    @Mock
+    AdminAccess adminAccess;
+
     ProductAdminService service;
 
     private final Category oldCategory = category(2, "Áo");
@@ -66,7 +70,9 @@ class ProductAdminServiceTest {
             String path = inv.getArgument(0);
             return path == null || path.isBlank() ? null : path;
         });
-        service = new ProductAdminService(productRepository, categoryRepository, storage, new ProductImages(storage));
+        lenient().when(adminAccess.requireAdmin()).thenReturn(ADMIN_ID);
+        service = new ProductAdminService(productRepository, categoryRepository, storage, new ProductImages(storage),
+                adminAccess);
     }
 
     // ---------- helpers ----------
@@ -115,7 +121,7 @@ class ProductAdminServiceTest {
             return p;
         });
 
-        SavedProduct saved = service.create(ADMIN_ID, draft(2), 30, true, image);
+        SavedProduct saved = service.create(draft(2), 30, true, image);
 
         assertThat(saved).isEqualTo(new SavedProduct(11, "Bình nước 1L"));
         InOrder order = inOrder(categoryRepository, storage, productRepository);
@@ -139,7 +145,7 @@ class ProductAdminServiceTest {
         when(categoryRepository.lockById(2L)).thenReturn(Optional.of(oldCategory));
         stubSaveWithId();
 
-        service.create(ADMIN_ID, draft(2), 0, false, null);
+        service.create(draft(2), 0, false, null);
 
         ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
         verify(productRepository).save(captor.capture());
@@ -154,7 +160,7 @@ class ProductAdminServiceTest {
     void create_whenCategoryIsGone_throwsAndNeverStoresOrSaves() {
         when(categoryRepository.lockById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.create(ADMIN_ID, draft(99), 5, true, image()))
+        assertThatThrownBy(() -> service.create(draft(99), 5, true, image()))
                 .isInstanceOf(CategoryNotFoundException.class);
 
         verifyNoInteractions(storage);
@@ -165,7 +171,7 @@ class ProductAdminServiceTest {
     @ParameterizedTest
     @ValueSource(ints = {-1, 100_001, Integer.MIN_VALUE, Integer.MAX_VALUE})
     void create_withInitialStockOutOfRange_throwsBeforeLockingAnything(int stock) {
-        assertThatThrownBy(() -> service.create(ADMIN_ID, draft(2), stock, true, null))
+        assertThatThrownBy(() -> service.create(draft(2), stock, true, null))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(categoryRepository, storage, productRepository);
@@ -177,7 +183,7 @@ class ProductAdminServiceTest {
         when(categoryRepository.lockById(2L)).thenReturn(Optional.of(oldCategory));
         stubSaveWithId();
 
-        service.create(ADMIN_ID, draft(2), stock, true, null);
+        service.create(draft(2), stock, true, null);
 
         ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
         verify(productRepository).save(captor.capture());
@@ -194,7 +200,7 @@ class ProductAdminServiceTest {
         when(productRepository.findById(7L)).thenReturn(Optional.of(existing));
         when(categoryRepository.lockById(3L)).thenReturn(Optional.of(newCategory));
 
-        String name = service.update(ADMIN_ID, 7, draft(3), null);
+        String name = service.update(7, draft(3), null);
 
         assertThat(name).isEqualTo("Bình nước 1L");
         assertThat(existing.getName()).isEqualTo("Bình nước 1L");
@@ -218,7 +224,7 @@ class ProductAdminServiceTest {
         when(categoryRepository.lockById(3L)).thenReturn(Optional.of(newCategory));
         when(storage.store(image)).thenReturn("/uploads/22222222-aaaa-bbbb-cccc-0123456789ab.png");
 
-        service.update(ADMIN_ID, 7, draft(3), image);
+        service.update(7, draft(3), image);
 
         assertThat(existing.getImagePath()).isEqualTo("/uploads/22222222-aaaa-bbbb-cccc-0123456789ab.png");
         InOrder order = inOrder(categoryRepository, storage);
@@ -237,7 +243,7 @@ class ProductAdminServiceTest {
         when(categoryRepository.lockById(2L)).thenReturn(Optional.of(oldCategory));
         when(storage.store(image)).thenReturn("/uploads/22222222-aaaa-bbbb-cccc-0123456789ab.png");
 
-        service.update(ADMIN_ID, 7, draft(2), image);
+        service.update(7, draft(2), image);
 
         verify(storage).deleteAfterCommit("/images/products/ao-thun.jpg");
     }
@@ -250,7 +256,7 @@ class ProductAdminServiceTest {
         when(categoryRepository.lockById(2L)).thenReturn(Optional.of(oldCategory));
         when(storage.store(image)).thenReturn("/uploads/22222222-aaaa-bbbb-cccc-0123456789ab.png");
 
-        service.update(ADMIN_ID, 7, draft(2), image);
+        service.update(7, draft(2), image);
 
         verify(storage).deleteAfterCommit(null);
     }
@@ -261,7 +267,7 @@ class ProductAdminServiceTest {
         when(productRepository.findById(7L)).thenReturn(Optional.of(product(7, 10, true)));
         when(categoryRepository.lockById(2L)).thenReturn(Optional.of(oldCategory));
 
-        service.update(ADMIN_ID, 7, draft(2), null);
+        service.update(7, draft(2), null);
 
         verify(productRepository, never()).adjustStock(anyLong(), anyInt());
         verify(productRepository, never()).decrementStock(anyLong(), anyInt());
@@ -272,7 +278,7 @@ class ProductAdminServiceTest {
     void update_whenProductMissing_throwsNotFoundBeforeLockingTheCategory() {
         when(productRepository.findById(7L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.update(ADMIN_ID, 7, draft(2), image()))
+        assertThatThrownBy(() -> service.update(7, draft(2), image()))
                 .isInstanceOf(NotFoundException.class);
 
         verifyNoInteractions(categoryRepository, storage);
@@ -285,7 +291,7 @@ class ProductAdminServiceTest {
         when(productRepository.findById(7L)).thenReturn(Optional.of(existing));
         when(categoryRepository.lockById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.update(ADMIN_ID, 7, draft(99), image()))
+        assertThatThrownBy(() -> service.update(7, draft(99), image()))
                 .isInstanceOf(CategoryNotFoundException.class);
 
         verifyNoInteractions(storage);
@@ -300,7 +306,7 @@ class ProductAdminServiceTest {
         Product existing = product(7, 10, true);
         when(productRepository.findById(7L)).thenReturn(Optional.of(existing));
 
-        assertThat(service.setActive(ADMIN_ID, 7, false)).isEqualTo("Áo thun");
+        assertThat(service.setActive(7, false)).isEqualTo("Áo thun");
 
         assertThat(existing.isActive()).isFalse();
         assertThat(existing.getStock()).isEqualTo(10);
@@ -312,7 +318,7 @@ class ProductAdminServiceTest {
         Product existing = product(7, 10, false);
         when(productRepository.findById(7L)).thenReturn(Optional.of(existing));
 
-        assertThat(service.setActive(ADMIN_ID, 7, true)).isEqualTo("Áo thun");
+        assertThat(service.setActive(7, true)).isEqualTo("Áo thun");
 
         assertThat(existing.isActive()).isTrue();
     }
@@ -321,7 +327,7 @@ class ProductAdminServiceTest {
     void setActive_whenMissing_throwsNotFound() {
         when(productRepository.findById(7L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.setActive(ADMIN_ID, 7, true)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.setActive(7, true)).isInstanceOf(NotFoundException.class);
     }
 
     // ---------- adjustStock ----------
@@ -332,7 +338,7 @@ class ProductAdminServiceTest {
         when(productRepository.adjustStock(7L, 5)).thenReturn(1);
         when(productRepository.findById(7L)).thenReturn(Optional.of(product(7, 15, true)));
 
-        StockAdjustResult result = service.adjustStock(ADMIN_ID, 7, 5);
+        StockAdjustResult result = service.adjustStock(7, 5);
 
         assertThat(result).isEqualTo(new StockAdjustResult.Adjusted("Áo thun", 15));
         InOrder order = inOrder(productRepository);
@@ -346,7 +352,7 @@ class ProductAdminServiceTest {
         when(productRepository.adjustStock(7L, -5)).thenReturn(0);
         when(productRepository.findById(7L)).thenReturn(Optional.of(product(7, 3, true)));
 
-        assertThat(service.adjustStock(ADMIN_ID, 7, -5))
+        assertThat(service.adjustStock(7, -5))
                 .isEqualTo(new StockAdjustResult.NotEnough("Áo thun", 5, 3));
     }
 
@@ -355,7 +361,7 @@ class ProductAdminServiceTest {
         when(productRepository.adjustStock(7L, -2)).thenReturn(1);
         when(productRepository.findById(7L)).thenReturn(Optional.of(product(7, 1, true)));
 
-        assertThat(service.adjustStock(ADMIN_ID, 7, -2)).isEqualTo(new StockAdjustResult.Adjusted("Áo thun", 1));
+        assertThat(service.adjustStock(7, -2)).isEqualTo(new StockAdjustResult.Adjusted("Áo thun", 1));
     }
 
     /** AC-006-34 */
@@ -364,7 +370,7 @@ class ProductAdminServiceTest {
         when(productRepository.adjustStock(7L, 10)).thenReturn(0);
         when(productRepository.findById(7L)).thenReturn(Optional.of(product(7, 99_995, true)));
 
-        assertThat(service.adjustStock(ADMIN_ID, 7, 10)).isEqualTo(new StockAdjustResult.WouldExceed("Áo thun"));
+        assertThat(service.adjustStock(7, 10)).isEqualTo(new StockAdjustResult.WouldExceed("Áo thun"));
     }
 
     /** AC-006-5: a missing product is a 404, not a "not enough" message. */
@@ -373,14 +379,14 @@ class ProductAdminServiceTest {
         when(productRepository.adjustStock(7L, 5)).thenReturn(0);
         when(productRepository.findById(7L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.adjustStock(ADMIN_ID, 7, 5)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.adjustStock(7, 5)).isInstanceOf(NotFoundException.class);
     }
 
     /** AC-006-34: the service is the last guard even though the controller checks first. */
     @ParameterizedTest
     @ValueSource(ints = {0, 100_001, -100_001, Integer.MAX_VALUE, Integer.MIN_VALUE})
     void adjustStock_withInvalidDelta_throwsWithoutCallingTheRepository(int delta) {
-        assertThatThrownBy(() -> service.adjustStock(ADMIN_ID, 7, delta))
+        assertThatThrownBy(() -> service.adjustStock(7, delta))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(productRepository);
@@ -392,7 +398,7 @@ class ProductAdminServiceTest {
         when(productRepository.adjustStock(7L, delta)).thenReturn(1);
         when(productRepository.findById(7L)).thenReturn(Optional.of(product(7, 100_000, true)));
 
-        assertThat(service.adjustStock(ADMIN_ID, 7, delta)).isInstanceOf(StockAdjustResult.Adjusted.class);
+        assertThat(service.adjustStock(7, delta)).isInstanceOf(StockAdjustResult.Adjusted.class);
     }
 
     /** AC-006-37: hidden products can be adjusted; nothing in the flow looks at {@code active}. */
@@ -401,7 +407,7 @@ class ProductAdminServiceTest {
         when(productRepository.adjustStock(7L, 20)).thenReturn(1);
         when(productRepository.findById(7L)).thenReturn(Optional.of(product(7, 20, false)));
 
-        assertThat(service.adjustStock(ADMIN_ID, 7, 20)).isEqualTo(new StockAdjustResult.Adjusted("Áo thun", 20));
+        assertThat(service.adjustStock(7, 20)).isEqualTo(new StockAdjustResult.Adjusted("Áo thun", 20));
     }
 
     @Test
@@ -409,7 +415,7 @@ class ProductAdminServiceTest {
         when(productRepository.adjustStock(7L, 5)).thenReturn(1);
         when(productRepository.findById(7L)).thenReturn(Optional.of(product(7, 15, true)));
 
-        service.adjustStock(ADMIN_ID, 7, 5);
+        service.adjustStock(7, 5);
 
         verify(productRepository, never()).decrementStock(anyLong(), anyInt());
         verify(productRepository, never()).incrementStock(anyLong(), anyInt());

@@ -1249,3 +1249,411 @@
     -fx-hgap: 16px;
     -fx-vgap: 8px;
 }
+
+/* =====================================================================================================
+   D5: khu quản trị (admin.AdminScreen và các màn con). Chỉ dùng token; không mã màu ngoài khối token ở đầu file.
+   Bảng tái dùng .data-table, .data-table-header, .data-table-row, .order-table; nhãn trạng thái đơn dùng
+   .status-pill. Khung: thanh bên 200 px (thẻ trắng bo 28) cạnh vùng màn cuộn dọc.
+   ===================================================================================================== */
+
+/* admin-layout: HBox thanh bên + vùng màn, canh ở đầu cột. Lề trái 8 px chừa chỗ cho bóng của thanh bên
+   (bóng 24 px bị cắt ở mép khung, như .page-root) */
+.admin-layout {
+    -fx-spacing: 12px;
+    -fx-alignment: top-left;
+    -fx-padding: 8px 0 0 8px;
+}
+
+/* admin-sidebar: thẻ trắng bo 28 cao bằng nội dung; tiêu đề "Quản trị" rồi bốn nút */
+.admin-sidebar {
+    -fx-background-color: -ms-surface;
+    -fx-background-radius: 28px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 24, 0, 0, 8);
+    -fx-padding: 20px 14px 20px 14px;
+    -fx-spacing: 6px;
+}
+
+.admin-sidebar .section-title {
+    -fx-padding: 0 0 8px 14px;
+}
+
+/* admin-nav-item: ToggleButton dạng pill; mục đang mở (:selected) nền ink chữ surface; viền focus accent */
+.admin-nav-item {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 999px;
+    -fx-padding: 10px 14px;
+    -fx-cursor: hand;
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+}
+
+.admin-nav-item:hover {
+    -fx-background-color: -ms-surface-muted;
+}
+
+.admin-nav-item:selected {
+    -fx-background-color: -ms-ink;
+    -fx-text-fill: -ms-surface;
+}
+
+.admin-nav-item:selected:hover {
+    -fx-background-color: -ms-dark;
+}
+
+.admin-nav-item:focused {
+    -fx-border-color: -ms-accent;
+}
+
+/* admin-body: cột nội dung của một màn quản trị (như .page-root, lề trái 8 px) */
+.admin-body {
+    -fx-padding: 8px 8px 32px 8px;
+    -fx-spacing: 20px;
+}
+
+/* admin-head: hàng tiêu đề màn + nút ở bên phải */
+.admin-head {
+    -fx-alignment: center-left;
+}
+
+/* admin-toolbar: hàng công cụ trên bảng ("Tìm theo tên sản phẩm…" + "Tìm") */
+.admin-toolbar {
+    -fx-alignment: center-left;
+    -fx-spacing: 12px;
+}
+
+/* admin-compact: nút nhỏ trong hàng bảng ("Sửa", "Xóa", "Ẩn"); ghép sau .button-secondary / .button-danger
+   (đứng cuối file nên thắng padding của chúng) */
+.admin-compact {
+    -fx-padding: 6px 16px;
+}
+
+/* admin-actions: nhóm nút trong ô thao tác của một hàng */
+.admin-actions {
+    -fx-alignment: center-left;
+    -fx-spacing: 8px;
+}
+
+/* ---- Tổng quan: ô số theo trạng thái, doanh thu, danh sách ---- */
+.admin-counts {
+    -fx-hgap: 12px;
+    -fx-vgap: 12px;
+}
+
+/* admin-count: ô số bấm được (VBox focus được): thẻ trắng bo 20, trỏ chuột nền surface-muted, viền focus accent */
+.admin-count {
+    -fx-background-color: -ms-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 20px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 20px;
+    -fx-padding: 14px 16px;
+    -fx-spacing: 2px;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 24, 0, 0, 8);
+}
+
+.admin-count:hover {
+    -fx-background-color: -ms-surface-muted;
+}
+
+.admin-count:focused {
+    -fx-border-color: -ms-accent;
+}
+
+/* admin-count-lead: "Chờ xử lý" (việc cần làm trước) viền accent; có focus thì viền ink để vẫn thấy khác */
+.admin-count-lead {
+    -fx-border-color: -ms-accent;
+}
+
+.admin-count-lead:focused {
+    -fx-border-color: -ms-ink;
+}
+
+.admin-count-label {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+}
+
+.admin-count-value {
+    -fx-font-size: 32px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -ms-ink;
+}
+
+/* admin-columns: GridPane hai cột (đơn mới nhất | doanh thu + sắp hết hàng) hoặc xếp chồng */
+.admin-columns {
+    -fx-hgap: 20px;
+    -fx-vgap: 20px;
+}
+
+.admin-side-column {
+    -fx-spacing: 20px;
+}
+
+.admin-revenue {
+    -fx-spacing: 6px;
+}
+
+/* admin-list / admin-list-row: danh sách dòng bấm được ("Sắp hết hàng"): nền surface-muted bo 20 */
+.admin-list {
+    -fx-spacing: 8px;
+}
+
+.admin-list-row {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-insets: 0;
+    -fx-background-radius: 20px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 20px;
+    -fx-padding: 12px 16px;
+    -fx-cursor: hand;
+}
+
+.admin-list-row:hover {
+    -fx-background-color: derive(-ms-surface-muted, -4%);
+}
+
+.admin-list-row:focused {
+    -fx-border-color: -ms-accent;
+}
+
+.admin-list-name {
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+}
+
+/* admin-stock-low: nhãn tồn kho 1-5 (chấm accent); tồn kho 0 dùng .stock-out (chấm danger). Chữ luôn là
+   "Tồn kho: {n}" nên không chỉ dựa vào màu */
+.admin-stock-low .stock-dot {
+    -fx-background-color: -ms-accent;
+}
+
+/* admin-row-link: hàng bảng bấm được (ghép với .data-table-row): con trỏ tay, nền khi trỏ chuột, viền focus */
+.admin-row-link {
+    -fx-cursor: hand;
+}
+
+.admin-row-link:hover {
+    -fx-background-color: -ms-surface-muted;
+}
+
+.admin-row-link:focused {
+    -fx-border-color: -ms-accent;
+}
+
+/* admin-person / admin-person-meta: họ tên và email của khách (email nhỏ, muted, xuống dòng dưới tên) */
+.admin-person {
+    -fx-spacing: 2px;
+}
+
+.admin-person-meta {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+}
+
+/* ---- Sản phẩm: ảnh nhỏ trong bảng, nhãn "Đang bán"/"Đã ẩn", khu chọn ảnh, khối tồn kho ---- */
+
+/* admin-thumb: nền ô ảnh nhỏ trong bảng sản phẩm (khi chưa có ảnh); bo 20 giống .image-well */
+.admin-thumb {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-radius: 20px;
+}
+
+/* admin-flag-on / admin-flag-off: nhãn "Đang bán" / "Đã ẩn" (chữ ink + chấm success / muted; chữ luôn là
+   trạng thái nên không chỉ dựa vào màu). Graphic của nhãn là một Region có class .stock-dot */
+.admin-flag-on,
+.admin-flag-off {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-content-display: left;
+    -fx-graphic-text-gap: 8px;
+}
+
+.admin-flag-on .stock-dot  { -fx-background-color: -ms-success; }
+.admin-flag-off .stock-dot { -fx-background-color: -ms-muted; }
+
+/* admin-image-field: khu chọn ảnh của form sản phẩm (ô xem trước, nút, tên file, gợi ý, lỗi) */
+.admin-image-field {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-radius: 20px;
+    -fx-padding: 16px;
+    -fx-spacing: 10px;
+}
+
+/* admin-stock-card: thẻ "Điều chỉnh tồn kho" cạnh (hoặc dưới) thẻ form sản phẩm: thẻ trắng như các thẻ khác
+   (nền muted chìm vào nền cửa sổ); ô nhập và nút phụ trong thẻ giữ kiểu mặc định (nền surface-muted) */
+.admin-stock-card {
+    -fx-background-color: -ms-surface;
+    -fx-background-radius: 28px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 24, 0, 0, 8);
+    -fx-padding: 24px;
+    -fx-spacing: 10px;
+}
+
+/* =====================================================================================================
+   D5 / F6: chỉnh theo báo cáo F2 đến F5 (bảng quản trị, trạng thái bận, ô trên nền muted, form, vòng quay)
+   ===================================================================================================== */
+
+/* admin-table-head / admin-th: hàng tiêu đề bảng quản trị (AdminScreen.headerRow). Đệm ngang 18 px ở chính lưới
+   (16 đệm + 2 viền của .data-table-row), nhãn không đệm riêng, nên cột thẳng hàng với hàng dữ liệu dù cột co giãn
+   nằm ở đầu, giữa hay cuối. Khác .data-table-header (đệm 18 px trong từng ô, dùng ở bảng của order) */
+.admin-table-head {
+    -fx-padding: 0 18px 8px 18px;
+}
+
+.admin-th {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+    -fx-padding: 0;
+}
+
+/* admin-table-card: thẻ chứa bảng quản trị (ghép với .summary-card; đứng sau nên thắng đệm 24). Đệm ngang hẹp vì
+   mỗi hàng đã có đệm 18 px, khe cột 12 để bảng sản phẩm 7 cột vừa vùng màn 760 px ở cửa sổ 1024 x 700 */
+.admin-table-card {
+    -fx-padding: 20px 8px 20px 8px;
+}
+
+.admin-table-card .data-table {
+    -fx-hgap: 12px;
+}
+
+/* is-busy: hàng đang ghi (Ẩn/Hiện lại): mờ đi nhưng vẫn đọc được; nút không bị khóa nên focus không nhảy */
+.data-table-row.is-busy {
+    -fx-opacity: 0.55;
+}
+
+/* Ô trên nền surface-muted (khu chọn ảnh): ô nhập và nút phụ nền surface để không chìm vào nền; ô ảnh xem
+   trước cũng nền surface. Viền focus accent vẫn từ .text-field:focused */
+.admin-image-field .text-field {
+    -fx-background-color: -ms-surface;
+}
+
+.admin-image-field .button-secondary {
+    -fx-background-color: -ms-surface;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 8, 0, 0, 2);
+}
+
+.admin-image-field .button-secondary:hover {
+    -fx-background-color: derive(-ms-surface, -8%);
+}
+
+.admin-image-field .image-well,
+.admin-image-field .image-tile {
+    -fx-background-color: -ms-surface;
+}
+
+/* form-combo: ComboBox của form (ô "Danh mục"): pill nền surface-muted như .text-field, viền focus accent
+   (cả khi danh sách đang mở) */
+.form-combo {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 999px;
+    -fx-padding: 10px 8px 10px 14px;
+    -fx-cursor: hand;
+}
+
+.form-combo:hover,
+.form-combo:showing {
+    -fx-background-color: -ms-surface-muted;
+}
+
+.form-combo:focused,
+.form-combo:showing {
+    -fx-background-color: -ms-surface-muted;
+    -fx-border-color: -ms-accent;
+}
+
+.form-combo:disabled {
+    -fx-opacity: 0.55;
+}
+
+.form-combo .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 0 0 0 6px;
+    -fx-text-fill: -ms-ink;
+    -fx-font-family: "Plus Jakarta Sans";
+    -fx-font-weight: normal;
+}
+
+.form-combo .arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.form-combo .arrow {
+    -fx-background-color: -ms-ink;
+}
+
+/* ---- CheckBox ("Đang bán"): ô vuông bo 8 nền surface-muted viền muted; chọn thì nền ink, dấu tích surface;
+   viền focus accent. Trạng thái nằm ở dấu tích và chữ, không chỉ ở màu ---- */
+.check-box {
+    -fx-text-fill: -ms-ink;
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-weight: normal;
+    -fx-label-padding: 0 0 0 10px;
+    -fx-cursor: hand;
+    -fx-mark-color: -ms-surface;
+    -fx-mark-highlight-color: transparent;
+}
+
+.check-box > .box {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-insets: 0;
+    -fx-background-radius: 8px;
+    -fx-border-color: -ms-muted;
+    -fx-border-width: 2px;
+    -fx-border-radius: 8px;
+    -fx-padding: 4px;
+    -fx-effect: null;
+}
+
+.check-box:hover > .box {
+    -fx-background-color: derive(-ms-surface-muted, -6%);
+}
+
+.check-box:selected > .box,
+.check-box:indeterminate > .box {
+    -fx-background-color: -ms-ink;
+    -fx-border-color: -ms-ink;
+}
+
+.check-box:focused > .box {
+    -fx-background-color: -ms-surface-muted;
+    -fx-border-color: -ms-accent;
+}
+
+.check-box:selected:focused > .box {
+    -fx-background-color: -ms-ink;
+    -fx-border-color: -ms-accent;
+}
+
+.check-box:disabled {
+    -fx-opacity: 0.55;
+}
+
+/* ---- Vòng quay ngoài .loading (vòng nhỏ bên nút, ở đầu màn): cùng màu ink với vòng khi nạp ---- */
+.progress-indicator {
+    -fx-progress-color: -ms-ink;
+}
+
+.admin-busy {
+    -fx-alignment: center-left;
+    -fx-padding: 4px 0 0 0;
+}

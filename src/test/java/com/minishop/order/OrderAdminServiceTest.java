@@ -3,6 +3,7 @@ package com.minishop.order;
 import com.minishop.catalog.Category;
 import com.minishop.catalog.Product;
 import com.minishop.catalog.ProductRepository;
+import com.minishop.common.AdminAccess;
 import com.minishop.common.NotFoundException;
 import com.minishop.user.Role;
 import com.minishop.user.User;
@@ -59,6 +60,9 @@ class OrderAdminServiceTest {
     @Mock
     ProductRepository productRepository;
 
+    @Mock
+    AdminAccess adminAccess;
+
     OrderAdminService service;
 
     private final User customer = new User("buyer@order.test", "hash", "Nguyễn Văn An", Role.USER);
@@ -67,7 +71,8 @@ class OrderAdminServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderAdminService(orderRepository, productRepository);
+        lenient().when(adminAccess.requireAdmin()).thenReturn(ADMIN_ID);
+        service = new OrderAdminService(orderRepository, productRepository, adminAccess);
         ReflectionTestUtils.setField(customer, "id", 2L);
     }
 
@@ -118,7 +123,7 @@ class OrderAdminServiceTest {
         Order order = order(from, ORDER_ID, new long[]{3, 2});
         stubLock(order);
 
-        StatusChangeResult result = service.changeStatus(ADMIN_ID, ORDER_ID, target);
+        StatusChangeResult result = service.changeStatus(ORDER_ID, target);
 
         assertThat(result).isEqualTo(new StatusChangeResult.Changed(label));
         assertThat(order.getStatus()).isEqualTo(OrderStatus.valueOf(target));
@@ -133,7 +138,7 @@ class OrderAdminServiceTest {
         stubLock(order);
         when(productRepository.incrementStock(anyLong(), anyInt())).thenReturn(1);
 
-        StatusChangeResult result = service.changeStatus(ADMIN_ID, ORDER_ID, "CANCELLED");
+        StatusChangeResult result = service.changeStatus(ORDER_ID, "CANCELLED");
 
         assertThat(result).isEqualTo(new StatusChangeResult.Cancelled());
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
@@ -150,7 +155,7 @@ class OrderAdminServiceTest {
         stubLock(order);
         when(productRepository.incrementStock(3L, 2)).thenReturn(0);
 
-        assertThatThrownBy(() -> service.changeStatus(ADMIN_ID, ORDER_ID, "CANCELLED"))
+        assertThatThrownBy(() -> service.changeStatus(ORDER_ID, "CANCELLED"))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -158,7 +163,7 @@ class OrderAdminServiceTest {
     void changeStatus_acceptsTargetWithSurroundingSpaces() {
         stubLock(order(OrderStatus.PENDING, ORDER_ID, new long[]{3, 2}));
 
-        assertThat(service.changeStatus(ADMIN_ID, ORDER_ID, " CONFIRMED "))
+        assertThat(service.changeStatus(ORDER_ID, " CONFIRMED "))
                 .isEqualTo(new StatusChangeResult.Changed("Đã xác nhận"));
     }
 
@@ -188,7 +193,7 @@ class OrderAdminServiceTest {
         Order order = order(from, ORDER_ID, new long[]{3, 2});
         stubLock(order);
 
-        StatusChangeResult result = service.changeStatus(ADMIN_ID, ORDER_ID, target);
+        StatusChangeResult result = service.changeStatus(ORDER_ID, target);
 
         assertThat(result).isEqualTo(new StatusChangeResult.NotAllowed(fromLabel, toLabel));
         assertThat(order.getStatus()).isEqualTo(from);
@@ -200,7 +205,7 @@ class OrderAdminServiceTest {
     @NullSource
     @ValueSource(strings = {"abc", "", "   ", "pending", "Confirmed", "CONFIRMED;", "0"})
     void changeStatus_invalidTarget_returnsInvalidStatusWithoutLockingOrWriting(String raw) {
-        StatusChangeResult result = service.changeStatus(ADMIN_ID, ORDER_ID, raw);
+        StatusChangeResult result = service.changeStatus(ORDER_ID, raw);
 
         assertThat(result).isEqualTo(new StatusChangeResult.InvalidStatus());
         verifyNoInteractions(orderRepository, productRepository);
@@ -211,7 +216,7 @@ class OrderAdminServiceTest {
     void changeStatus_whenOrderMissing_throwsNotFoundAndRestoresNothing() {
         when(orderRepository.lockById(ORDER_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.changeStatus(ADMIN_ID, ORDER_ID, "CONFIRMED"))
+        assertThatThrownBy(() -> service.changeStatus(ORDER_ID, "CONFIRMED"))
                 .isInstanceOf(NotFoundException.class);
 
         verifyNoInteractions(productRepository);
@@ -222,7 +227,7 @@ class OrderAdminServiceTest {
     void changeStatus_locksByIdAndNeverUsesTheCustomerLock() {
         stubLock(order(OrderStatus.PENDING, ORDER_ID, new long[]{3, 2}));
 
-        service.changeStatus(ADMIN_ID, ORDER_ID, "CONFIRMED");
+        service.changeStatus(ORDER_ID, "CONFIRMED");
 
         verify(orderRepository).lockById(ORDER_ID);
         verify(orderRepository, never()).lockByIdAndUserId(anyLong(), anyLong());

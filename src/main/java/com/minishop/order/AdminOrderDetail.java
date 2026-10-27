@@ -10,7 +10,7 @@ public record AdminOrderDetail(long id, Instant createdAt, Instant updatedAt, St
                                String receiverName, String phone, String shippingAddress, String note,
                                List<OrderLineView> lines, BigDecimal totalAmount, List<StatusAction> actions) {
 
-    /** True khi không còn bước nào (đã giao hoặc đã hủy). Public: template đọc qua SpEL. */
+    /** True khi không còn bước nào (đã giao hoặc đã hủy). Màn hình dùng để ẩn các nút đổi trạng thái. */
     public boolean isFinalStatus() {
         return actions.isEmpty();
     }

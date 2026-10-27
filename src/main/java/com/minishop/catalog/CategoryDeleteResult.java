@@ -1,6 +1,6 @@
 package com.minishop.catalog;
 
-/** Kết quả xóa danh mục: controller {@code switch} theo pattern. */
+/** Kết quả xóa danh mục: màn hình {@code switch} theo pattern. */
 public sealed interface CategoryDeleteResult {
 
     /** Đã xóa. */

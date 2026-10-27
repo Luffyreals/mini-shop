@@ -1,5 +1,6 @@
 package com.minishop.catalog;
 
+import com.minishop.common.AdminAccess;
 import com.minishop.common.NotFoundException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -40,11 +42,15 @@ class CategoryAdminServiceTest {
     @Mock
     ProductRepository productRepository;
 
+    @Mock
+    AdminAccess adminAccess;
+
     CategoryAdminService service;
 
     @BeforeEach
     void setUp() {
-        service = new CategoryAdminService(categoryRepository, productRepository);
+        lenient().when(adminAccess.requireAdmin()).thenReturn(ADMIN_ID);
+        service = new CategoryAdminService(categoryRepository, productRepository, adminAccess);
     }
 
     private static Category category(long id, String name, String description) {
@@ -116,7 +122,7 @@ class CategoryAdminServiceTest {
             return c;
         });
 
-        String name = service.create(ADMIN_ID, new CategoryDraft("Đồ chơi", "  "));
+        String name = service.create(new CategoryDraft("Đồ chơi", "  "));
 
         assertThat(name).isEqualTo("Đồ chơi");
         ArgumentCaptor<Category> saved = ArgumentCaptor.forClass(Category.class);
@@ -130,9 +136,9 @@ class CategoryAdminServiceTest {
     void create_withNameThatDiffersOnlyByCase_throwsAndSavesNothing() {
         when(categoryRepository.findAll()).thenReturn(List.of(category(1, "Đồ chơi", null)));
 
-        assertThatThrownBy(() -> service.create(ADMIN_ID, new CategoryDraft("đồ chơi", null)))
+        assertThatThrownBy(() -> service.create(new CategoryDraft("đồ chơi", null)))
                 .isInstanceOf(CategoryNameTakenException.class);
-        assertThatThrownBy(() -> service.create(ADMIN_ID, new CategoryDraft("ĐỒ CHƠI", null)))
+        assertThatThrownBy(() -> service.create(new CategoryDraft("ĐỒ CHƠI", null)))
                 .isInstanceOf(CategoryNameTakenException.class);
 
         verify(categoryRepository, never()).saveAndFlush(any());
@@ -143,7 +149,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.findAll()).thenReturn(List.of(category(1, "Áo", null), category(2, "Quần", null)));
         when(categoryRepository.saveAndFlush(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThat(service.create(ADMIN_ID, new CategoryDraft("Áo khoác", null))).isEqualTo("Áo khoác");
+        assertThat(service.create(new CategoryDraft("Áo khoác", null))).isEqualTo("Áo khoác");
     }
 
     /** AC-006-13: the database constraint is the safety net when two requests race. */
@@ -152,7 +158,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.findAll()).thenReturn(List.of());
         when(categoryRepository.saveAndFlush(any(Category.class))).thenThrow(violation("UQ_CATEGORIES_NAME"));
 
-        assertThatThrownBy(() -> service.create(ADMIN_ID, new CategoryDraft("Đồ chơi", null)))
+        assertThatThrownBy(() -> service.create(new CategoryDraft("Đồ chơi", null)))
                 .isInstanceOf(CategoryNameTakenException.class);
     }
 
@@ -162,7 +168,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.saveAndFlush(any(Category.class)))
                 .thenThrow(violation("PUBLIC.UQ_CATEGORIES_NAME_INDEX_8 ON PUBLIC.CATEGORIES(NAME NULLS FIRST)"));
 
-        assertThatThrownBy(() -> service.create(ADMIN_ID, new CategoryDraft("Đồ chơi", null)))
+        assertThatThrownBy(() -> service.create(new CategoryDraft("Đồ chơi", null)))
                 .isInstanceOf(CategoryNameTakenException.class);
     }
 
@@ -172,7 +178,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.findAll()).thenReturn(List.of());
         when(categoryRepository.saveAndFlush(any(Category.class))).thenThrow(other);
 
-        assertThatThrownBy(() -> service.create(ADMIN_ID, new CategoryDraft("Đồ chơi", null)))
+        assertThatThrownBy(() -> service.create(new CategoryDraft("Đồ chơi", null)))
                 .isSameAs(other);
     }
 
@@ -182,7 +188,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.findAll()).thenReturn(List.of());
         when(categoryRepository.saveAndFlush(any(Category.class))).thenThrow(other);
 
-        assertThatThrownBy(() -> service.create(ADMIN_ID, new CategoryDraft("X", null))).isSameAs(other);
+        assertThatThrownBy(() -> service.create(new CategoryDraft("X", null))).isSameAs(other);
     }
 
     // ---------- update ----------
@@ -194,7 +200,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.lockById(5L)).thenReturn(Optional.of(existing));
         when(categoryRepository.findAll()).thenReturn(List.of(existing, category(6, "Áo", null)));
 
-        String name = service.update(ADMIN_ID, 5, new CategoryDraft("Đồ chơi trẻ em", "Cho bé"));
+        String name = service.update(5, new CategoryDraft("Đồ chơi trẻ em", "Cho bé"));
 
         assertThat(name).isEqualTo("Đồ chơi trẻ em");
         assertThat(existing.getName()).isEqualTo("Đồ chơi trẻ em");
@@ -209,7 +215,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.lockById(5L)).thenReturn(Optional.of(existing));
         when(categoryRepository.findAll()).thenReturn(List.of(existing));
 
-        assertThat(service.update(ADMIN_ID, 5, new CategoryDraft("Đồ chơi", "Mô tả mới"))).isEqualTo("Đồ chơi");
+        assertThat(service.update(5, new CategoryDraft("Đồ chơi", "Mô tả mới"))).isEqualTo("Đồ chơi");
     }
 
     @Test
@@ -218,7 +224,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.lockById(5L)).thenReturn(Optional.of(existing));
         when(categoryRepository.findAll()).thenReturn(List.of(existing));
 
-        assertThat(service.update(ADMIN_ID, 5, new CategoryDraft("ĐỒ CHƠI", null))).isEqualTo("ĐỒ CHƠI");
+        assertThat(service.update(5, new CategoryDraft("ĐỒ CHƠI", null))).isEqualTo("ĐỒ CHƠI");
     }
 
     /** AC-006-13 */
@@ -228,7 +234,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.lockById(5L)).thenReturn(Optional.of(existing));
         when(categoryRepository.findAll()).thenReturn(List.of(existing, category(6, "Đồ chơi", null)));
 
-        assertThatThrownBy(() -> service.update(ADMIN_ID, 5, new CategoryDraft("Đồ Chơi", null)))
+        assertThatThrownBy(() -> service.update(5, new CategoryDraft("Đồ Chơi", null)))
                 .isInstanceOf(CategoryNameTakenException.class);
 
         verify(categoryRepository, never()).saveAndFlush(any());
@@ -241,7 +247,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.findAll()).thenReturn(List.of(existing));
         when(categoryRepository.saveAndFlush(existing)).thenThrow(violation("uq_categories_name"));
 
-        assertThatThrownBy(() -> service.update(ADMIN_ID, 5, new CategoryDraft("Quần", null)))
+        assertThatThrownBy(() -> service.update(5, new CategoryDraft("Quần", null)))
                 .isInstanceOf(CategoryNameTakenException.class);
     }
 
@@ -252,7 +258,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.lockById(5L)).thenReturn(Optional.of(existing));
         when(categoryRepository.findAll()).thenReturn(List.of(existing));
 
-        service.update(ADMIN_ID, 5, new CategoryDraft("Quần", null));
+        service.update(5, new CategoryDraft("Quần", null));
 
         InOrder order = inOrder(categoryRepository);
         order.verify(categoryRepository).lockById(5L);
@@ -265,7 +271,7 @@ class CategoryAdminServiceTest {
     void update_whenMissing_throwsNotFound() {
         when(categoryRepository.lockById(5L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.update(ADMIN_ID, 5, new CategoryDraft("X", null)))
+        assertThatThrownBy(() -> service.update(5, new CategoryDraft("X", null)))
                 .isInstanceOf(NotFoundException.class);
 
         verify(categoryRepository, never()).saveAndFlush(any());
@@ -280,7 +286,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.lockById(5L)).thenReturn(Optional.of(existing));
         when(productRepository.countByCategoryId(5L)).thenReturn(0L);
 
-        CategoryDeleteResult result = service.delete(ADMIN_ID, 5);
+        CategoryDeleteResult result = service.delete(5);
 
         assertThat(result).isEqualTo(new CategoryDeleteResult.Deleted("Đồ chơi"));
         InOrder order = inOrder(categoryRepository, productRepository);
@@ -296,7 +302,7 @@ class CategoryAdminServiceTest {
         when(categoryRepository.lockById(5L)).thenReturn(Optional.of(category(5, "Đồ chơi", null)));
         when(productRepository.countByCategoryId(5L)).thenReturn(2L);
 
-        CategoryDeleteResult result = service.delete(ADMIN_ID, 5);
+        CategoryDeleteResult result = service.delete(5);
 
         assertThat(result).isEqualTo(new CategoryDeleteResult.InUse("Đồ chơi", 2));
         verify(categoryRepository, never()).delete(any(Category.class));
@@ -308,7 +314,7 @@ class CategoryAdminServiceTest {
     void delete_whenMissing_throwsNotFoundWithoutCounting() {
         when(categoryRepository.lockById(5L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.delete(ADMIN_ID, 5)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.delete(5)).isInstanceOf(NotFoundException.class);
 
         verifyNoInteractions(productRepository);
         verify(categoryRepository, never()).delete(any(Category.class));

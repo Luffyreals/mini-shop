@@ -1,9 +1,12 @@
 package com.minishop;
 
 import com.minishop.catalog.CategoryAdminService;
+import com.minishop.support.ResetAdminAccess;
+import com.minishop.support.TestAdminAccess;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.PessimisticLockingFailureException;
@@ -38,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code @BeforeEach} and {@code @AfterEach}; seed accounts and products are never touched.
  */
 @SpringBootTest
+@ExtendWith(ResetAdminAccess.class)
 class LockTimeoutIntegrationTest {
 
     private static final Duration AT_LEAST = Duration.ofMillis(4_500);
@@ -52,15 +56,20 @@ class LockTimeoutIntegrationTest {
     @Autowired
     CategoryAdminService categoryAdminService;
 
+    @Autowired
+    TestAdminAccess access;
+
     private final List<Connection> holders = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
+        access.actAsAdmin(1L);
         cleanUp();
     }
 
     @AfterEach
     void tearDown() throws SQLException {
+        access.reset();
         for (Connection holder : holders) {
             try {
                 holder.rollback(); // no-op after commit; releases the lock when a test failed early
@@ -83,7 +92,7 @@ class LockTimeoutIntegrationTest {
         Connection holder = holdRow("select id from categories where id = ? for update", categoryId);
 
         long start = System.nanoTime();
-        Throwable failure = failureOf(() -> categoryAdminService.delete(1L, categoryId));
+        Throwable failure = failureOf(() -> categoryAdminService.delete(categoryId));
         Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(elapsed).as("waited for the 5 second lock timeout").isGreaterThanOrEqualTo(AT_LEAST)

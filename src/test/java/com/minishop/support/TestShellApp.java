@@ -18,10 +18,27 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class TestShellApp extends MiniShopApp {
 
     private final AtomicReference<ConfigurableApplicationContext> builtContext = new AtomicReference<>();
+    private final Class<?>[] extraSources;
+
+    public TestShellApp() {
+        this(new Class<?>[0]);
+    }
+
+    /**
+     * Starts the app with extra annotated classes registered next to it (test doubles that replace a real bean, for
+     * example a {@code @Primary} stub of the OS file chooser). This context does not scan {@code test-classes} at
+     * all (see {@link StandaloneApp#builder()}), so a double has to be listed here. That is also why
+     * {@link TestAdminAccess}, which {@code @SpringBootTest} contexts pick up by scanning, is absent here: the admin
+     * services use the real {@code AppSession}.
+     */
+    public TestShellApp(Class<?>... extraSources) {
+        this.extraSources = extraSources.clone();
+    }
 
     @Override
     protected ConfigurableApplicationContext createContext(String[] args) {
         ConfigurableApplicationContext context = StandaloneApp.builder()
+                .sources(extraSources)
                 .headless(false)
                 .run("--spring.main.banner-mode=off",
                         "--app.seed.admin-password=" + StandaloneApp.DEV_ADMIN_PASSWORD,

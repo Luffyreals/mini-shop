@@ -6,11 +6,14 @@ import com.minishop.order.OrderAdminService;
 import com.minishop.order.OrderDashboard;
 import com.minishop.order.StatusCount;
 import com.minishop.support.AdminTestData;
+import com.minishop.support.ResetAdminAccess;
+import com.minishop.support.TestAdminAccess;
 import com.minishop.user.Role;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,10 +34,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the slice test with a mocked service).
  */
 @SpringBootTest
+@ExtendWith(ResetAdminAccess.class)
 class AdminDashboardIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    TestAdminAccess access;
 
     @Autowired
     PasswordEncoder encoder;
@@ -60,11 +67,13 @@ class AdminDashboardIntegrationTest {
         data = new AdminTestData(jdbc, encoder, Path.of(uploadDirSetting).toAbsolutePath().normalize());
         data.cleanUp();
         admin = data.createUser(Role.ADMIN);
+        access.actAsAdmin(admin.id());
         category = data.createCategory("Dashboard");
     }
 
     @AfterEach
     void tearDown() {
+        access.reset();
         data.cleanUp();
     }
 

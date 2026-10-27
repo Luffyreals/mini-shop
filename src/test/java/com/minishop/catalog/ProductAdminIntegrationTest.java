@@ -3,11 +3,14 @@ package com.minishop.catalog;
 import com.minishop.common.NotFoundException;
 import com.minishop.storage.ImageUpload;
 import com.minishop.support.AdminTestData;
+import com.minishop.support.ResetAdminAccess;
+import com.minishop.support.TestAdminAccess;
 import com.minishop.support.TestImages;
 import com.minishop.user.Role;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -44,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * upload directory.
  */
 @SpringBootTest
+@ExtendWith(ResetAdminAccess.class)
 class ProductAdminIntegrationTest {
 
     private static final Pattern UPLOAD_PATH = Pattern.compile("/uploads/[0-9a-f-]{36}\\.png");
@@ -53,6 +57,9 @@ class ProductAdminIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    TestAdminAccess access;
 
     @Autowired
     DataSource dataSource;
@@ -83,11 +90,13 @@ class ProductAdminIntegrationTest {
         data = new AdminTestData(jdbc, encoder, uploadDir);
         data.cleanUp();
         admin = data.createUser(Role.ADMIN);
+        access.actAsAdmin(admin.id());
         category = data.createCategory("Product admin");
     }
 
     @AfterEach
     void tearDown() {
+        access.reset();
         data.cleanUp();
     }
 
@@ -146,7 +155,7 @@ class ProductAdminIntegrationTest {
         ImageUpload upload = ImageUpload.from("ảnh sản phẩm (1).PNG", "image/png", png.length,
                 new ByteArrayResource(png)).orElseThrow();
 
-        SavedProduct saved = productAdminService.create(admin.id(),
+        SavedProduct saved = productAdminService.create(
                 new ProductDraft(name, category, new BigDecimal("1250000"), "Giữ nhiệt 12 giờ"), 30, true, upload);
 
         assertThat(saved.name()).isEqualTo(name);
@@ -228,7 +237,7 @@ class ProductAdminIntegrationTest {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
 
         tx.executeWithoutResult(status -> {
-            productAdminService.update(admin.id(), product, draft(category, newName, "150000"), null);
+            productAdminService.update(product, draft(category, newName, "150000"), null);
             try (Connection other = dataSource.getConnection()) {
                 other.setAutoCommit(true);
                 try (PreparedStatement st = other.prepareStatement(
@@ -258,7 +267,7 @@ class ProductAdminIntegrationTest {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
 
         tx.executeWithoutResult(status -> {
-            productAdminService.update(admin.id(), product, draft(category, newName, "150000"), null);
+            productAdminService.update(product, draft(category, newName, "150000"), null);
             try (Connection other = dataSource.getConnection()) {
                 other.setAutoCommit(true);
                 try (PreparedStatement st = other.prepareStatement("update products set active = false where id = ?")) {
@@ -281,11 +290,11 @@ class ProductAdminIntegrationTest {
     @Test
     void update_withNewImage_deletesOldUploadAfterCommitAndKeepsNewOne() throws Exception {
         String name = AdminTestData.NAME_PREFIX + "Replace image";
-        SavedProduct saved = productAdminService.create(admin.id(), draft(category, name, "100000"), 5, true, png(200));
+        SavedProduct saved = productAdminService.create(draft(category, name, "100000"), 5, true, png(200));
         String oldPath = (String) data.productRow(saved.id()).get("image_path");
         assertThat(data.uploadFile(oldPath)).exists();
 
-        productAdminService.update(admin.id(), saved.id(), draft(category, name, "100000"), png(300));
+        productAdminService.update(saved.id(), draft(category, name, "100000"), png(300));
 
         String newPath = (String) data.productRow(saved.id()).get("image_path");
         assertThat(newPath).isNotEqualTo(oldPath).matches(UPLOAD_PATH.pattern());
@@ -302,7 +311,7 @@ class ProductAdminIntegrationTest {
         assertThat(seedFile).exists();
         Set<Path> uploadsBefore = filesInUploadDir();
 
-        productAdminService.update(admin.id(), product, draft(category, data.productName(product), "100000"), png(200));
+        productAdminService.update(product, draft(category, data.productName(product), "100000"), png(200));
 
         String newPath = (String) data.productRow(product).get("image_path");
         assertThat(newPath).matches(UPLOAD_PATH.pattern());
@@ -320,7 +329,7 @@ class ProductAdminIntegrationTest {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
 
         tx.executeWithoutResult(status -> {
-            productAdminService.update(admin.id(), product, draft(category, data.productName(product), "100000"), png(200));
+            productAdminService.update(product, draft(category, data.productName(product), "100000"), png(200));
             try {
                 assertThat(filesInUploadDir()).as("the new file exists until the rollback").hasSize(before.size() + 1);
             } catch (IOException e) {
@@ -349,7 +358,7 @@ class ProductAdminIntegrationTest {
         long orderId = data.insertOrder(customer.id(), "PENDING", new long[]{product, 1});
         String newName = AdminTestData.NAME_PREFIX + "After edit " + product;
 
-        String saved = productAdminService.update(admin.id(), product,
+        String saved = productAdminService.update(product,
                 new ProductDraft(newName, category, new BigDecimal("150000"), "Mới"), null);
 
         assertThat(saved).isEqualTo(newName);
@@ -373,13 +382,13 @@ class ProductAdminIntegrationTest {
         data.createCart(customer.id(), new long[]{product, 1});
         String name = data.productName(product);
 
-        assertThat(productAdminService.setActive(admin.id(), product, false)).isEqualTo(name);
+        assertThat(productAdminService.setActive(product, false)).isEqualTo(name);
 
         assertThat(data.productRow(product).get("active")).isEqualTo(false);
         assertThatThrownBy(() -> productService.getDetail(product)).isInstanceOf(NotFoundException.class);
         assertThat(data.cartLines(customer.id())).containsExactly(Map.entry(product, 1));
 
-        assertThat(productAdminService.setActive(admin.id(), product, true)).isEqualTo(name);
+        assertThat(productAdminService.setActive(product, true)).isEqualTo(name);
 
         assertThat(productService.getDetail(product).name()).isEqualTo(name);
     }
@@ -391,7 +400,7 @@ class ProductAdminIntegrationTest {
         long product = data.createProduct(category, "Stock plus", 100_000, 10, true);
         String name = data.productName(product);
 
-        assertThat(productAdminService.adjustStock(admin.id(), product, 5))
+        assertThat(productAdminService.adjustStock(product, 5))
                 .isEqualTo(new StockAdjustResult.Adjusted(name, 15));
 
         assertThat(data.stock(product)).isEqualTo(15);
@@ -402,9 +411,9 @@ class ProductAdminIntegrationTest {
         long product = data.createProduct(category, "Stock minus", 100_000, 3, true);
         String name = data.productName(product);
 
-        assertThat(productAdminService.adjustStock(admin.id(), product, -2))
+        assertThat(productAdminService.adjustStock(product, -2))
                 .isEqualTo(new StockAdjustResult.Adjusted(name, 1));
-        assertThat(productAdminService.adjustStock(admin.id(), product, -5))
+        assertThat(productAdminService.adjustStock(product, -5))
                 .isEqualTo(new StockAdjustResult.NotEnough(name, 5, 1));
         assertThat(data.stock(product)).isEqualTo(1);
     }
@@ -414,7 +423,7 @@ class ProductAdminIntegrationTest {
         long product = data.createProduct(category, "Hidden stock", 100_000, 4, false);
         String name = data.productName(product);
 
-        assertThat(productAdminService.adjustStock(admin.id(), product, 6))
+        assertThat(productAdminService.adjustStock(product, 6))
                 .isEqualTo(new StockAdjustResult.Adjusted(name, 10));
         assertThat(data.stock(product)).isEqualTo(10);
     }
@@ -425,15 +434,15 @@ class ProductAdminIntegrationTest {
         long product = data.createProduct(category, "Bounds", 100_000, 0, true);
         String name = data.productName(product);
 
-        assertThat(productAdminService.adjustStock(admin.id(), product, -1))
+        assertThat(productAdminService.adjustStock(product, -1))
                 .isEqualTo(new StockAdjustResult.NotEnough(name, 1, 0));
         assertThat(data.stock(product)).isZero();
-        assertThat(productAdminService.adjustStock(admin.id(), product, 100_000))
+        assertThat(productAdminService.adjustStock(product, 100_000))
                 .isEqualTo(new StockAdjustResult.Adjusted(name, 100_000));
-        assertThat(productAdminService.adjustStock(admin.id(), product, 1))
+        assertThat(productAdminService.adjustStock(product, 1))
                 .isEqualTo(new StockAdjustResult.WouldExceed(name));
         assertThat(data.stock(product)).isEqualTo(100_000);
-        assertThat(productAdminService.adjustStock(admin.id(), product, -100_000))
+        assertThat(productAdminService.adjustStock(product, -100_000))
                 .isEqualTo(new StockAdjustResult.Adjusted(name, 0));
         assertThat(data.stock(product)).isZero();
     }
@@ -443,10 +452,10 @@ class ProductAdminIntegrationTest {
         long product = data.createProduct(category, "Near top", 100_000, 99_999, true);
         String name = data.productName(product);
 
-        assertThat(productAdminService.adjustStock(admin.id(), product, 2))
+        assertThat(productAdminService.adjustStock(product, 2))
                 .isEqualTo(new StockAdjustResult.WouldExceed(name));
         assertThat(data.stock(product)).isEqualTo(99_999);
-        assertThat(productAdminService.adjustStock(admin.id(), product, 1))
+        assertThat(productAdminService.adjustStock(product, 1))
                 .isEqualTo(new StockAdjustResult.Adjusted(name, 100_000));
     }
 }

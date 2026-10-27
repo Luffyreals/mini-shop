@@ -4,12 +4,15 @@ import com.minishop.catalog.ProductAdminService;
 import com.minishop.common.NotFoundException;
 import com.minishop.catalog.StockAdjustResult;
 import com.minishop.support.AdminTestData;
+import com.minishop.support.ResetAdminAccess;
+import com.minishop.support.TestAdminAccess;
 import com.minishop.support.AdminTestData.Outcome;
 import com.minishop.user.Role;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,12 +40,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * No @Transactional: races need real transactions. Only {@link AdminTestData} rows.
  */
 @SpringBootTest
+@ExtendWith(ResetAdminAccess.class)
 class OrderAdminIntegrationTest {
 
     private static final int ROUNDS = 20;
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    TestAdminAccess access;
 
     @Autowired
     PasswordEncoder encoder;
@@ -77,11 +84,13 @@ class OrderAdminIntegrationTest {
         data = new AdminTestData(jdbc, encoder, Path.of(uploadDirSetting).toAbsolutePath().normalize());
         data.cleanUp();
         admin = data.createUser(Role.ADMIN);
+        access.actAsAdmin(admin.id());
         category = data.createCategory("Order admin");
     }
 
     @AfterEach
     void tearDown() {
+        access.reset();
         data.cleanUp();
     }
 
@@ -177,7 +186,7 @@ class OrderAdminIntegrationTest {
         long a = data.createProduct(category, "Cancel A", 100_000, 3, true);   // 5 before the order took 2
         long orderId = data.insertOrder(u.id(), "CONFIRMED", new long[]{a, 2});
 
-        StatusChangeResult result = orderAdminService.changeStatus(admin.id(), orderId, "CANCELLED");
+        StatusChangeResult result = orderAdminService.changeStatus(orderId, "CANCELLED");
 
         assertThat(result).isInstanceOf(StatusChangeResult.Cancelled.class);
         assertThat(data.orderStatus(orderId)).isEqualTo("CANCELLED");
@@ -192,7 +201,7 @@ class OrderAdminIntegrationTest {
         long orderId = data.insertOrder(u.id(), "PENDING", new long[]{a, 2});
         data.setActive(a, false);
 
-        StatusChangeResult result = orderAdminService.changeStatus(admin.id(), orderId, "CANCELLED");
+        StatusChangeResult result = orderAdminService.changeStatus(orderId, "CANCELLED");
 
         assertThat(result).isInstanceOf(StatusChangeResult.Cancelled.class);
         assertThat(data.stock(a)).isEqualTo(5);
@@ -206,7 +215,7 @@ class OrderAdminIntegrationTest {
         long b = data.createProduct(category, "Two B", 100_000, 0, true);
         long orderId = data.insertOrder(u.id(), "PENDING", new long[]{b, 4}, new long[]{a, 2});
 
-        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "CANCELLED"))
+        assertThat(orderAdminService.changeStatus(orderId, "CANCELLED"))
                 .isInstanceOf(StatusChangeResult.Cancelled.class);
 
         assertThat(data.stock(a)).isEqualTo(3);
@@ -222,7 +231,7 @@ class OrderAdminIntegrationTest {
         long orderId = data.insertOrder(u.id(), "PENDING", new long[]{a, 1});
         assertThat(orderService.getOrder(u.id(), orderId).cancellable()).isTrue();
 
-        StatusChangeResult result = orderAdminService.changeStatus(admin.id(), orderId, "CONFIRMED");
+        StatusChangeResult result = orderAdminService.changeStatus(orderId, "CONFIRMED");
 
         assertThat(result).isEqualTo(new StatusChangeResult.Changed("Đã xác nhận"));
         OrderDetailView seenByCustomer = orderService.getOrder(u.id(), orderId);
@@ -273,24 +282,24 @@ class OrderAdminIntegrationTest {
         assertThat(orderAdminService.getOrder(orderId).actions()).extracting(StatusAction::targetStatus)
                 .containsExactly("CONFIRMED", "CANCELLED");
 
-        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "CONFIRMED"))
+        assertThat(orderAdminService.changeStatus(orderId, "CONFIRMED"))
                 .isEqualTo(new StatusChangeResult.Changed("Đã xác nhận"));
         assertThat(orderAdminService.getOrder(orderId).actions()).extracting(StatusAction::targetStatus)
                 .containsExactly("SHIPPING", "CANCELLED");
 
-        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "SHIPPING"))
+        assertThat(orderAdminService.changeStatus(orderId, "SHIPPING"))
                 .isEqualTo(new StatusChangeResult.Changed("Đang giao"));
         assertThat(orderAdminService.getOrder(orderId).actions()).extracting(StatusAction::targetStatus)
                 .containsExactly("DELIVERED");
 
-        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "DELIVERED"))
+        assertThat(orderAdminService.changeStatus(orderId, "DELIVERED"))
                 .isEqualTo(new StatusChangeResult.Changed("Đã giao"));
         assertThat(orderAdminService.getOrder(orderId).isFinalStatus()).isTrue();
         assertThat(data.orderStatus(orderId)).isEqualTo("DELIVERED");
         assertThat(data.stock(product)).isEqualTo(8);
 
         // A refused step changes nothing: a delivered order cannot be cancelled, so no stock comes back.
-        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "CANCELLED"))
+        assertThat(orderAdminService.changeStatus(orderId, "CANCELLED"))
                 .isEqualTo(new StatusChangeResult.NotAllowed("Đã giao", "Đã hủy"));
         assertThat(data.stock(product)).isEqualTo(8);
 
@@ -317,7 +326,7 @@ class OrderAdminIntegrationTest {
 
         orderService.placeOrder(u.id(), form(), new BigDecimal("200000"));
 
-        assertThat(productAdminService.adjustStock(admin.id(), a, -2))
+        assertThat(productAdminService.adjustStock(a, -2))
                 .isEqualTo(new StockAdjustResult.NotEnough(name, 2, 0));
         assertThat(data.stock(a)).isZero();
     }
@@ -329,7 +338,7 @@ class OrderAdminIntegrationTest {
         data.createCart(u.id(), new long[]{a, 2});
         String name = data.productName(a);
 
-        assertThat(productAdminService.adjustStock(admin.id(), a, -2))
+        assertThat(productAdminService.adjustStock(a, -2))
                 .isEqualTo(new StockAdjustResult.Adjusted(name, 0));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(
@@ -350,7 +359,7 @@ class OrderAdminIntegrationTest {
 
         assertThat(orderService.cancelByCustomer(u.id(), orderId)).isEqualTo(CancelResult.CANCELLED);
 
-        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "CONFIRMED"))
+        assertThat(orderAdminService.changeStatus(orderId, "CONFIRMED"))
                 .isEqualTo(new StatusChangeResult.NotAllowed("Đã hủy", "Đã xác nhận"));
         assertThat(data.stock(a)).isEqualTo(10);
     }
@@ -362,7 +371,7 @@ class OrderAdminIntegrationTest {
         data.createCart(u.id(), new long[]{a, 2});
         long orderId = orderService.placeOrder(u.id(), form(), new BigDecimal("200000"));
 
-        assertThat(orderAdminService.changeStatus(admin.id(), orderId, "CONFIRMED"))
+        assertThat(orderAdminService.changeStatus(orderId, "CONFIRMED"))
                 .isEqualTo(new StatusChangeResult.Changed("Đã xác nhận"));
 
         assertThat(orderService.cancelByCustomer(u.id(), orderId)).isEqualTo(CancelResult.NOT_CANCELLABLE);
@@ -383,7 +392,7 @@ class OrderAdminIntegrationTest {
             data.createCart(u2.id(), new long[]{a, 2});
 
             List<Outcome<Object>> results = AdminTestData.race(
-                    () -> productAdminService.adjustStock(admin.id(), a, 10),
+                    () -> productAdminService.adjustStock(a, 10),
                     () -> orderService.placeOrder(u1.id(), form(), new BigDecimal("200000")),
                     () -> orderService.placeOrder(u2.id(), form(), new BigDecimal("200000")));
 
@@ -411,7 +420,7 @@ class OrderAdminIntegrationTest {
             List<Outcome<Object>> results = AdminTestData.race(
                     () -> {
                         pause(jitter);
-                        return productAdminService.adjustStock(admin.id(), a, -2);
+                        return productAdminService.adjustStock(a, -2);
                     },
                     () -> orderService.placeOrder(u.id(), form(), new BigDecimal("200000")));
 
@@ -449,7 +458,7 @@ class OrderAdminIntegrationTest {
             List<Outcome<Object>> results = AdminTestData.race(
                     () -> {
                         pause(jitter);
-                        return orderAdminService.changeStatus(admin.id(), orderId, "CONFIRMED");
+                        return orderAdminService.changeStatus(orderId, "CONFIRMED");
                     },
                     () -> orderService.cancelByCustomer(u.id(), orderId));
 
@@ -483,8 +492,8 @@ class OrderAdminIntegrationTest {
             long orderId = data.insertOrder(u.id(), "CONFIRMED", new long[]{a, 2}, new long[]{b, 3});
 
             List<Outcome<Object>> results = AdminTestData.race(
-                    () -> orderAdminService.changeStatus(admin.id(), orderId, "CANCELLED"),
-                    () -> orderAdminService.changeStatus(admin.id(), orderId, "CANCELLED"));
+                    () -> orderAdminService.changeStatus(orderId, "CANCELLED"),
+                    () -> orderAdminService.changeStatus(orderId, "CANCELLED"));
 
             assertThat(results).as("round %d: %s", round, results).noneMatch(Outcome::failed);
             assertThat(results).extracting(Outcome::value).containsExactlyInAnyOrder(
@@ -509,7 +518,7 @@ class OrderAdminIntegrationTest {
             data.createCart(buyer.id(), new long[]{b, 1}, new long[]{a, 1});
 
             List<Outcome<Object>> results = AdminTestData.race(
-                    () -> orderAdminService.changeStatus(admin.id(), orderId, "CANCELLED"),
+                    () -> orderAdminService.changeStatus(orderId, "CANCELLED"),
                     () -> orderService.placeOrder(buyer.id(), form(), new BigDecimal("200000")));
 
             assertThat(results).as("round %d: %s", round, results).noneMatch(Outcome::failed);
