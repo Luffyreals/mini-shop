@@ -1,5 +1,6 @@
 package com.minishop.catalog;
 
+import com.minishop.common.AdminAccess;
 import com.minishop.common.NotFoundException;
 import com.minishop.storage.ImageUpload;
 import com.minishop.storage.StorageService;
@@ -29,7 +30,8 @@ import java.util.List;
  * dòng tới khi commit nên giá trị đọc được là của chính mình; khi UPDATE đổi 0 dòng thì không có gì bị khóa, lần
  * đọc chỉ để biết vì sao và tồn kho báo về có thể cũ đôi chút (chấp nhận).
  *
- * <p>Mọi method ghi nhận {@code adminId} chỉ để log một dòng INFO, không bao giờ có thông tin cá nhân.
+ * <p>Mọi phương thức public gọi {@code requireAdmin()} đầu tiên (AC-009-9, ADR-0014); không khóa, không ghi khi
+ * bị từ chối. Phương thức ghi giữ id admin trả về chỉ để log một dòng INFO, không bao giờ có thông tin cá nhân.
  */
 @Service
 @Transactional
@@ -47,17 +49,21 @@ public class ProductAdminService {
     private final StorageService storage;
     private final ProductImages productImages;
 
+    private final AdminAccess adminAccess;
+
     ProductAdminService(ProductRepository productRepository, CategoryRepository categoryRepository,
-                        StorageService storage, ProductImages productImages) {
+                        StorageService storage, ProductImages productImages, AdminAccess adminAccess) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.storage = storage;
         this.productImages = productImages;
+        this.adminAccess = adminAccess;
     }
 
     /** Một trang sản phẩm (cả đã ẩn), mới thêm trước. {@code rawQ} và {@code rawPage} là chuỗi thô, sai thì bỏ qua. */
     @Transactional(readOnly = true)
     public AdminProductPage list(String rawQ, String rawPage) {
+        adminAccess.requireAdmin();
         ProductFilter filter = ProductFilter.from(new ProductSearchParams(rawQ, null, null, rawPage));
         String q = filter.q();
         int page = filter.page();
@@ -87,6 +93,7 @@ public class ProductAdminService {
     /** @throws NotFoundException khi không có sản phẩm */
     @Transactional(readOnly = true)
     public ProductEditView getForEdit(long id) {
+        adminAccess.requireAdmin();
         Product p = find(id);
         return new ProductEditView(p.getId(), p.getName(), p.getCategory().getId(), p.getPrice(),
                 p.getDescription(), p.getStock(), p.isActive(), productImages.toUrl(p.getImagePath()));
@@ -95,6 +102,7 @@ public class ProductAdminService {
     /** Sản phẩm đang bán có tồn kho không quá 5, ít nhất trước, tối đa 10 dòng (BR-006-14). */
     @Transactional(readOnly = true)
     public List<LowStockRow> lowStock() {
+        adminAccess.requireAdmin();
         return productRepository.findTop10ByActiveTrueAndStockLessThanEqualOrderByStockAscIdAsc(LOW_STOCK_THRESHOLD)
                 .stream()
                 .map(p -> new LowStockRow(p.getId(), p.getName(), p.getStock()))
@@ -105,8 +113,8 @@ public class ProductAdminService {
      * @param image ảnh đã kiểm tra, hoặc {@code null} nếu không có ảnh
      * @throws CategoryNotFoundException khi danh mục không còn
      */
-    public SavedProduct create(long adminId, ProductDraft draft, int initialStock, boolean active,
-                               ImageUpload image) {
+    public SavedProduct create(ProductDraft draft, int initialStock, boolean active, ImageUpload image) {
+        long adminId = adminAccess.requireAdmin();
         if (initialStock < 0 || initialStock > MAX_STOCK) {
             throw new IllegalArgumentException("Initial stock must be in 0.." + MAX_STOCK);
         }
@@ -129,7 +137,8 @@ public class ProductAdminService {
      * @throws NotFoundException         khi không có sản phẩm
      * @throws CategoryNotFoundException khi danh mục đích không còn
      */
-    public String update(long adminId, long id, ProductDraft draft, ImageUpload image) {
+    public String update(long id, ProductDraft draft, ImageUpload image) {
+        long adminId = adminAccess.requireAdmin();
         Product product = find(id);
         Category category = lockCategory(draft.categoryId());
         product.updateDetails(category, draft.name(), draft.description(), draft.price());
@@ -143,7 +152,8 @@ public class ProductAdminService {
     }
 
     /** Ẩn hoặc hiện lại. Gọi lại khi đã ở trạng thái đó vẫn thành công. @return tên sản phẩm */
-    public String setActive(long adminId, long id, boolean active) {
+    public String setActive(long id, boolean active) {
+        long adminId = adminAccess.requireAdmin();
         Product product = find(id);
         product.setActive(active);
         log.info("Admin action: admin={}, product={}, action={}", adminId, id, active ? "show" : "hide");
@@ -157,9 +167,10 @@ public class ProductAdminService {
      * có thể cũ đôi chút.
      *
      * @throws NotFoundException        khi không có sản phẩm
-     * @throws IllegalArgumentException khi {@code delta} bằng 0 hoặc vượt ±100.000 (controller đã kiểm trước)
+     * @throws IllegalArgumentException khi {@code delta} bằng 0 hoặc vượt ±100.000 (màn hình đã kiểm trước)
      */
-    public StockAdjustResult adjustStock(long adminId, long id, int delta) {
+    public StockAdjustResult adjustStock(long id, int delta) {
+        long adminId = adminAccess.requireAdmin();
         if (delta == 0 || Math.abs((long) delta) > MAX_STOCK) {
             throw new IllegalArgumentException("Stock delta must be non-zero and within +/-" + MAX_STOCK);
         }

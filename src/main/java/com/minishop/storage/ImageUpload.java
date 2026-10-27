@@ -1,12 +1,16 @@
 package com.minishop.storage;
 
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.InputStreamSource;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -57,6 +61,40 @@ public final class ImageUpload {
             throw unsupported("file signature does not match " + byExtension);
         }
         return Optional.of(new ImageUpload(byExtension, data));
+    }
+
+    /**
+     * Lối vào cho một file người dùng chọn (desktop). Kích thước được kiểm trước nên file quá 2 MiB không bị đọc.
+     * Content type lấy từ {@link Files#probeContentType}; trên Windows hàm này đọc registry và có thể trả
+     * {@code null}, khi đó dùng content type theo đuôi file (đuôi lạ thì để {@code null} và {@link #from} từ chối).
+     * Đuôi, content type và magic bytes vẫn được kiểm như {@link #from}.
+     *
+     * @throws InvalidImageException khi file quá lớn hoặc không phải JPG/PNG/WebP hợp lệ
+     * @throws UncheckedIOException  khi không đọc được file; thông điệp không chứa đường dẫn (có tên thư mục người dùng)
+     */
+    public static ImageUpload fromFile(Path path) {
+        Objects.requireNonNull(path, "path");
+        Path fileName = path.getFileName();
+        if (fileName == null) {
+            throw unsupported("no file name");
+        }
+        String name = fileName.toString();
+        try {
+            long size = Files.size(path);
+            if (size > MAX_BYTES) {
+                throw new InvalidImageException(InvalidImageException.Reason.TOO_LARGE, "Image too large: " + size);
+            }
+            String contentType = Files.probeContentType(path);
+            if (contentType == null) {
+                ImageFormat byExtension = formatOfExtension(name);
+                contentType = byExtension == null ? null : byExtension.contentType();
+            }
+            return from(name, contentType, size, new FileSystemResource(path))
+                    .orElseThrow(() -> unsupported("empty file"));
+        } catch (IOException | UncheckedIOException e) {
+            // Không gắn e làm cause: thông điệp của nó chứa đường dẫn đầy đủ
+            throw new UncheckedIOException("Could not read the chosen image", new IOException("I/O error"));
+        }
     }
 
     public ImageFormat format() {

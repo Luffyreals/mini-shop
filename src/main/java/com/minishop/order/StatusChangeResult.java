@@ -2,7 +2,7 @@ package com.minishop.order;
 
 /**
  * Kết quả đổi trạng thái đơn của admin. Trả kết quả thay vì ném exception vì mọi nhánh "không cho phép"
- * chưa ghi gì, nên không có gì cần rollback; controller {@code switch} theo pattern.
+ * chưa ghi gì, nên không có gì cần rollback; màn hình {@code switch} theo pattern.
  */
 public sealed interface StatusChangeResult {
 

@@ -209,6 +209,113 @@ class StorefrontPresenterTest {
         verify(navigator).goHome();
     }
 
+    // ------------------------------------------------------------------ refresh (CategoriesMenu, QĐ11 of the D5 plan)
+
+    @Test
+    void presenter_isTheCategoriesMenuPortTheAdminScreensCall() {
+        assertThat(presenter()).isInstanceOf(CategoriesMenu.class);
+    }
+
+    @Test
+    void refresh_reloadsTheCategoriesAndUpdatesTheMenu() {
+        StorefrontPresenter presenter = presenter();
+        presenter.contribute(shell);
+        when(productService.categories()).thenReturn(List.of(new CategoryOption(9L, "Thể thao"),
+                new CategoryOption(2L, "Điện tử"), new CategoryOption(1L, "Sách")));
+
+        presenter.refresh();
+
+        verify(productService, times(2)).categories();   // once at start-up, once for the refresh
+        assertThat(shell.categoriesMenuEntries()).extracting(ShellMenuEntry::id)
+                .containsExactly("categoryMenuAll", "categoryMenu-9", "categoryMenu-2", "categoryMenu-1");
+        assertThat(shell.categoriesMenuEntries()).extracting(ShellMenuEntry::label)
+                .containsExactly("Tất cả danh mục", "Thể thao", "Điện tử", "Sách");
+    }
+
+    @Test
+    void refresh_afterADeletedCategory_dropsItFromTheMenu() {
+        StorefrontPresenter presenter = presenter();
+        presenter.contribute(shell);
+        when(productService.categories()).thenReturn(List.of(new CategoryOption(1L, "Sách")));
+
+        presenter.refresh();
+
+        assertThat(shell.categoriesMenuEntries()).extracting(ShellMenuEntry::id)
+                .containsExactly("categoryMenuAll", "categoryMenu-1");
+    }
+
+    @Test
+    void refresh_theEntriesOfTheNewMenuStillNavigate() {
+        StorefrontPresenter presenter = presenter();
+        presenter.contribute(shell);
+        when(productService.categories()).thenReturn(List.of(new CategoryOption(9L, "Thể thao")));
+        presenter.refresh();
+
+        menuEntry("categoryMenu-9").action().run();
+
+        verify(navigator).navigateTo(CatalogRoute.inCategory(9L));
+    }
+
+    @Test
+    void refresh_whileTheMenuIsLoading_cancelsThePreviousLoad_soAnOldResultNeverOverwritesANewOne() {
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        StorefrontPresenter presenter = new StorefrontPresenter(productService, navigator, manual, errors);
+        presenter.contribute(shell);   // task 0: the start-up load
+        when(productService.categories()).thenReturn(List.of(new CategoryOption(9L, "Thể thao")));
+
+        presenter.refresh();           // task 1 replaces it
+        manual.runAll();
+
+        assertThat(manual.handle(0).isCancelled()).isTrue();
+        assertThat(manual.handle(1).isCancelled()).isFalse();
+        assertThat(shell.categoriesMenuEntries()).extracting(ShellMenuEntry::id)
+                .containsExactly("categoryMenuAll", "categoryMenu-9");
+    }
+
+    @Test
+    void refresh_whenAnEarlierRefreshAlreadyFinished_cancellingItIsHarmless() {
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        StorefrontPresenter presenter = new StorefrontPresenter(productService, navigator, manual, errors);
+        presenter.contribute(shell);
+        manual.runAll();
+        when(productService.categories()).thenReturn(List.of(new CategoryOption(9L, "Thể thao")));
+
+        presenter.refresh();
+        presenter.refresh();
+        manual.runAll();
+
+        assertThat(manual.submittedCount()).isEqualTo(3);
+        assertThat(shell.categoriesMenuEntries()).extracting(ShellMenuEntry::id)
+                .containsExactly("categoryMenuAll", "categoryMenu-9");
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void refresh_whenTheCategoriesCannotBeLoaded_reportsOnce_andKeepsTheCurrentMenu() {
+        StorefrontPresenter presenter = presenter();
+        presenter.contribute(shell);
+        RuntimeException failure = new IllegalStateException("database is down");
+        when(productService.categories()).thenThrow(failure);
+
+        assertThatNoException().isThrownBy(presenter::refresh);
+
+        verify(errors, times(1)).report(failure);
+        assertThat(shell.categoriesMenuEntries()).extracting(ShellMenuEntry::id)
+                .containsExactly("categoryMenuAll", "categoryMenu-2", "categoryMenu-1");
+    }
+
+    @Test
+    void refresh_doesNotNavigateOrTouchTheStoreButtons() {
+        StorefrontPresenter presenter = presenter();
+        presenter.contribute(shell);
+
+        presenter.refresh();
+
+        // contribute went home once; refresh must not do it again
+        verify(navigator, times(1)).goHome();
+        verify(navigator, never()).navigateTo(any());
+    }
+
     // ------------------------------------------------------------------ search
 
     @Test

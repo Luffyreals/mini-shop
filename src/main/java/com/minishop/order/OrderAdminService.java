@@ -1,6 +1,7 @@
 package com.minishop.order;
 
 import com.minishop.catalog.ProductRepository;
+import com.minishop.common.AdminAccess;
 import com.minishop.common.NotFoundException;
 import com.minishop.user.User;
 import org.slf4j.Logger;
@@ -25,6 +26,9 @@ import java.util.Optional;
  * API quản trị hẹp của {@code order}: danh sách, chi tiết, dashboard và đổi trạng thái đơn. Trạng thái và
  * trang đến dạng chuỗi thô và được parse ở đây, nên {@link OrderStatus} và bảng chuyển trạng thái không
  * ra khỏi package. Đổi trạng thái khóa dòng {@code orders} trước, rồi {@code products} tăng dần (ADR-0009).
+ *
+ * <p>Mọi phương thức public gọi {@code requireAdmin()} đầu tiên (AC-009-9, ADR-0014); không khóa, không ghi khi
+ * bị từ chối.
  */
 @Service
 @Transactional
@@ -39,14 +43,19 @@ public class OrderAdminService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
 
-    OrderAdminService(OrderRepository orderRepository, ProductRepository productRepository) {
+    private final AdminAccess adminAccess;
+
+    OrderAdminService(OrderRepository orderRepository, ProductRepository productRepository,
+                      AdminAccess adminAccess) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
+        this.adminAccess = adminAccess;
     }
 
     /** Một trang đơn, mới nhất trước; trạng thái hoặc trang sai thì coi như "Tất cả" / trang 1. */
     @Transactional(readOnly = true)
     public AdminOrderPage listOrders(String rawStatus, String rawPage) {
+        adminAccess.requireAdmin();
         Optional<OrderStatus> filter = OrderInput.status(rawStatus);
         int page = OrderInput.page(rawPage);
         Page<Order> result = findPage(filter, page);
@@ -76,6 +85,7 @@ public class OrderAdminService {
     /** @throws NotFoundException when the order does not exist */
     @Transactional(readOnly = true)
     public AdminOrderDetail getOrder(long orderId) {
+        adminAccess.requireAdmin();
         Order order = orderRepository.findAdminDetailById(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
         List<OrderLineView> lines = order.getItems().stream()
@@ -108,6 +118,7 @@ public class OrderAdminService {
     /** Fixed number of statements: counts, delivered revenue, latest 5 (AC-006-9). */
     @Transactional(readOnly = true)
     public OrderDashboard dashboard() {
+        adminAccess.requireAdmin();
         Map<OrderStatus, Long> totals = new EnumMap<>(OrderStatus.class);
         for (StatusTotal t : orderRepository.countByStatus()) {
             totals.put(t.status(), t.count());
@@ -130,7 +141,8 @@ public class OrderAdminService {
      *
      * @throws NotFoundException when the order does not exist
      */
-    public StatusChangeResult changeStatus(long adminId, long orderId, String rawTargetStatus) {
+    public StatusChangeResult changeStatus(long orderId, String rawTargetStatus) {
+        long adminId = adminAccess.requireAdmin();
         // 1. Parse first: a bad value neither locks nor writes.
         Optional<OrderStatus> parsed = OrderInput.status(rawTargetStatus);
         if (parsed.isEmpty()) {

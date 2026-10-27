@@ -217,15 +217,15 @@ class AccountMenuSmokeTest {
     }
 
     @Test
-    void signIn_asAnAdmin_getsOrdersAndLogoutBecauseNoFeatureAttachedAnAdminEntryYet() {
+    void signIn_asAnAdmin_getsOrdersAdminAndLogout() {
         signInAs(DemoAccounts.ADMIN_EMAIL);
 
         ContextMenu menu = openAccountMenu();
 
+        // D5 attaches "Quản trị" (admin.AdminMenuPresenter); the admin screens themselves are checked by their own smoke test
         assertThat(FxTestSupport.callOnFx(() -> accountButton().getText())).isEqualTo("Quản trị viên");
-        assertThat(itemTexts(menu)).as("no \"Quản trị\" and no dead entry before D5")
-                .containsExactly("Đơn hàng của tôi", "Đăng xuất");
-        assertThat(itemIds(menu)).containsExactly("accountMenuOrders", "accountMenuLogout");
+        assertThat(itemTexts(menu)).containsExactly("Đơn hàng của tôi", "Quản trị", "Đăng xuất");
+        assertThat(itemIds(menu)).containsExactly("accountMenuOrders", "accountMenuAdmin", "accountMenuLogout");
         hideMenus();
         signOut();
     }

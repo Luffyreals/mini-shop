@@ -7,6 +7,8 @@
  * {@code ProductAdminService} điều chỉnh kho ({@code adjustStock}). Thêm/sửa sản phẩm và xóa danh mục khóa
  * dòng {@code categories} trước (ADR-0010).
  * <p>API công khai cho {@code admin}: {@code CategoryAdminService}, {@code ProductAdminService} và các
- * record của chúng.
+ * record của chúng; từ D5 mọi phương thức public của hai service này gọi {@code common.AdminAccess.requireAdmin()}
+ * trước tiên và không còn nhận {@code adminId}. {@code CategoriesMenu} là cổng để {@code admin} làm mới menu
+ * "Danh mục" của thanh trên ({@code StorefrontPresenter} cài đặt, vẫn package-private).
  */
 package com.minishop.catalog;

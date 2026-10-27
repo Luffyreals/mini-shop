@@ -28,7 +28,7 @@ import java.util.Objects;
  * làm hỏng cửa sổ chính.
  */
 @Component
-class StorefrontPresenter implements ShellContributor {
+class StorefrontPresenter implements ShellContributor, CategoriesMenu {
 
     static final String ALL_CATEGORIES_LABEL = "Tất cả danh mục";
     static final String ALL_CATEGORIES_ID = "categoryMenuAll";
@@ -40,6 +40,9 @@ class StorefrontPresenter implements ShellContributor {
 
     /** {@code null} cho tới khi cửa sổ chính gọi {@link #contribute}. */
     private ShellPresenter shell;
+
+    /** Lần nạp danh mục gần nhất; chỉ chạm trên luồng giao diện. */
+    private BackgroundTasks.Handle pendingCategories;
 
     StorefrontPresenter(ProductService productService, Navigator navigator, BackgroundTasks tasks,
                         UnexpectedErrors errors) {
@@ -56,10 +59,23 @@ class StorefrontPresenter implements ShellContributor {
         shell.setAction(ShellAction.NEW_ARRIVALS, () -> navigator.navigateTo(CatalogRoute.all()));
         shell.setSearchHandler(this::search);
         updateCategories(List.of());
-        tasks.submit(productService::categories, this::updateCategories, errors::report);
+        refresh();
         // MainWindow đã gắn Navigator vào vùng nội dung trước khi gọi contribute; factory chỉ dựng node và gửi việc nền
         navigator.setHomeRoute(new HomeRoute());
         navigator.goHome();
+    }
+
+    /**
+     * Nạp lại danh mục ở nền rồi cập nhật menu "Danh mục" (QĐ11 của D5: admin vừa thêm, sửa hoặc xóa danh mục).
+     * Một lần nạp mới hủy callback của lần nạp cũ chưa xong, nên kết quả cũ không bao giờ ghi đè kết quả mới.
+     * Gọi trên luồng giao diện.
+     */
+    @Override
+    public void refresh() {
+        if (pendingCategories != null) {
+            pendingCategories.cancel();
+        }
+        pendingCategories = tasks.submit(productService::categories, this::updateCategories, errors::report);
     }
 
     /**

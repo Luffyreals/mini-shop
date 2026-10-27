@@ -6,7 +6,7 @@ import java.util.List;
 public record AdminProductPage(List<AdminProductRow> products, String q, int page, int totalPages,
                                long totalElements) {
 
-    /** True khi không có sản phẩm nào khớp (không chỉ là trang rỗng). Public: template đọc qua SpEL. */
+    /** True khi không có sản phẩm nào khớp (không chỉ là trang rỗng). Màn hình dùng để hiện trạng thái rỗng. */
     public boolean isEmpty() {
         return totalElements == 0;
     }

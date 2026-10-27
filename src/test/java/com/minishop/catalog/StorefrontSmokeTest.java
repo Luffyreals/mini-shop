@@ -72,8 +72,9 @@ class StorefrontSmokeTest {
                     window.hide();
                 }
             }
-            // A logout clears the guest cart and refreshes the badge; no session is ever opened here
-            app.context().getBeansOfType(SessionListener.class).values()
+            // A logout clears the guest cart and refreshes the badge; no session is ever opened here. Same @Order
+            // as AppSession, so the guest cart is cleared before the badge reads it
+            app.context().getBeanProvider(SessionListener.class).orderedStream()
                     .forEach(listener -> listener.sessionChanged(null, null));
             shell().setSearchText("");
             navigator().goHome();

@@ -114,7 +114,22 @@ class ArchitectureTest {
     static final ArchRule featureSlices_haveNoCycles = slices().matching("com.minishop.(*)..")
             .should().beFreeOfCycles();
 
-    /** GĐ6: admin chỉ được dùng catalog, order, storage, user và common (không cart, không config). */
+    /**
+     * D5 (QĐ15): the three admin services are called only from {@code admin}. A storefront class (a catalog, cart,
+     * order or user screen, or a service) can never reach an admin API by mistake. The services themselves, with
+     * their nested classes, are exempt.
+     */
+    @ArchTest
+    static final ArchRule adminServices_onlyUsedByAdmin = noClasses()
+            .that().resideOutsideOfPackage("com.minishop.admin..")
+            .and().haveNameNotMatching("com[.]minishop[.](catalog[.](Category|Product)|order[.]Order)AdminService([$].*)?")
+            .should().dependOnClassesThat().haveNameMatching(
+                    "com[.]minishop[.](catalog[.](Category|Product)|order[.]Order)AdminService");
+
+    /**
+     * D5: admin dùng catalog, order, storage, user ({@code AccountMenu}, {@code AccountMenuItem}), desktop và common;
+     * không cart, không config. Luật này không được nới khi thêm các màn quản trị.
+     */
     @ArchTest
     static final ArchRule admin_dependsOnlyOnAllowedFeatures = noClasses().that().resideInAPackage("com.minishop.admin..")
             .should().dependOnClassesThat().resideInAnyPackage("com.minishop.cart..", "com.minishop.config..");

@@ -5,7 +5,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
-Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)). Sau đó Mini Shop chuyển từ website sang ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)); giai đoạn D1 dựng nền tảng, D2 làm lại tài khoản, D3 làm lại cửa hàng, D4 làm lại giỏ hàng và đặt hàng, khu quản trị được làm lại ở D5.
+Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)). Sau đó Mini Shop chuyển từ website sang ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)); giai đoạn D1 dựng nền tảng, D2 làm lại tài khoản, D3 làm lại cửa hàng, D4 làm lại giỏ hàng và đặt hàng, D5 làm lại khu quản trị.
 
 ### Thêm
 - Trang chủ chỉ dùng dữ liệu thật: sản phẩm mới nhất (thêm vào giỏ, xem chi tiết), hai sản phẩm mới kế tiếp, khối "Sắp hết hàng" (còn 1–5 cái, ẩn khi không có) và thẻ "Giao hàng và thanh toán". App mở vào trang chủ; nút "Cửa hàng" và đăng xuất cũng về đó.
@@ -18,6 +18,11 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - Màn Thanh toán (COD): tóm tắt giỏ, form người nhận điền sẵn họ tên, lỗi theo từng ô. "Đặt hàng" khi chưa đăng nhập mở hộp thoại đăng nhập rồi đi tiếp. Hết hàng hoặc giá vừa đổi lúc xác nhận thì báo đúng câu của quy tắc đặt hàng; đóng ngăn giỏ thì tóm tắt được nạp lại, chữ đã nhập được giữ.
 - "Đơn hàng của tôi" trong menu tài khoản: danh sách đơn có phân trang, chi tiết đơn (đặt xong hiện "Đặt hàng thành công. Mã đơn của bạn là #{id}."), tự hủy đơn đang chờ xác nhận qua hộp thoại "Bạn có chắc muốn hủy đơn hàng này?".
 - Thành phần dùng chung trong `desktop`: `DrawerHost` (ngăn trượt trong cửa sổ, nằm dưới lớp toast), `ConfirmDialog` (hộp xác nhận, focus sẵn ở nút từ chối), `ToastAction` (nút trong toast).
+- Khu quản trị trên desktop, mở từ mục "Quản trị" trong menu tài khoản (chỉ tài khoản quản trị thấy), có thanh bên "Tổng quan", "Đơn hàng", "Sản phẩm", "Danh mục"; thanh trên vẫn dùng được.
+- Tổng quan: số đơn theo từng trạng thái (bấm để mở danh sách đã lọc), doanh thu đơn đã giao, đơn mới nhất, sản phẩm sắp hết hàng.
+- Danh mục: danh sách, thêm, sửa, xóa qua hộp xác nhận; không xóa được danh mục còn sản phẩm. Menu "Danh mục ▾" của thanh trên cập nhật ngay.
+- Sản phẩm: danh sách cả sản phẩm đã ẩn, tìm theo tên, 20 sản phẩm một trang, ẩn/hiện ngay trên hàng; form thêm/sửa có chọn ảnh (kiểm ngay khi chọn, xem trước, "Bỏ chọn ảnh"), khối "Điều chỉnh tồn kho" không xóa chữ đang nhập ở form.
+- Đơn hàng: lọc theo trạng thái, phân trang, chi tiết đơn, các nút đổi trạng thái theo luồng cho phép; "Hủy đơn" và "Xác nhận đã giao" hỏi lại trước.
 
 ### Thay đổi
 - App là ứng dụng desktop JavaFX 25 chạy bằng `./mvnw javafx:run`; Spring chạy không có web server. Cửa sổ khung có thanh trên cùng (logo, mục điều hướng, ô tìm kiếm, nút giỏ, nút đăng nhập; các nút bật dần ở D2–D4), theme "soft modern" và phông Plus Jakarta Sans đóng gói kèm.
@@ -29,6 +34,8 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - Hộp thoại đăng ký không còn cao hơn cửa sổ: phần ô nhập cuộn được, tiêu đề và nút "Đăng ký" luôn hiện. Nút tài khoản có độ rộng tối đa để tên dài không làm chật ô tìm kiếm.
 - `PageNav` chỉ còn số trang (không còn URL); `desktop.PageBar` vẽ thanh trang dùng chung.
 - `OrderService.checkoutPage` trả tóm tắt giỏ và form điền sẵn trong một lần đọc, cho màn Thanh toán.
+- `CategoryAdminService`, `ProductAdminService`, `OrderAdminService` gọi `AdminAccess.requireAdmin()` đầu tiên ở mọi phương thức public: phiên khách hoặc USER bị từ chối trước mọi khóa và câu SQL. Tham số `adminId` bị bỏ; id quản trị lấy từ chính phiên.
+- `ImageUpload.fromFile(Path)` nhận ảnh từ file đã chọn: kiểm kích thước trước khi đọc, lấy kiểu file theo đuôi khi Windows không biết, vẫn luôn kiểm magic bytes; lỗi đọc file không ghi đường dẫn vào log.
 - Ảnh sản phẩm mẫu chuyển sang `images/products/` (đường dẫn lưu trong DB không đổi); nguồn và giấy phép ảnh chuyển từ `credits.html` sang `images/credits.tsv`. Thay 5 ảnh sản phẩm chưa đúng chủ thể và thêm ảnh cho 2 cuốn sách.
 - `CurrentUser` là record không chứa hash mật khẩu; chỉ còn `spring-security-crypto` để băm mật khẩu.
 - Test web (MockMvc, Tomcat thật) được bỏ; các quy tắc nghiệp vụ chúng kiểm được chuyển xuống test service. CI chạy test giao diện dưới màn hình ảo `xvfb`.

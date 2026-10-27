@@ -316,6 +316,34 @@ class DesktopRulesDetectViolationsTest {
         assertGreen(ArchitectureTest.javafxConcurrent_onlyInDesktop, classes);
     }
 
+    // ------------------------------------------------------------------ D5: admin services belong to admin
+
+    @Test
+    void adminServices_flagAStorefrontClassThatCallsAnAdminService() throws IOException {
+        JavaClasses classes = classes(
+                type("com.minishop.catalog.ProductScreen").field("com.minishop.catalog.CategoryAdminService"),
+                type("com.minishop.cart.CartHelper").field("com.minishop.catalog.ProductAdminService"),
+                type("com.minishop.order.OrderHistoryScreen").field("com.minishop.order.OrderAdminService"),
+                type("com.minishop.user.AccountMenuHelper").field("com.minishop.order.OrderAdminService"));
+
+        assertRed(ArchitectureTest.adminServices_onlyUsedByAdmin, classes, "ProductScreen");
+        assertRed(ArchitectureTest.adminServices_onlyUsedByAdmin, classes, "CartHelper");
+        assertRed(ArchitectureTest.adminServices_onlyUsedByAdmin, classes, "OrderHistoryScreen");
+        assertRed(ArchitectureTest.adminServices_onlyUsedByAdmin, classes, "AccountMenuHelper");
+    }
+
+    @Test
+    void adminServices_acceptAdminClassesAndTheServicesThemselves() throws IOException {
+        JavaClasses classes = classes(
+                type("com.minishop.admin.AdminProductsPresenter").field("com.minishop.catalog.ProductAdminService")
+                        .field("com.minishop.catalog.CategoryAdminService")
+                        .field("com.minishop.order.OrderAdminService"),
+                type("com.minishop.catalog.ProductAdminService").field("com.minishop.catalog.CategoryAdminService"),
+                type("com.minishop.order.PlainClass").field("java.lang.String"));
+
+        assertGreen(ArchitectureTest.adminServices_onlyUsedByAdmin, classes);
+    }
+
     // ------------------------------------------------------------------ D2 rule 1: nothing below desktop knows desktop
 
     @Test

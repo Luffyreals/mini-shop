@@ -1,5 +1,6 @@
 package com.minishop.catalog;
 
+import com.minishop.common.AdminAccess;
 import com.minishop.common.ConstraintViolations;
 import com.minishop.common.NotFoundException;
 import org.slf4j.Logger;
@@ -16,6 +17,9 @@ import java.util.Locale;
 /**
  * Quản trị danh mục (admin). Trùng tên kiểm không phân biệt hoa thường trong Java; {@code uq_categories_name}
  * là lưới an toàn khi hai yêu cầu đua nhau. Xóa khóa dòng {@code categories} trước (ADR-0010).
+ *
+ * <p>Mọi phương thức public gọi {@code requireAdmin()} đầu tiên (AC-009-9, ADR-0014); không khóa, không ghi khi
+ * bị từ chối. Id admin trả về chỉ dùng cho một dòng log INFO.
  */
 @Service
 @Transactional
@@ -27,13 +31,18 @@ public class CategoryAdminService {
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
 
-    CategoryAdminService(CategoryRepository categoryRepository, ProductRepository productRepository) {
+    private final AdminAccess adminAccess;
+
+    CategoryAdminService(CategoryRepository categoryRepository, ProductRepository productRepository,
+                         AdminAccess adminAccess) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
+        this.adminAccess = adminAccess;
     }
 
     @Transactional(readOnly = true)
     public List<CategoryRow> list() {
+        adminAccess.requireAdmin();
         Collator collator = Collator.getInstance(Locale.forLanguageTag("vi")); // Collator không thread-safe
         return categoryRepository.findAllWithProductCount().stream()
                 .sorted(Comparator.comparing(CategoryRow::name, collator))
@@ -42,6 +51,7 @@ public class CategoryAdminService {
 
     @Transactional(readOnly = true)
     public CategoryEditView get(long id) {
+        adminAccess.requireAdmin();
         Category c = categoryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Category not found: " + id));
         return new CategoryEditView(c.getId(), c.getName(), c.getDescription());
@@ -49,11 +59,13 @@ public class CategoryAdminService {
 
     @Transactional(readOnly = true)
     public List<CategoryOption> options() {
+        adminAccess.requireAdmin();
         return CategoryOptions.sortedByName(categoryRepository.findAll());
     }
 
     /** @return tên đã lưu */
-    public String create(long adminId, CategoryDraft draft) {
+    public String create(CategoryDraft draft) {
+        long adminId = adminAccess.requireAdmin();
         if (nameTaken(draft.name(), null)) {
             throw new CategoryNameTakenException("Category name taken");
         }
@@ -68,7 +80,8 @@ public class CategoryAdminService {
     }
 
     /** @return tên đã lưu */
-    public String update(long adminId, long id, CategoryDraft draft) {
+    public String update(long id, CategoryDraft draft) {
+        long adminId = adminAccess.requireAdmin();
         // Row lock (like delete, ADR-0010): a concurrent delete cannot turn this into an optimistic-lock 500.
         Category c = categoryRepository.lockById(id)
                 .orElseThrow(() -> new NotFoundException("Category not found: " + id));
@@ -89,7 +102,8 @@ public class CategoryAdminService {
      * Thứ tự: khóa dòng danh mục, đếm sản phẩm (cả đã ẩn), rồi xóa hoặc báo còn dùng. Thêm sản phẩm cũng khóa dòng
      * này trước, nên hai việc không thể chen nhau.
      */
-    public CategoryDeleteResult delete(long adminId, long id) {
+    public CategoryDeleteResult delete(long id) {
+        long adminId = adminAccess.requireAdmin();
         Category c = categoryRepository.lockById(id)
                 .orElseThrow(() -> new NotFoundException("Category not found: " + id));
         long count = productRepository.countByCategoryId(id);
