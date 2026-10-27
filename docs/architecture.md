@@ -189,7 +189,8 @@ mini-shop/
 │   └── licenses/        Giấy phép thư viện phải chép kèm bản đóng gói (TwelveMonkeys)
 ├── docs/
 │   ├── architecture.md  Tài liệu này
-│   └── adr/             Các quyết định kiến trúc
+│   ├── adr/             Các quyết định kiến trúc
+│   └── images/          Ảnh chụp màn hình dùng trong README
 ├── .github/             CI: build, test, kiểm không có test bị bỏ qua; đóng gói và mở thử bản Windows
 ├── pom.xml, mvnw, mvnw.cmd   Maven và Maven Wrapper (không cần cài Maven)
 ├── CHANGELOG.md
