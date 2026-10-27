@@ -57,6 +57,7 @@ class AdminOrdersPresenter {
 
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loaded = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final BooleanProperty empty = new SimpleBooleanProperty(false);
     private final StringProperty emptyText = new SimpleStringProperty("");
     private final ObservableList<FilterOption> filters = FXCollections.observableArrayList();
@@ -65,6 +66,8 @@ class AdminOrdersPresenter {
 
     /** Route thật đang hiện (trạng thái và trang do service chuẩn hóa); {@code null} tới lần nạp đầu tiên. */
     private AdminOrdersRoute current;
+    /** Route mà {@link #load} nhận gần nhất, để {@link #retry()} nạp lại đúng nó. */
+    private AdminOrdersRoute requested;
     private BackgroundTasks.Handle pending;
     private boolean disposed;
 
@@ -111,6 +114,7 @@ class AdminOrdersPresenter {
         if (disposed || loading.get()) {
             return;
         }
+        requested = route;
         String rawStatus = route.status();
         String rawPage = Integer.toString(route.page());
         loading.set(true);
@@ -124,13 +128,30 @@ class AdminOrdersPresenter {
         emptyText.set(page.status() == null ? EMPTY_ALL : EMPTY_FILTERED.formatted(page.statusLabel()));
         empty.set(page.isEmpty());
         pageNav.set(PageNav.of(page.page(), page.totalPages()));
+        loadFailed.set(false);
         loaded.set(true);
         loading.set(false);
     }
 
     private void loadFailed(Throwable failure) {
         loading.set(false);
-        failures.handle(failure);
+        boolean unexpected = failures.handle(failure);
+        // Chỉ lần nạp đầu mới thay màn bằng khối lỗi (QĐ12)
+        if (unexpected && !loaded.get()) {
+            loadFailed.set(true);
+        }
+    }
+
+    /**
+     * "Thử lại" sau lỗi lạ của lần nạp đầu (QĐ12): tắt {@code loadFailed} rồi nạp lại đúng route đã nhận. Bỏ qua
+     * sau {@link #dispose}, khi đang nạp hoặc khi không có lỗi nào để thử lại.
+     */
+    void retry() {
+        if (disposed || loading.get() || !loadFailed.get() || requested == null) {
+            return;
+        }
+        loadFailed.set(false);
+        load(requested);
     }
 
     private static FilterOption toFilter(StatusFilterOption option) {
@@ -200,6 +221,11 @@ class AdminOrdersPresenter {
     /** {@code true} từ lần nạp thành công đầu tiên. */
     ReadOnlyBooleanProperty loadedProperty() {
         return loaded;
+    }
+
+    /** {@code true} khi lần nạp đầu lỗi vì một lỗi lạ (màn hiện khối "Thử lại"); xem {@link #retry()}. */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** {@code true} khi không có đơn nào khớp bộ lọc (không chỉ là trang rỗng). */

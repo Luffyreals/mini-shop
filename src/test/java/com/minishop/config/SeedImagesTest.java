@@ -131,6 +131,56 @@ class SeedImagesTest {
         }
     }
 
+    // ------------------------------------------------------------------ font and icon rows (D6, AC-009-15)
+
+    @Test
+    void credits_everyRowOfEveryKindHasNineColumnsAndAKnownKind() throws IOException {
+        List<String[]> rows = allCreditRows();
+
+        assertThat(rows).hasSize(IMAGE_COUNT + 2);
+        for (String[] row : rows) {
+            assertThat(row).as("columns of %s", row[1]).hasSize(COLUMNS);
+            assertThat(row[0]).as("kind of %s", row[1]).isIn("image", "font", "icon");
+            for (int column : new int[]{1, 2, 3, 4, 5, 7}) {
+                assertThat(row[column]).as("column %d of %s", column, row[1]).isNotBlank();
+            }
+        }
+    }
+
+    @Test
+    void credits_everyNonEmptyUrlStartsWithHttps() throws IOException {
+        for (String[] row : allCreditRows()) {
+            for (int column : new int[]{6, 8}) {
+                if (!row[column].isEmpty()) {
+                    assertThat(row[column]).as("column %d of %s", column, row[1]).startsWith("https://");
+                }
+            }
+        }
+    }
+
+    @Test
+    void credits_hasExactlyOneFontRowWhoseFileIsThePrefixOfEveryTtf() throws IOException {
+        List<String[]> fonts = rowsOfKind("font");
+        Set<String> ttfFiles = new TreeSet<>();
+        for (String name : filesIn("ui/fonts/")) {
+            if (name.endsWith(".ttf")) {
+                ttfFiles.add(name);
+            }
+        }
+
+        assertThat(fonts).hasSize(1);
+        assertThat(ttfFiles).isNotEmpty().allMatch(name -> name.startsWith(fonts.getFirst()[1]));
+    }
+
+    @Test
+    void credits_hasExactlyOneIconRowWhoseFileExistsInTheIconsFolder() throws IOException {
+        List<String[]> icons = rowsOfKind("icon");
+
+        assertThat(icons).hasSize(1);
+        assertThat(filesIn("ui/icons/")).contains(icons.getFirst()[1]);
+        assertThat(new ClassPathResource("ui/icons/" + icons.getFirst()[1]).exists()).isTrue();
+    }
+
     @Test
     void credits_ccByAndCcBySaRowsHaveAnAuthorAndLicenseUrl() throws IOException {
         List<String[]> attributionRows = creditRows().stream()
@@ -168,17 +218,32 @@ class SeedImagesTest {
         return creditRows().stream().map(row -> row[1]).toList();
     }
 
-    /** The {@code image} rows: no {@code #} lines, the first other line is the header, split on tabs. */
+    /** The {@code image} rows only (the 21 photos). */
     private static List<String[]> creditRows() throws IOException {
+        return rowsOfKind("image");
+    }
+
+    private static List<String[]> rowsOfKind(String kind) throws IOException {
+        return allCreditRows().stream().filter(columns -> columns[0].equals(kind)).toList();
+    }
+
+    /** Every row of every kind: no {@code #} lines, the first other line is the header, split on tabs. */
+    private static List<String[]> allCreditRows() throws IOException {
         List<String> data = readLines().stream().filter(line -> !line.startsWith("#") && !line.isBlank()).toList();
         List<String[]> rows = new ArrayList<>();
         for (String line : data.subList(1, data.size())) {
-            String[] columns = line.split("\t", -1);
-            if (columns.length > 0 && columns[0].equals("image")) {
-                rows.add(columns);
-            }
+            rows.add(line.split("\t", -1));
         }
         return rows;
+    }
+
+    /** File names (not paths) of the classpath resources directly inside {@code directory}, e.g. {@code ui/fonts/}. */
+    private static Set<String> filesIn(String directory) throws IOException {
+        Set<String> names = new TreeSet<>();
+        for (Resource resource : new PathMatchingResourcePatternResolver().getResources("classpath:" + directory + "*")) {
+            names.add(resource.getFilename());
+        }
+        return names;
     }
 
     private static List<String> readLines() throws IOException {

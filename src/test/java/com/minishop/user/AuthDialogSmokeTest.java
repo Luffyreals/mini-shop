@@ -5,6 +5,7 @@ import com.minishop.support.StandaloneApp;
 import com.minishop.support.TestShellApp;
 import javafx.application.Application;
 import javafx.geometry.Bounds;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
@@ -12,6 +13,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.stage.Modality;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.junit.jupiter.api.AfterAll;
@@ -274,6 +276,52 @@ class AuthDialogSmokeTest {
                 mainStage.setHeight(originalHeight);
             });
         }
+    }
+
+    @Test
+    void dialog_withTheMainWindowMostlyOffScreen_staysInsideTheScreenInBothModes() {
+        double originalX = FxTestSupport.callOnFx(mainStage::getX);
+        double originalY = FxTestSupport.callOnFx(mainStage::getY);
+        double originalWidth = FxTestSupport.callOnFx(mainStage::getWidth);
+        double originalHeight = FxTestSupport.callOnFx(mainStage::getHeight);
+        Rectangle2D screen = FxTestSupport.callOnFx(() -> Screen.getPrimary().getVisualBounds());
+        FxTestSupport.runOnFx(() -> {
+            mainStage.setWidth(1024);
+            mainStage.setHeight(700);
+            // only a 400 x 300 top-left corner of the main window stays on the screen
+            mainStage.setX(screen.getMaxX() - 400);
+            mainStage.setY(screen.getMaxY() - 300);
+        });
+        try {
+            FxTestSupport.flushFx();
+            Stage dialog = openDialog();
+            settle(dialog);
+            assertInsideTheScreen(dialog, screen, "in login mode");
+
+            fire(dialog, "toRegister");
+            settle(dialog);
+            assertInsideTheScreen(dialog, screen, "after switching to the taller register mode");
+        } finally {
+            FxTestSupport.runOnFx(() -> {
+                mainStage.setWidth(originalWidth);
+                mainStage.setHeight(originalHeight);
+                mainStage.setX(originalX);
+                mainStage.setY(originalY);
+            });
+        }
+    }
+
+    private static void assertInsideTheScreen(Stage dialog, Rectangle2D screen, String when) {
+        double x = FxTestSupport.callOnFx(dialog::getX);
+        double y = FxTestSupport.callOnFx(dialog::getY);
+        double width = FxTestSupport.callOnFx(dialog::getWidth);
+        double height = FxTestSupport.callOnFx(dialog::getHeight);
+        assertThat(x).as("dialog left edge %s", when).isGreaterThanOrEqualTo(screen.getMinX() - 1);
+        assertThat(y).as("dialog top edge %s", when).isGreaterThanOrEqualTo(screen.getMinY() - 1);
+        assertThat(x + width).as("dialog right edge %s (screen %s)", when, screen)
+                .isLessThanOrEqualTo(screen.getMaxX() + 1);
+        assertThat(y + height).as("dialog bottom edge %s (screen %s)", when, screen)
+                .isLessThanOrEqualTo(screen.getMaxY() + 1);
     }
 
     /** Waits until the dialog has stopped resizing (the stage is fitted to its content in a later pulse). */

@@ -455,4 +455,122 @@ class AdminCategoriesPresenterTest {
         verifyNoInteractions(navigator, confirmDialog);
         verify(service, never()).delete(anyLong());
     }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    @Test
+    void load_firstLoadFailsUnexpectedly_setsLoadFailed_reportsOnce_andStopsLoading() {
+        IllegalStateException failure = new IllegalStateException("database is down");
+        when(service.list()).thenThrow(failure);
+        AdminCategoriesPresenter presenter = presenter(direct);
+
+        presenter.load();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+        assertThat(presenter.rows()).isEmpty();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(toasts, navigator);
+    }
+
+    @Test
+    void load_asANonAdmin_keepsTheOldPath_andLoadFailedStaysFalse() {
+        when(service.list()).thenThrow(new AccessDeniedException());
+        AdminCategoriesPresenter presenter = presenter(direct);
+
+        presenter.load();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verify(toasts).show("Bạn không có quyền truy cập trang này.", ToastKind.ERROR);
+        verify(navigator).goHome();
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsAgain_clearsLoadFailed_showsTheRows_andFocusesTheTop() {
+        when(service.list()).thenThrow(new IllegalStateException("down")).thenReturn(List.of(BOOKS, TOYS));
+        AdminCategoriesPresenter presenter = presenter(direct);
+        presenter.load();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.rows()).hasSize(2);
+        assertThat(presenter.focusTargetProperty().get()).isEqualTo(new AdminCategoriesPresenter.FocusTarget(null));
+        verify(service, times(2)).list();
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        IllegalStateException failure = new IllegalStateException("down");
+        when(service.list()).thenThrow(failure);
+        AdminCategoriesPresenter presenter = presenter(direct);
+        presenter.load();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(service.list()).thenThrow(new IllegalStateException("down")).thenReturn(List.of(BOOKS));
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        AdminCategoriesPresenter presenter = presenter(manual);
+        presenter.load();
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(service.list()).thenThrow(new IllegalStateException("down"));
+        AdminCategoriesPresenter presenter = presenter(direct);
+        presenter.load();
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(service, times(1)).list();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_beforeAnyLoad_orWhenNothingFailed_doesNothing() {
+        presenter(direct).retry();
+        verifyNoInteractions(service);
+
+        AdminCategoriesPresenter presenter = loaded();
+        presenter.retry();
+
+        verify(service, times(1)).list();
+    }
+
+    @Test
+    void reload_failsAfterTheTableWasShown_keepsTheRows_andLoadFailedStaysFalse() {
+        IllegalStateException failure = new IllegalStateException("down");
+        when(service.delete(1L)).thenReturn(new CategoryDeleteResult.Deleted("Sách"));
+        when(service.list()).thenReturn(List.of(BOOKS, TOYS)).thenThrow(failure);
+        AdminCategoriesPresenter presenter = loaded();
+
+        confirmedAction(presenter, presenter.rows().get(0)).run();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.rows()).hasSize(2);
+        verify(errors, times(1)).report(failure);
+    }
 }

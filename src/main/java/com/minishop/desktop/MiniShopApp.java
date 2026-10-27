@@ -3,6 +3,7 @@ package com.minishop.desktop;
 import com.minishop.MiniShopApplication;
 import com.minishop.common.SafeExceptionLog;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -10,6 +11,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
@@ -32,6 +34,11 @@ public class MiniShopApp extends Application {
     static final double MIN_HEIGHT = 700;
     static final double INITIAL_WIDTH = 1280;
     static final double INITIAL_HEIGHT = 800;
+
+    private static final int[] ICON_SIZES = {16, 32, 48, 256};
+
+    /** Dòng INFO ghi một lần khi cửa sổ chính đã hiện (job CI {@code package-windows} chờ dòng này). */
+    static final String MAIN_WINDOW_SHOWN = "Main window shown";
 
     private static final Logger LOG = LoggerFactory.getLogger(MiniShopApp.class);
 
@@ -64,6 +71,10 @@ public class MiniShopApp extends Application {
         return new SpringApplicationBuilder(MiniShopApplication.class)
                 .web(WebApplicationType.NONE)
                 .headless(false)
+                // HostServices thuộc về Application nên phải được đưa vào context từ đây: FxExternalLinks lấy nó
+                // để mở liên kết trong trình duyệt (context của test không có bean này).
+                .initializers(applicationContext -> applicationContext.getBeanFactory()
+                        .registerSingleton("hostServices", getHostServices()))
                 .properties(
                         "logging.level.org.springframework.boot.SpringApplication=OFF",
                         "logging.level.org.springframework.boot.diagnostics.LoggingFailureAnalysisReporter=OFF",
@@ -125,9 +136,37 @@ public class MiniShopApp extends Application {
         stage.setMinWidth(Math.min(MIN_WIDTH, screen.getWidth()));
         stage.setMinHeight(Math.min(MIN_HEIGHT, screen.getHeight()));
         stage.setScene(scene);
+        addWindowIcons(stage);
         stage.show();
+        // Dấu mốc "app đã mở thật": Boot không ghi "Started …" (logger đã tắt, xem createContext), nên job CI
+        // package-windows chờ đúng dòng này trong file log của bản đóng gói. Đổi chữ thì sửa cả ci.yml.
+        LOG.info(MAIN_WINDOW_SHOWN);
         // Một lần sau khi context đã dựng và cửa sổ đã hiện: nạp sẵn ImageIO ngoài luồng giao diện
         context.getBeanProvider(ImageLoader.class).ifAvailable(ImageLoader::warmUp);
+    }
+
+    /**
+     * Biểu tượng của cửa sổ chính (thanh tiêu đề, thanh tác vụ, Alt+Tab): bốn PNG vì JavaFX không đọc SVG. Thiếu
+     * hoặc hỏng file nào thì bỏ file đó, ghi một dòng WARN và vẫn mở cửa sổ (giống {@link Theme}).
+     */
+    private static void addWindowIcons(Stage stage) {
+        for (int size : ICON_SIZES) {
+            String path = "/ui/icons/app-icon-" + size + ".png";
+            try (InputStream in = MiniShopApp.class.getResourceAsStream(path)) {
+                if (in == null) {
+                    LOG.warn("Window icon missing: {}", path);
+                    continue;
+                }
+                Image image = new Image(in);
+                if (image.isError()) {
+                    LOG.warn("Window icon unreadable: {}", path);
+                    continue;
+                }
+                stage.getIcons().add(image);
+            } catch (IOException | RuntimeException e) {
+                LOG.warn("Window icon failed: {}: {}", path, e.toString());
+            }
+        }
     }
 
     @Override

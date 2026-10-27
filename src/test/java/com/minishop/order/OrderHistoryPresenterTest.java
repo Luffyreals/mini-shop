@@ -24,6 +24,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -321,5 +322,132 @@ class OrderHistoryPresenterTest {
         presenter.dispose();
 
         assertThat(presenter.rows()).isEmpty();
+    }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    @Test
+    void load_firstLoadFails_setsLoadFailed_reportsOnce_andStopsLoading() {
+        RuntimeException failure = new IllegalStateException("database is down");
+        when(orders.listOrders(anyLong(), anyString())).thenThrow(failure);
+        OrderHistoryPresenter presenter = presenter();
+
+        presenter.load(new OrdersRoute(2));
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+        assertThat(presenter.rows()).isEmpty();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(navigator);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsTheSameRouteAgain_clearsLoadFailed_andShowsTheRows() {
+        when(orders.listOrders(USER_ID, "2")).thenThrow(new IllegalStateException("down"))
+                .thenReturn(page(2, 3, 25, summary(42, NOON_IN_VIETNAM, "1250000", "Chờ xác nhận", "pending")));
+        OrderHistoryPresenter presenter = presenter();
+        presenter.load(new OrdersRoute(2));
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.rows()).hasSize(1);
+        assertThat(presenter.pageNavProperty().get()).isEqualTo(PageNav.of(2, 3));
+        verify(orders, times(2)).listOrders(USER_ID, "2");
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        RuntimeException failure = new IllegalStateException("down");
+        when(orders.listOrders(anyLong(), anyString())).thenThrow(failure);
+        OrderHistoryPresenter presenter = presenter();
+        presenter.load(OrdersRoute.first());
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(orders.listOrders(anyLong(), anyString())).thenThrow(new IllegalStateException("down"))
+                .thenReturn(page(1, 1, 0));
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        OrderHistoryPresenter presenter = new OrderHistoryPresenter(orders, session, manual, navigator, errors);
+        presenter.load(OrdersRoute.first());
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(orders.listOrders(anyLong(), anyString())).thenThrow(new IllegalStateException("down"));
+        OrderHistoryPresenter presenter = presenter();
+        presenter.load(OrdersRoute.first());
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(orders, times(1)).listOrders(anyLong(), anyString());
+        assertThat(presenter.loadedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_beforeAnyLoad_orWhenNothingFailed_doesNothing() {
+        presenter().retry();
+        verifyNoInteractions(orders);
+
+        when(orders.listOrders(anyLong(), anyString())).thenReturn(page(1, 1, 0));
+        OrderHistoryPresenter presenter = presenter();
+        presenter.load(OrdersRoute.first());
+        presenter.retry();
+
+        verify(orders, times(1)).listOrders(anyLong(), anyString());
+    }
+
+    @Test
+    void retry_afterTheSessionEnded_doesNotCallTheServiceAndGoesHome() {
+        when(orders.listOrders(anyLong(), anyString())).thenThrow(new IllegalStateException("down"));
+        OrderHistoryPresenter presenter = presenter();
+        presenter.load(OrdersRoute.first());
+        when(session.currentUser()).thenReturn(Optional.empty());
+
+        presenter.retry();
+
+        verify(orders, times(1)).listOrders(anyLong(), anyString());
+        verify(navigator).goHome();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void load_failsAfterRowsWereShown_keepsThem_andLoadFailedStaysFalse() {
+        when(orders.listOrders(USER_ID, "1")).thenReturn(page(1, 2, 12,
+                summary(42, NOON_IN_VIETNAM, "1250000", "Chờ xác nhận", "pending")));
+        RuntimeException failure = new IllegalStateException("down");
+        when(orders.listOrders(USER_ID, "2")).thenThrow(failure);
+        OrderHistoryPresenter presenter = presenter();
+        presenter.load(OrdersRoute.first());
+
+        presenter.load(new OrdersRoute(2));
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.rows()).hasSize(1);
+        verify(errors, times(1)).report(failure);
+        presenter.retry();
+        verify(orders, times(1)).listOrders(USER_ID, "2");
     }
 }

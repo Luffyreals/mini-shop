@@ -38,8 +38,9 @@ import java.util.Objects;
  * đang có ở trang 1 không đổi gì, còn ở trang sau thì về trang 1.
  *
  * <p><b>Luồng:</b> {@code ProductService.search} chạy qua {@link BackgroundTasks}; property chỉ đổi trên luồng
- * giao diện. Lỗi lạ đi vào {@link UnexpectedErrors} và màn giữ nội dung đang có. Sau {@link #dispose} không
- * callback nào đổi property hay điều hướng nữa.
+ * giao diện. Lỗi lạ đi vào {@link UnexpectedErrors} và màn giữ nội dung đang có; nếu đó là lần nạp đầu thì
+ * {@link #loadFailedProperty()} bật và {@link #retry()} nạp lại (QĐ12). Sau {@link #dispose} không callback nào đổi
+ * property hay điều hướng nữa.
  *
  * <p>Presenter chỉ import {@code javafx.beans} và {@code javafx.collections}.
  */
@@ -60,6 +61,7 @@ class CatalogPresenter {
 
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loaded = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final ObservableList<ProductCardView> cards = FXCollections.observableArrayList();
     private final StringProperty resultText = new SimpleStringProperty("");
     private final BooleanProperty empty = new SimpleBooleanProperty(false);
@@ -118,6 +120,7 @@ class CatalogPresenter {
         resultText.set("Tìm thấy " + view.totalElements() + " sản phẩm");
         empty.set(view.products().isEmpty());
         pageNav.set(PageNav.of(view.filter().page(), view.totalPages()));
+        loadFailed.set(false);
         loaded.set(true);
         loading.set(false);
         if (firstLoad) {
@@ -131,7 +134,22 @@ class CatalogPresenter {
 
     private void failed(Throwable failure) {
         loading.set(false);
+        if (!loaded.get()) {
+            loadFailed.set(true);   // lần nạp đầu lỗi: màn hiện khối lỗi thay vì để trống
+        }
         errors.report(failure);
+    }
+
+    /**
+     * "Thử lại" sau một lỗi lạ ở lần nạp đầu (QĐ12): tắt {@link #loadFailedProperty()} rồi nạp lại đúng route. Bỏ
+     * qua khi đã {@link #dispose}, khi đang nạp hoặc khi chưa có lỗi.
+     */
+    void retry() {
+        if (disposed || loading.get() || !loadFailed.get()) {
+            return;
+        }
+        loadFailed.set(false);
+        reload();
     }
 
     /** Chọn một danh mục ({@code null} là mọi danh mục). */
@@ -201,6 +219,11 @@ class CatalogPresenter {
 
     ReadOnlyBooleanProperty loadingProperty() {
         return loading;
+    }
+
+    /** {@code true} khi lần nạp đầu của route này lỗi vì một lỗi lạ (màn hiện khối "Thử lại"). */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** {@code true} từ lần nạp thành công đầu tiên; màn dùng nó để biết đã có gì để hiện chưa. */

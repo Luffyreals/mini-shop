@@ -19,6 +19,7 @@ import com.minishop.desktop.Toasts;
 import com.minishop.storage.ImageUpload;
 import com.minishop.storage.InvalidImageException;
 import jakarta.validation.Validator;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +62,9 @@ import org.springframework.stereotype.Component;
  * ({@link #checkingImageProperty()}). Hợp lệ thì thành lựa chọn và xem trước; không hợp lệ thì lỗi dưới ô ảnh và
  * <em>giữ lựa chọn cũ</em>. Lúc "Lưu": {@code Validator} trên form (luồng giao diện) có lỗi thì dừng, không đọc
  * file, không gọi service; không lỗi thì một việc nền đọc lại file ({@code fromFile}, vì file có thể đã đổi) rồi
- * đúng một lời gọi service, nên ảnh hỏng không bao giờ ghi file nào.
+ * đúng một lời gọi service, nên ảnh hỏng không bao giờ ghi file nào. File không đọc được (đã bị xóa, bị khóa, lỗi
+ * I/O; D6 QĐ16) cho {@link #MSG_IMAGE_UNREADABLE} dưới ô ảnh ở cả hai lúc, không hộp thoại lỗi, và lúc lưu thì không
+ * gọi service; lỗi I/O khác (ví dụ {@code store} ghi file) vẫn là lỗi lạ qua {@link AdminFailures}.
  *
  * <p>{@link #dispose} hủy việc nạp và việc kiểm ảnh nhưng <em>không</em> hủy việc ghi đang chạy (hủy callback không
  * hủy transaction): ghi xong sau {@code dispose} thì thành công vẫn hiện toast, không đổi property, không điều
@@ -84,6 +87,8 @@ class AdminProductFormPresenter {
     static final String MSG_CATEGORY_GONE = "Danh mục không tồn tại.";
     static final String MSG_IMAGE_TYPE = "Ảnh chỉ được là JPG, PNG hoặc WebP.";
     static final String MSG_IMAGE_SIZE = "Ảnh tối đa 2 MB.";
+    /** File đã chọn không đọc được (biến mất, bị khóa, lỗi I/O); QĐ16 của D6. */
+    static final String MSG_IMAGE_UNREADABLE = "Không đọc được file ảnh. Vui lòng chọn ảnh khác.";
     /** "Tồn kho hiện tại: {n}". */
     static final String STOCK_TEXT = "Tồn kho hiện tại: %d";
 
@@ -247,7 +252,7 @@ class AdminProductFormPresenter {
         }
         checkingImage.set(true);
         pendingImageCheck = tasks.submit(() -> {
-            ImageUpload.fromFile(file);   // chỉ để kiểm; lúc lưu đọc lại
+            readImage(file);   // chỉ để kiểm; lúc lưu đọc lại
             return file;
         }, this::imageAccepted, this::imageRejected);
     }
@@ -265,6 +270,9 @@ class AdminProductFormPresenter {
         checkingImage.set(false);
         if (failure instanceof InvalidImageException invalid) {
             imageError.set(imageMessage(invalid));
+        } else if (failure instanceof UnreadableImageException) {
+            // File đã biến mất, bị khóa hoặc không đọc được: câu dưới ô ảnh, giữ lựa chọn cũ, không hộp thoại lỗi
+            imageError.set(MSG_IMAGE_UNREADABLE);
         } else {
             failures.handle(failure);
         }
@@ -351,9 +359,31 @@ class AdminProductFormPresenter {
         }, this::updated, this::writeFailed);
     }
 
-    /** Đọc lại file ngay trước khi lưu (file có thể đã đổi từ lúc chọn); chạy ở nền. */
+    /**
+     * Đọc file ảnh ở nền (lúc chọn để kiểm, lúc lưu để đọc lại vì file có thể đã đổi). Lỗi I/O của chính file này
+     * thành {@link UnreadableImageException}, tách khỏi {@link UncheckedIOException} mà {@code store} có thể ném
+     * (ghi vào thư mục tải lên): lỗi sau vẫn là lỗi lạ. Khi dùng làm đối số của lời gọi service, lỗi này ném trước
+     * khi service được gọi nên không ghi gì.
+     */
     private static ImageUpload readImage(Path image) {
-        return image == null ? null : ImageUpload.fromFile(image);
+        if (image == null) {
+            return null;
+        }
+        try {
+            return ImageUpload.fromFile(image);
+        } catch (UncheckedIOException e) {
+            throw new UnreadableImageException();
+        }
+    }
+
+    /** File ảnh đã chọn không đọc được (QĐ16). Không mang đường dẫn, cause hay stack trace. */
+    private static final class UnreadableImageException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        UnreadableImageException() {
+            super("The chosen image could not be read", null, false, false);
+        }
     }
 
     private String categoryIdText() {
@@ -394,6 +424,11 @@ class AdminProductFormPresenter {
         busy.set(false);
         if (failure instanceof InvalidImageException invalid) {
             imageError.set(imageMessage(invalid));
+            firstErrorField.set(null);
+            firstErrorField.set(Field.IMAGE);
+        } else if (failure instanceof UnreadableImageException) {
+            // Chưa gọi service (đọc file là đối số của lời gọi): không ghi gì, giữ nguyên form và lựa chọn ảnh
+            imageError.set(MSG_IMAGE_UNREADABLE);
             firstErrorField.set(null);
             firstErrorField.set(Field.IMAGE);
         } else if (failure instanceof CategoryNotFoundException) {
@@ -510,6 +545,7 @@ class AdminProductFormPresenter {
     /** Lỗi đến sau {@link #dispose}: lỗi nghiệp vụ bỏ qua, lỗi lạ vẫn báo (AC-009-12). */
     private void lateFailure(Throwable failure) {
         boolean business = failure instanceof InvalidImageException
+                || failure instanceof UnreadableImageException
                 || failure instanceof CategoryNotFoundException
                 || failure instanceof NotFoundException
                 || failure instanceof AccessDeniedException;

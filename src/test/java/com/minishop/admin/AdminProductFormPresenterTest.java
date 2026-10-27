@@ -516,7 +516,7 @@ class AdminProductFormPresenterTest {
     }
 
     @Test
-    void save_new_readsTheFileAgainAtSaveTime_soAFileDeletedAfterChoosingFailsWithoutCallingTheService()
+    void save_new_readsTheFileAgainAtSaveTime_soAFileDeletedAfterChoosingShowsTheImageErrorWithoutCallingTheService()
             throws IOException {
         Path image = png("gone.png");
         ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
@@ -531,13 +531,31 @@ class AdminProductFormPresenterTest {
 
         manual.run(2);
 
-        ArgumentCaptor<Throwable> reported = ArgumentCaptor.forClass(Throwable.class);
-        verify(errors, times(1)).report(reported.capture());
-        assertThat(reported.getValue()).isInstanceOf(UncheckedIOException.class);
-        assertThat(reported.getValue().getMessage()).doesNotContain(tmp.toString());
-        verify(productAdmin, never()).create(any(), anyInt(), anyBoolean(), any());
+        assertThat(presenter.imageErrorProperty().get()).isEqualTo(AdminProductFormPresenter.MSG_IMAGE_UNREADABLE);
+        assertThat(presenter.firstErrorFieldProperty().get()).isEqualTo(AdminProductFormPresenter.Field.IMAGE);
         assertThat(presenter.busyProperty().get()).isFalse();
+        assertThat(presenter.nameProperty().get()).isEqualTo("Bàn phím");   // typed text stays
+        assertThat(presenter.selectedImageProperty().get()).isEqualTo(image);
+        verify(productAdmin, never()).create(any(), anyInt(), anyBoolean(), any());
+        verifyNoInteractions(errors, toasts, navigator);
+    }
+
+    @Test
+    void save_new_whenTheServiceFailsWritingTheImage_stillReportsTheIoErrorAsUnexpected() throws IOException {
+        Path image = png("ok.png");
+        UncheckedIOException storeFailure = new UncheckedIOException("Cannot store image x.png", new IOException("disk"));
+        when(productAdmin.create(any(), anyInt(), anyBoolean(), any())).thenThrow(storeFailure);
+        AdminProductFormPresenter presenter = newForm();
+        presenter.imageChosen(image);
+        fillValid(presenter);
+
+        presenter.save();
+
+        verify(errors, times(1)).report(storeFailure);
         assertThat(presenter.imageErrorProperty().get()).isEmpty();
+        assertThat(presenter.busyProperty().get()).isFalse();
+        verify(toasts, never()).show(any(), any());
+        verify(navigator, never()).navigateTo(any());
     }
 
     @Test
@@ -835,7 +853,7 @@ class AdminProductFormPresenterTest {
     }
 
     @Test
-    void save_edit_whenTheImageFileCannotBeReadAtSaveTime_reportsOnce_andNeverCallsUpdate() throws IOException {
+    void save_edit_whenTheImageFileCannotBeReadAtSaveTime_showsTheImageError_andNeverCallsUpdate() throws IOException {
         Path image = png("gone.png");
         ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
         AdminProductFormPresenter presenter = presenter(manual);
@@ -848,11 +866,29 @@ class AdminProductFormPresenterTest {
 
         manual.run(2);
 
-        verify(errors, times(1)).report(any(UncheckedIOException.class));
+        assertThat(presenter.imageErrorProperty().get()).isEqualTo(AdminProductFormPresenter.MSG_IMAGE_UNREADABLE);
+        assertThat(presenter.firstErrorFieldProperty().get()).isEqualTo(AdminProductFormPresenter.Field.IMAGE);
         verify(productAdmin, never()).update(anyLong(), any(), any());
         verify(productAdmin, times(1)).getForEdit(PRODUCT_ID);
         assertThat(presenter.busyProperty().get()).isFalse();
+        verifyNoInteractions(errors);
         verify(navigator, never()).navigateTo(any());
+        verify(toasts, never()).show(any(), any());
+    }
+
+    @Test
+    void save_edit_whenTheServiceFailsWritingTheImage_stillReportsTheIoErrorAsUnexpected() throws IOException {
+        Path image = png("ok.png");
+        UncheckedIOException storeFailure = new UncheckedIOException("Cannot store image x.png", new IOException("disk"));
+        when(productAdmin.update(anyLong(), any(), any())).thenThrow(storeFailure);
+        AdminProductFormPresenter presenter = editForm();
+        presenter.imageChosen(image);
+
+        presenter.save();
+
+        verify(errors, times(1)).report(storeFailure);
+        assertThat(presenter.imageErrorProperty().get()).isEmpty();
+        assertThat(presenter.busyProperty().get()).isFalse();
         verify(toasts, never()).show(any(), any());
     }
 
@@ -973,16 +1009,30 @@ class AdminProductFormPresenterTest {
     }
 
     @Test
-    void imageChosen_aFileThatCannotBeRead_isReportedAsAnUnexpectedError_withoutAnImageError() {
+    void imageChosen_aFileThatCannotBeRead_showsTheImageError_withoutReporting() {
         Path missing = tmp.resolve("missing.png");
         AdminProductFormPresenter presenter = newForm();
 
         presenter.imageChosen(missing);
 
-        verify(errors, times(1)).report(any(UncheckedIOException.class));
-        assertThat(presenter.imageErrorProperty().get()).isEmpty();
+        assertThat(presenter.imageErrorProperty().get()).isEqualTo(AdminProductFormPresenter.MSG_IMAGE_UNREADABLE);
         assertThat(presenter.selectedImageProperty().get()).isNull();
         assertThat(presenter.checkingImageProperty().get()).isFalse();
+        verifyNoInteractions(errors, toasts);
+    }
+
+    @Test
+    void imageChosen_anUnreadableFileAfterAGoodOne_keepsTheEarlierSelection() throws IOException {
+        Path good = png("good.png");
+        AdminProductFormPresenter presenter = newForm();
+        presenter.imageChosen(good);
+
+        presenter.imageChosen(tmp.resolve("missing.png"));
+
+        assertThat(presenter.imageErrorProperty().get()).isEqualTo(AdminProductFormPresenter.MSG_IMAGE_UNREADABLE);
+        assertThat(presenter.selectedImageProperty().get()).isEqualTo(good);
+        assertThat(presenter.selectedImageNameProperty().get()).isEqualTo("good.png");
+        verifyNoInteractions(errors);
     }
 
     @Test

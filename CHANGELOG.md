@@ -5,7 +5,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
-Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)). Sau đó Mini Shop chuyển từ website sang ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)); giai đoạn D1 dựng nền tảng, D2 làm lại tài khoản, D3 làm lại cửa hàng, D4 làm lại giỏ hàng và đặt hàng, D5 làm lại khu quản trị.
+Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)). Sau đó Mini Shop chuyển từ website sang ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)); giai đoạn D1 dựng nền tảng, D2 làm lại tài khoản, D3 làm lại cửa hàng, D4 làm lại giỏ hàng và đặt hàng, D5 làm lại khu quản trị, D6 hoàn thiện và đóng gói app thành `MiniShop.exe`.
 
 ### Thêm
 - Trang chủ chỉ dùng dữ liệu thật: sản phẩm mới nhất (thêm vào giỏ, xem chi tiết), hai sản phẩm mới kế tiếp, khối "Sắp hết hàng" (còn 1–5 cái, ẩn khi không có) và thẻ "Giao hàng và thanh toán". App mở vào trang chủ; nút "Cửa hàng" và đăng xuất cũng về đó.
@@ -23,6 +23,14 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - Danh mục: danh sách, thêm, sửa, xóa qua hộp xác nhận; không xóa được danh mục còn sản phẩm. Menu "Danh mục ▾" của thanh trên cập nhật ngay.
 - Sản phẩm: danh sách cả sản phẩm đã ẩn, tìm theo tên, 20 sản phẩm một trang, ẩn/hiện ngay trên hàng; form thêm/sửa có chọn ảnh (kiểm ngay khi chọn, xem trước, "Bỏ chọn ảnh"), khối "Điều chỉnh tồn kho" không xóa chữ đang nhập ở form.
 - Đơn hàng: lọc theo trạng thái, phân trang, chi tiết đơn, các nút đổi trạng thái theo luồng cho phép; "Hủy đơn" và "Xác nhận đã giao" hỏi lại trước.
+- Bản đóng gói Windows: `.\mvnw.cmd -Pjpackage -DskipTests package` tạo `target\dist\MiniShop\` có `MiniShop.exe` và Java 25 riêng (chỉ các module app cần, có `jdk.localedata` để sắp xếp tiếng Việt), chạy được trên máy không cài Java. Thông tin của file `.exe` đọc từ `src/packaging/windows/metadata.args` (UTF-8) để giữ đúng dấu tiếng Việt. Kèm `THIRD-PARTY.txt` và văn bản giấy phép TwelveMonkeys. Build bỏ thuộc tính chỉ-đọc jpackage đặt cho `MiniShop.exe`, nên `mvnw clean` sau đó xóa được. Thư mục app cần nằm ở đường dẫn không dấu: chữ ngoài bảng mã ANSI của Windows (ví dụ "ư") làm `MiniShop.exe` thoát ngay (xem README).
+- Bản đóng gói ghi log ra `logs/mini-shop.log` trong thư mục dữ liệu (cuộn ở 10 MB, giữ 7 ngày); chạy từ mã nguồn vẫn chỉ ra console.
+- Job CI `package-windows` trên `windows-latest`: build bản đóng gói, mở thử `MiniShop.exe` và chờ dòng log "Main window shown", rồi tải lên artifact `MiniShop-<phiên bản>-windows`. Chạy khi push lên `main`, chạy tay, và ở PR có đổi `pom.xml`, `src/packaging/` hoặc workflow.
+- Hộp thoại "Nguồn ảnh" mở từ chân trang của trang chủ: tên ảnh, tác giả, giấy phép và nguồn của 21 ảnh sản phẩm, của phông Plus Jakarta Sans và của biểu tượng app; link giấy phép và nguồn mở trình duyệt (chỉ `https://`).
+- Màn nạp lỗi bất ngờ không còn trống: ngoài hộp thoại lỗi, màn hiện "Đã có lỗi xảy ra. Vui lòng thử lại." và nút "Thử lại" (trang chủ, danh sách và chi tiết sản phẩm, ngăn giỏ, đơn hàng của tôi, chi tiết đơn, các màn quản trị).
+- Biểu tượng app: chữ M trắng trên nền tối với chấm cam, theo token màu desktop; có `.ico` cho `MiniShop.exe` và PNG cho cửa sổ. `src/packaging/windows/MakeIcon.java` vẽ lại mọi cỡ từ `app-icon.svg` chỉ bằng JDK.
+- Form sản phẩm của quản trị: file ảnh không đọc được (bị xóa hoặc khóa sau khi chọn) báo "Không đọc được file ảnh. Vui lòng chọn ảnh khác." dưới ô ảnh thay cho hộp thoại lỗi chung.
+- Thành phần dùng chung trong `desktop`: `Tables` (bảng), `StatusPill` (nhãn trạng thái đơn), `LoadError` (khối lỗi có "Thử lại"), `Credits`, `CreditsDialog`, `ExternalLinks`.
 
 ### Thay đổi
 - App là ứng dụng desktop JavaFX 25 chạy bằng `./mvnw javafx:run`; Spring chạy không có web server. Cửa sổ khung có thanh trên cùng (logo, mục điều hướng, ô tìm kiếm, nút giỏ, nút đăng nhập; các nút bật dần ở D2–D4), theme "soft modern" và phông Plus Jakarta Sans đóng gói kèm.
@@ -45,6 +53,12 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - `.claude/` và `CLAUDE.md` (công cụ AI lúc phát triển) không còn nằm trong git.
 - README rút gọn; kiến trúc, sơ đồ bảng, bảng ADR và cấu trúc repo chuyển sang `docs/architecture.md`; quy ước đóng góp gộp vào README.
 - Link tới đặc tả giai đoạn trong ADR và CHANGELOG trỏ tới tag `v0.8.0`.
+- Thư mục dữ liệu: `DATA_DIR` nếu có, không thì `%LOCALAPPDATA%\MiniShop` khi chạy bản đóng gói, không thì `./data` như cũ (`config.DataDirectory`); thư mục upload đi theo.
+- Hộp thoại (đăng nhập, xác nhận, lỗi, "Nguồn ảnh") nằm giữa cửa sổ app và trong màn hình, thay vì giữa màn hình ở một phần ba chiều cao.
+- Nút tài khoản rộng hơn (tối đa 168 px) để "Quản trị viên" và "Khách hàng mẫu" hiện đủ ở cửa sổ 1024 px; tên dài hơn vẫn cắt bằng "…" và trình đọc màn hình đọc đủ.
+- Ô "Điều chỉnh tồn kho" nhận số dán kèm khoảng trắng đặc biệt (NBSP) hoặc ký tự vô hình.
+- "Đơn hàng của tôi" và khu quản trị dùng chung bộ dựng bảng và nhãn trạng thái trong `desktop`.
+- Phiên bản trong `pom.xml` lên `0.9.0`.
 
 ### Bỏ
 - Giao diện web: controller, Thymeleaf, Bootstrap/WebJars, CSS/JS, trang lỗi HTTP, ảnh chụp màn hình web trong `docs/images/` (vẫn xem được ở tag `v0.8.0`).
@@ -53,6 +67,7 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - PostgreSQL, Docker Compose (`compose.yaml`), Testcontainers, profile `local` và `h2`.
 - Tài liệu quy trình theo giai đoạn (`docs/project-brief.md`, `docs/specs/`, `docs/plans/`), vẫn xem được ở tag `v0.8.0`.
 - `CONTRIBUTING.md`, template issue và PR, Dependabot.
+- Bộ parse không còn ai gọi từ khi bỏ URL: `AdminInput.id`, `AdminInput.page`, `OrderInput.orderId`, `OrderInput.amount`, `CartInput.productId`.
 
 ### Sửa
 - Trên database mới, sau khoảng 30 phút chạy app thì đặt hàng, đăng ký và đổi trạng thái đơn đều lỗi cho tới khi mở lại app. Nguyên nhân là lỗi của H2 2.4.240: ràng buộc `CHECK (… in (…))` gắn với kết nối Flyway đã tạo nó, và hỏng khi pool thay kết nối đó. Nâng H2 lên 2.5.252 (ghi đè bản của Spring Boot); file database cũ vẫn mở được. Hai test mới tái hiện lỗi: `H2CheckConstraintSessionTest` và `PoolConnectionRetireIntegrationTest`.

@@ -399,4 +399,127 @@ class HomePresenterTest {
 
         verify(storefront, times(2)).updateCategories(CATEGORIES);
     }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    @Test
+    void load_firstLoadFails_setsLoadFailed_reportsOnce_andStopsLoading() {
+        RuntimeException failure = new IllegalStateException("database is down");
+        when(productService.home()).thenThrow(failure);
+        HomePresenter presenter = presenter(direct);
+
+        presenter.load();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+        verify(errors, times(1)).report(failure);
+    }
+
+    @Test
+    void load_whenItSucceeds_loadFailedStaysFalse() {
+        HomePresenter presenter = loaded();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsAgain_clearsLoadFailed_andShowsTheContent() {
+        when(productService.home()).thenThrow(new IllegalStateException("down")).thenReturn(HOME);
+        HomePresenter presenter = presenter(direct);
+        presenter.load();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.featuredProperty().get()).isEqualTo(FEATURED);
+        assertThat(presenter.contentVersionProperty().get()).isEqualTo(1);
+        verify(productService, times(2)).home();
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        RuntimeException failure = new IllegalStateException("down");
+        when(productService.home()).thenThrow(failure);
+        HomePresenter presenter = presenter(direct);
+        presenter.load();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(productService.home()).thenThrow(new IllegalStateException("down")).thenReturn(HOME);
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        HomePresenter presenter = presenter(manual);
+        presenter.load();
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(productService.home()).thenThrow(new IllegalStateException("down")).thenReturn(HOME);
+        HomePresenter presenter = presenter(direct);
+        presenter.load();
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(productService, times(1)).home();
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_whenNothingFailed_doesNothing() {
+        HomePresenter presenter = loaded();
+
+        presenter.retry();
+
+        verify(productService, times(1)).home();
+        assertThat(presenter.contentVersionProperty().get()).isEqualTo(1);
+    }
+
+    @Test
+    void reload_failsAfterContentWasShown_keepsTheContent_andLoadFailedStaysFalse() {
+        HomePresenter presenter = loaded();
+        presenter.add(9L);
+        RuntimeException failure = new IllegalStateException("down");
+        when(productService.home()).thenThrow(failure);
+
+        captureAddCallback(9L).accept(AddToCartResult.OUT_OF_STOCK);
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.featuredProperty().get()).isEqualTo(FEATURED);
+        assertThat(presenter.moreNew()).containsExactlyElementsOf(MORE_NEW);
+        verify(errors, times(1)).report(failure);
+    }
+
+    @Test
+    void retry_afterAFailedReloadThatKeptTheContent_doesNothing() {
+        HomePresenter presenter = loaded();
+        presenter.add(9L);
+        when(productService.home()).thenThrow(new IllegalStateException("down"));
+        captureAddCallback(9L).accept(AddToCartResult.OUT_OF_STOCK);
+
+        presenter.retry();
+
+        verify(productService, times(2)).home();
+    }
 }

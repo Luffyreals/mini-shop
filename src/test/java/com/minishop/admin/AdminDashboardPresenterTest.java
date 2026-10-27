@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -274,9 +275,12 @@ class AdminDashboardPresenterTest {
         AdminDashboardPresenter presenter = presenter();
 
         presenter.load();
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
         presenter.load();
 
         assertThat(presenter.loadedProperty().get()).isTrue();
+        // Nạp thành công luôn tắt khối lỗi, kể cả khi không đi qua retry()
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
         assertThat(presenter.counts()).hasSize(5);
     }
 
@@ -364,5 +368,135 @@ class AdminDashboardPresenterTest {
         presenter.dispose();
 
         assertThat(presenter.loadedProperty().get()).isTrue();
+    }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    @Test
+    void load_firstLoadFailsUnexpectedly_setsLoadFailed_reportsOnce_andStopsLoading() {
+        IllegalStateException failure = new IllegalStateException("database is down");
+        when(orderAdminService.dashboard()).thenThrow(failure);
+        AdminDashboardPresenter presenter = presenter();
+
+        presenter.load();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(toasts, navigator);
+    }
+
+    @Test
+    void load_asANonAdmin_keepsTheOldPath_andLoadFailedStaysFalse() {
+        when(orderAdminService.dashboard()).thenThrow(new AccessDeniedException());
+        AdminDashboardPresenter presenter = presenter();
+
+        presenter.load();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verify(toasts).show("Bạn không có quyền truy cập trang này.", ToastKind.ERROR);
+        verify(navigator).goHome();
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsAgain_clearsLoadFailed_andShowsTheContent() {
+        when(orderAdminService.dashboard()).thenThrow(new IllegalStateException("down")).thenReturn(dashboard());
+        AdminDashboardPresenter presenter = presenter();
+        presenter.load();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.counts()).hasSize(5);
+        verify(orderAdminService, times(2)).dashboard();
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        IllegalStateException failure = new IllegalStateException("down");
+        when(orderAdminService.dashboard()).thenThrow(failure);
+        AdminDashboardPresenter presenter = presenter();
+        presenter.load();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whenTheRetryIsRefusedForNotBeingAnAdmin_goesHome_andLoadFailedStaysFalse() {
+        when(orderAdminService.dashboard()).thenThrow(new IllegalStateException("down"))
+                .thenThrow(new AccessDeniedException());
+        AdminDashboardPresenter presenter = presenter();
+        presenter.load();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        verify(toasts).show("Bạn không có quyền truy cập trang này.", ToastKind.ERROR);
+        verify(navigator).goHome();
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        when(orderAdminService.dashboard()).thenThrow(new IllegalStateException("down")).thenReturn(dashboard());
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        AdminDashboardPresenter presenter = presenter(manual);
+        presenter.load();
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(orderAdminService.dashboard()).thenThrow(new IllegalStateException("down"));
+        AdminDashboardPresenter presenter = presenter();
+        presenter.load();
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(orderAdminService, times(1)).dashboard();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_beforeAnyLoad_orWhenNothingFailed_doesNothing() {
+        presenter().retry();
+        verifyNoInteractions(orderAdminService, productAdminService);
+
+        AdminDashboardPresenter presenter = loaded();
+        presenter.retry();
+
+        verify(orderAdminService, times(1)).dashboard();
+    }
+
+    @Test
+    void load_failsAfterContentWasShown_keepsTheContent_andLoadFailedStaysFalse() {
+        AdminDashboardPresenter presenter = loaded();
+        IllegalStateException failure = new IllegalStateException("down");
+        when(orderAdminService.dashboard()).thenThrow(failure);
+
+        presenter.load();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.counts()).hasSize(5);
+        verify(errors, times(1)).report(failure);
     }
 }

@@ -74,6 +74,7 @@ class AdminProductsPresenter {
 
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loaded = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final BooleanProperty empty = new SimpleBooleanProperty(false);
     private final StringProperty emptyText = new SimpleStringProperty("");
     private final StringProperty queryText = new SimpleStringProperty("");
@@ -162,6 +163,7 @@ class AdminProductsPresenter {
             queryShown = true;
             queryText.set(page.q() == null ? "" : page.q());
         }
+        loadFailed.set(false);
         loaded.set(true);
         loading.set(false);
         releaseSettled();
@@ -170,7 +172,23 @@ class AdminProductsPresenter {
     private void loadFailed(Throwable failure) {
         loading.set(false);
         releaseSettled();
-        failures.handle(failure);
+        boolean unexpected = failures.handle(failure);
+        // Chỉ lần nạp đầu mới thay màn bằng khối lỗi; nạp lại sau khi ghi thì giữ danh sách cũ (QĐ12)
+        if (unexpected && !loaded.get()) {
+            loadFailed.set(true);
+        }
+    }
+
+    /**
+     * "Thử lại" sau lỗi lạ của lần nạp đầu (QĐ12): tắt {@code loadFailed} rồi nạp lại đúng route. Bỏ qua sau
+     * {@link #dispose}, khi đang nạp hoặc khi không có lỗi nào để thử lại.
+     */
+    void retry() {
+        if (disposed || route == null || loading.get() || !loadFailed.get()) {
+            return;
+        }
+        loadFailed.set(false);
+        reload();
     }
 
     private static ProductRow toRow(AdminProductRow product) {
@@ -301,6 +319,11 @@ class AdminProductsPresenter {
     /** {@code true} từ lần nạp thành công đầu tiên. */
     ReadOnlyBooleanProperty loadedProperty() {
         return loaded;
+    }
+
+    /** {@code true} khi lần nạp đầu lỗi vì một lỗi lạ (màn hiện khối "Thử lại"); xem {@link #retry()}. */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** {@code true} khi không có sản phẩm nào khớp (không chỉ là trang rỗng). */

@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.minishop</groupId>
     <artifactId>mini-shop</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.9.0</version>
     <name>mini-shop</name>
     <description>Ứng dụng desktop bán hàng mini (JavaFX) - dự án học tập / portfolio</description>
     <licenses>
@@ -32,6 +32,30 @@
              Flyway), nên sau khi Hikari thay kết nối đó (maxLifetime 30 phút) mọi lệnh ghi bị CHECK đó kiểm đều lỗi.
              Đã sửa từ 2.5.250 (H2 issue #4302), xem PoolConnectionRetireIntegrationTest. Bỏ dòng này khi Boot lên 2.5.x. -->
         <h2.version>2.5.252</h2.version>
+
+        <!-- Chỉ dùng trong profile jpackage (D6). Hai plugin này không có trong Spring Boot BOM nên ghim phiên bản
+             (bản mới nhất trên Maven Central lúc thêm: exec 3.6.4, license 2.7.1). -->
+        <exec-maven-plugin.version>3.6.4</exec-maven-plugin.version>
+        <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
+        <!-- Thư mục đầu vào phẳng của jpackage (jar app + jar thư viện + giấy phép) và thư mục đích của app-image -->
+        <jpackage.input>${project.build.directory}/jpackage-input</jpackage.input>
+        <jpackage.dest>${project.build.directory}/dist</jpackage.dest>
+        <!-- Module của runtime jlink (QĐ3). Đã chốt ở D2 (27/10/2026) bằng một lần chạy MiniShop.exe thật.
+             11 module đầu là kết quả của
+               jdeps với các tùy chọn ignore-missing-deps, multi-release 25, print-module-deps (có và không recursive)
+                     class-path "target/jpackage-input/*", phân tích target/jpackage-input/mini-shop-0.9.0.jar
+             (hai chế độ cho cùng kết quả), cộng hai module jdeps không thấy vì chỉ dùng qua reflection / service loader:
+               jdk.localedata  Collator tiếng Việt khi sắp danh mục. Đã thử: thiếu module này thì "Điện tử" bị sắp cuối danh sách;
+               java.naming     Spring/Hikari tra JNDI bằng tên lớp (đã có gián tiếp qua java.sql.rowset, ghi rõ cho khỏi lệ thuộc).
+             jlink tự kéo thêm module phụ thuộc (xem runtime/release trong app-image): java.datatransfer, java.xml,
+             java.logging, java.security.sasl, java.sql, java.transaction.xa.
+             Nơi dùng từng module trong 11 module của jdeps (jdeps -s theo từng jar):
+               java.desktop JavaFX, ImageIO;  java.sql.rowset spring-jdbc;  java.management H2, Spring Boot;
+               java.instrument, java.scripting H2, Spring context;  java.compiler H2, Spring (annotation processing API);
+               java.prefs spring-beans;  jdk.unsupported Spring core, AspectJ;  jdk.jfr JavaFX base, Spring core;
+               java.rmi có trong kết quả jdeps print-module-deps; chưa lần ra lớp nào dùng nó, giữ nguyên theo jdeps.
+             Đổi thư viện thì chạy lại jdeps và bản đóng gói, vì thiếu module chỉ lộ ra lúc chạy. -->
+        <jpackage.modules>java.base,java.compiler,java.desktop,java.instrument,java.management,java.prefs,java.rmi,java.scripting,java.sql.rowset,jdk.jfr,jdk.unsupported,jdk.localedata,java.naming</jpackage.modules>
     </properties>
 
     <dependencies>
@@ -165,5 +189,274 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Đóng gói app-image Windows (D6, QĐ1-QĐ3, QĐ6): ./mvnw -Pjpackage -DskipTests package
+             → target/dist/MiniShop/MiniShop.exe cùng runtime Java riêng, không cần cài Java hay WiX.
+             Profile tắt theo mặc định nên ./mvnw verify và job CI Linux không đổi.
+             Thứ tự: validate (kiểm HĐH) → prepare-package (dọn, chép jar thư viện, giấy phép)
+             → package (maven-jar-plugin ghi jar app vào thư mục đầu vào, rồi chạy jpackage). -->
+        <profile>
+            <id>jpackage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <!-- Bước 2 (jar app). Khai báo ĐẦU TIÊN trong profile và ghi thẳng vào thư mục đầu vào của jpackage.
+                             Trong một pha, Maven chạy theo thứ tự plugin trong effective POM; plugin chỉ có trong vòng đời mặc định
+                             (maven-jar-plugin) bị xếp SAU các plugin khai báo trong pom, nên không khai báo ở đây thì jpackage
+                             (cũng ở pha package) chạy trước khi jar tồn tại. Phiên bản do Spring Boot BOM quản lý. -->
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-jar-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>default-jar</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${jpackage.input}</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <!-- Bước 1. jpackage với tùy chọn icon .ico và launcher .exe chỉ chạy trên Windows; trên máy khác thì báo
+                             lỗi rõ ngay đầu build thay vì để jpackage từ chối giữa chừng. -->
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>jpackage-windows-only</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>enforce</goal>
+                                </goals>
+                                <configuration>
+                                    <rules>
+                                        <requireOS>
+                                            <family>windows</family>
+                                            <message>Profile jpackage chỉ chạy trên Windows (MiniShop.exe và biểu tượng .ico).</message>
+                                        </requireOS>
+                                    </rules>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <!-- Bước 4a (làm sớm, trước khi chép): jar của bản build trước (ví dụ khác số phiên bản) lẫn trong thư mục
+                             đầu vào sẽ bị đưa vào classpath của app, nên xóa thư mục đầu vào. Chỉ xóa thư mục này, không đụng
+                             phần còn lại của target. Thư mục đích target/dist/MiniShop xóa ở bước 4b (exec bên dưới), vì
+                             MiniShop.exe do jpackage tạo có thuộc tính chỉ-đọc mà maven-clean-plugin không xóa được trên Windows
+                             (bước 6 bỏ thuộc tính đó cho bản mới; bước 4b vẫn cần cho bản dựng trước khi có bước 6). -->
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-clean-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>jpackage-clean</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>clean</goal>
+                                </goals>
+                                <configuration>
+                                    <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                                    <filesets>
+                                        <fileset>
+                                            <directory>${jpackage.input}</directory>
+                                        </fileset>
+                                    </filesets>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <!-- Bước 2 (phần thư viện). JavaFX vẫn nằm trên classpath như lúc chạy test và javafx:run (QĐ1), nên cần
+                             MỌI jar phạm vi runtime trong một thư mục phẳng; jpackage đưa hết jar trong thư mục input vào classpath
+                             của MiniShop.cfg. includeScope=runtime bỏ JUnit, Mockito, TestFX. Classifier -win của JavaFX
+                             do pom OpenJFX chọn theo máy build, nên bản đóng gói đúng với Windows. -->
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>jpackage-copy-dependencies</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${jpackage.input}</outputDirectory>
+                                    <includeScope>runtime</includeScope>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <!-- Bước 3 (phần danh sách). THIRD-PARTY.txt liệt kê mọi jar được đóng gói kèm tên giấy phép, lấy từ
+                             pom của từng jar; không tự viết tay vì danh sách sẽ cũ đi mỗi khi Spring Boot đổi phiên bản (QĐ10).
+                             failOnMissing=false: jar không khai giấy phép chỉ hiện "Unknown license", không làm hỏng build.
+                             addOutputDirectoryAsResourceDir=false: thư mục này không phải tài nguyên của app.
+                             Không có trong Spring Boot BOM nên ghim phiên bản. -->
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>license-maven-plugin</artifactId>
+                        <version>${license-maven-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>jpackage-third-party</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>add-third-party</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${jpackage.input}</outputDirectory>
+                                    <thirdPartyFilename>THIRD-PARTY.txt</thirdPartyFilename>
+                                    <includedScopes>compile,runtime</includedScopes>
+                                    <excludedScopes>test,provided,system</excludedScopes>
+                                    <failOnMissing>false</failOnMissing>
+                                    <force>true</force>
+                                    <useRepositoryMissingFiles>false</useRepositoryMissingFiles>
+                                    <deployMissingFile>false</deployMissingFile>
+                                    <addOutputDirectoryAsResourceDir>false</addOutputDirectoryAsResourceDir>
+                                    <sortArtifactByName>true</sortArtifactByName>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <!-- Bước 3 (văn bản giấy phép). src/packaging/licenses/ (BSD-3 của TwelveMonkeys: sáu jar không kèm file LICENSE
+                             mà BSD-3 đòi chép lại trong bản nhị phân) đi vào licenses/ cạnh jar, tức nằm trong thư mục app.
+                             Không đặt overwrite (tham số này đã bị bỏ, báo WARNING): thư mục đầu vào vừa được dọn ở trên. -->
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>jpackage-copy-licenses</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${jpackage.input}/licenses</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}/src/packaging/licenses</directory>
+                                            <filtering>false</filtering>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <!-- Bước 5. Gọi jpackage của chính JDK đang chạy Maven (${java.home}); không dùng JAVA_HOME vì máy dev
+                             không đặt biến đó và mvnw lấy java từ PATH. JDK này phải là 25 mới biên dịch được dự án.
+                             Không có trong Spring Boot BOM nên ghim phiên bản.
+                             Chọn exec-maven-plugin thay plugin jpackage của bên thứ ba: tham số jpackage chuẩn nằm ngay đây,
+                             không thêm một lớp dịch tên tham số (QĐ2). Mỗi <argument> là một tham số riêng, không qua shell. -->
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>${exec-maven-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>jpackage-clean-dest</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Bước 4b. jpackage từ chối khi thư mục đích đã có. Remove-Item -Force xóa được cả file chỉ-đọc;
+                                         chỉ xóa target/dist/MiniShop. Nếu app đang chạy (file bị khóa) thì lỗi ngay và nói rõ file nào. -->
+                                    <executable>powershell</executable>
+                                    <arguments>
+                                        <argument>-NoProfile</argument>
+                                        <argument>-NonInteractive</argument>
+                                        <argument>-Command</argument>
+                                        <argument>$d = '${jpackage.dest}/MiniShop'; if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction Stop }</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>jpackage-app-image</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/jpackage</executable>
+                                    <arguments>
+                                        <!-- app-image (một thư mục chạy được, không cần WiX hay quyền quản trị; QĐ1, QĐ9) -->
+                                        <argument>--type</argument>
+                                        <argument>app-image</argument>
+                                        <argument>--name</argument>
+                                        <argument>MiniShop</argument>
+                                        <!-- Hiện trong Properties của MiniShop.exe (bảng câu chữ 3.3 g). app-version cần dạng a.b.c nên
+                                             pom phải bỏ -SNAPSHOT -->
+                                        <argument>--app-version</argument>
+                                        <argument>${project.version}</argument>
+                                        <argument>--vendor</argument>
+                                        <argument>Mini Shop</argument>
+                                        <!-- Hai tùy chọn description và copyright có dấu tiếng Việt nên KHÔNG đặt làm tham số tiến trình: Windows
+                                             chuyển tham số qua bảng mã ANSI và làm hỏng chữ (Properties của exe hiện "?ng d?ng").
+                                             Hai tùy chọn này nằm trong file @argfile UTF-8 (không BOM, LF), mỗi dòng một tùy chọn,
+                                             giá trị đặt trong ngoặc kép; jpackage tự đọc file đó bằng UTF-8. Không ghi chú thích trong
+                                             file vì không dựa vào việc argfile của jpackage hỗ trợ dòng '#'. -->
+                                        <argument>@${project.basedir}/src/packaging/windows/metadata.args</argument>
+                                        <!-- Đầu vào phẳng: jar app + jar thư viện + THIRD-PARTY.txt + licenses/. Lớp Launcher không
+                                             extends Application nên JavaFX trên classpath vẫn khởi động được (QĐ1) -->
+                                        <argument>--input</argument>
+                                        <argument>${jpackage.input}</argument>
+                                        <argument>--main-jar</argument>
+                                        <argument>${project.build.finalName}.jar</argument>
+                                        <argument>--main-class</argument>
+                                        <argument>com.minishop.desktop.Launcher</argument>
+                                        <argument>--dest</argument>
+                                        <argument>${jpackage.dest}</argument>
+                                        <!-- Biểu tượng của MiniShop.exe; file .ico do F0 tạo (src/packaging/windows/MakeIcon.java) -->
+                                        <argument>--icon</argument>
+                                        <argument>${project.basedir}/src/packaging/windows/MiniShop.ico</argument>
+                                        <!-- Runtime jlink chỉ gồm module cần thiết (QĐ3, danh sách ở property jpackage.modules).
+                                             jlink-options thay HẲN bộ mặc định nên phải nhắc lại bốn tùy chọn mặc định;
+                                             tùy chọn include-locales=en,vi cần jdk.localedata và giữ runtime nhỏ -->
+                                        <argument>--add-modules</argument>
+                                        <argument>${jpackage.modules}</argument>
+                                        <argument>--jlink-options</argument>
+                                        <argument>--strip-native-commands --strip-debug --no-man-pages --no-header-files --include-locales=en,vi</argument>
+                                        <!-- app.packaged=true: config.DataDirectory đổi thư mục dữ liệu mặc định sang %LOCALAPPDATA%\MiniShop
+                                             và bật file log (BR-009-6, QĐ4, QĐ5); DATA_DIR vẫn ghi đè. Không đặt thẳng app.data-dir,
+                                             vì system property sẽ thắng DATA_DIR. -->
+                                        <argument>--java-options</argument>
+                                        <argument>-Dapp.packaged=true</argument>
+                                        <!-- JavaFX nằm trên classpath (module không tên), như surefire: tùy chọn này tắt cảnh báo
+                                             truy cập native của JDK 25 và không hỏng khi JDK sau chặn mặc định -->
+                                        <argument>--java-options</argument>
+                                        <argument>--enable-native-access=ALL-UNNAMED</argument>
+                                        <!-- Cố ý KHÔNG có tùy chọn win-console: app giao diện không nên mở kèm cửa sổ đen; log đi vào file (QĐ5, QĐ6) -->
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <!-- Bước 6. Bỏ thuộc tính chỉ-đọc jpackage đặt cho MiniShop.exe (và mọi file khác trong thư mục app),
+                                     để "mvnw clean" sau đó (có hay không có profile này) xóa được target/dist. Chạy sau bước 5 vì
+                                     cùng pha package và khai báo sau. -->
+                                <id>jpackage-clear-read-only</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>powershell</executable>
+                                    <arguments>
+                                        <argument>-NoProfile</argument>
+                                        <argument>-NonInteractive</argument>
+                                        <argument>-Command</argument>
+                                        <argument>Get-ChildItem -LiteralPath '${jpackage.dest}/MiniShop' -Recurse -File | Where-Object IsReadOnly | ForEach-Object { $_.IsReadOnly = $false }</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

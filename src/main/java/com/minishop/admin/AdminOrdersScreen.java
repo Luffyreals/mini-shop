@@ -2,6 +2,7 @@ package com.minishop.admin;
 
 import com.minishop.admin.AdminOrdersPresenter.FilterOption;
 import com.minishop.admin.AdminOrdersPresenter.OrderRow;
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.PageBar;
 import com.minishop.desktop.ScreenFactory;
 import java.util.List;
@@ -9,6 +10,7 @@ import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.scene.AccessibleRole;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -34,9 +36,11 @@ import org.springframework.stereotype.Component;
  * chính {@code GridPane}, nên hàng tiêu đề cũng đệm 18 px ở {@code GridPane} để hai cột co giãn ở giữa vẫn thẳng cột.
  *
  * <p><b>Focus:</b> sau lần nạp đầu tiên focus ở hàng đầu (hoặc pill đang chọn khi không có đơn), nên sau khi đổi
- * trang hay bộ lọc người dùng bàn phím ở ngay đầu danh sách mới.
+ * trang hay bộ lọc người dùng bàn phím ở ngay đầu danh sách mới. Sau lỗi lạ của lần nạp đầu (D6, QĐ12) màn hiện khối
+ * lỗi và focus ở "Thử lại".
  *
  * <p>Id cố định cho test: {@code adminOrdersScreen}, {@code adminOrdersTitle}, {@code adminOrderFilters},
+ * {@code adminOrdersLoadError}, {@code adminOrdersRetry},
  * {@code orderFilter-{STATUS|all}}, {@code adminOrderRows} (bảng), {@code adminOrderRow-{id}},
  * {@code adminOrdersEmpty}, {@code adminOrdersEmptyText}, {@code pageBar}, {@code adminOrdersLoading}; cộng các id của
  * thanh bên ({@link AdminScreen}).
@@ -54,9 +58,18 @@ final class AdminOrdersScreen extends AdminScreen {
     static final String COLUMN_TOTAL = "Tổng tiền";
     static final String COLUMN_STATUS = "Trạng thái";
 
+    /** Lớp CSS khe cột hẹp 8 px (thay 12 px) cho cả hàng tiêu đề và hàng dữ liệu, để cột ngày vừa một dòng. */
+    private static final String TIGHT_COLUMNS = "table-tight";
+
+    /**
+     * Số đo (phông 15 px của {@code .text-body}) ở cửa sổ 1024 px (vùng bảng ~627 px trừ khe cột 8 px): ngày giờ
+     * "20/10/2026 00:00" rộng 138 px nên cột ngày 140 để nằm trọn một dòng; "Khách hàng mẫu" (người nhận mặc
+     * định) 116 px và email demo 120 px nên hai cột co giãn tối thiểu 118 và 124; "123.456.789 ₫" 98 px; nhãn
+     * trạng thái "Đã xác nhận" kèm chấm 106 px. Tổng tối thiểu 642 px, còn dư khoảng 5 px.
+     */
     private static final List<ColumnConstraints> COLUMNS = List.of(
-            fixedColumn(60), fixedColumn(104), growingColumn(140), growingColumn(92), fixedColumn(108),
-            fixedColumn(124));
+            fixedColumn(52), fixedColumn(140), growingColumn(124), growingColumn(118), fixedColumn(100),
+            fixedColumn(108));
 
     private final AdminOrdersPresenter presenter;
 
@@ -64,7 +77,9 @@ final class AdminOrdersScreen extends AdminScreen {
     private final VBox table = new VBox();
     private final PageBar pageBar = new PageBar(PAGINATION_LABEL);
     private ToggleButton selectedPill;
+    private final VBox loadError;
     private boolean pendingFocus = true;
+    private boolean retryFocusPending;
 
     AdminOrdersScreen(AdminOrdersPresenter presenter, AdminNavPresenter nav) {
         super(AdminSection.ORDERS, nav);
@@ -94,7 +109,16 @@ final class AdminOrdersScreen extends AdminScreen {
 
         pageBar.setId("pageBar");
 
-        setBody(page(head, pills, loadingBox, tableCard, pageBar, emptyState));
+        loadError = LoadError.create("adminOrders", presenter::retry);
+        show(loadError, presenter.loadFailedProperty());
+
+        setBody(page(head, pills, loadingBox, loadError, tableCard, pageBar, emptyState));
+        presenter.loadFailedProperty().addListener((observable, wasFailed, isFailed) -> {
+            if (isFailed) {
+                retryFocusPending = true;
+                Platform.runLater(this::tryFocus);
+            }
+        });
 
         presenter.filters().addListener((ListChangeListener<FilterOption>) change -> renderPills());
         presenter.rows().addListener((ListChangeListener<OrderRow>) change -> renderRows());
@@ -175,12 +199,15 @@ final class AdminOrdersScreen extends AdminScreen {
 
     /** Hàng tiêu đề dùng chung của khu quản trị ({@link #headerRow}): thẳng cột với hàng dữ liệu. */
     private static GridPane header() {
-        return headerRow(COLUMNS, COLUMN_ID, COLUMN_DATE, COLUMN_CUSTOMER, COLUMN_RECEIVER, COLUMN_TOTAL,
+        GridPane header = headerRow(COLUMNS, COLUMN_ID, COLUMN_DATE, COLUMN_CUSTOMER, COLUMN_RECEIVER, COLUMN_TOTAL,
                 COLUMN_STATUS);
+        header.getStyleClass().add(TIGHT_COLUMNS);
+        return header;
     }
 
     private GridPane dataRowNode(OrderRow order) {
         GridPane row = dataRow(COLUMNS, true);
+        row.getStyleClass().add(TIGHT_COLUMNS);
         row.setId("adminOrderRow-" + order.id());
         put(row, cell(order.idText(), "text-body"), 0);
         put(row, cell(order.dateText(), "text-body"), 1);
@@ -209,7 +236,19 @@ final class AdminOrdersScreen extends AdminScreen {
     }
 
     private void tryFocus() {
-        if (!pendingFocus || getScene() == null || !presenter.loadedProperty().get()) {
+        if (getScene() == null) {
+            return;
+        }
+        if (retryFocusPending && presenter.loadFailedProperty().get()) {
+            // Sau lỗi nạp đầu: focus vào "Thử lại" (QĐ12), đúng chỗ màn vẫn đặt focus sau khi nạp xong
+            Button retry = LoadError.retryButton(loadError);
+            if (retry.getScene() != null) {
+                retryFocusPending = false;
+                retry.requestFocus();
+            }
+            return;
+        }
+        if (!pendingFocus || !presenter.loadedProperty().get()) {
             return;
         }
         Node target = null;

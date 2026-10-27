@@ -2,6 +2,7 @@ package com.minishop.admin;
 
 import com.minishop.admin.AdminCategoriesPresenter.FocusTarget;
 import com.minishop.admin.AdminCategoriesPresenter.Row;
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.ScreenFactory;
 import java.util.HashMap;
 import java.util.List;
@@ -33,9 +34,12 @@ import org.springframework.stereotype.Component;
  * <p><b>Bàn phím:</b> Tab đi qua thanh bên, "Thêm danh mục", rồi "Sửa" và "Xóa" của từng dòng; Enter và Space đều
  * bấm nút có focus. Nút có chữ cho trình đọc màn hình "Sửa {tên}", "Xóa {tên}". Nút "Xóa" không bị khóa khi đang
  * xóa (khóa nút đang có focus làm focus nhảy đi); dòng đang xóa có vòng quay nhỏ và presenter bỏ qua lần bấm thứ
- * hai. Sau mỗi lần nạp focus về nút "Xóa" của dòng vừa thao tác nếu dòng còn, không thì nút "Thêm danh mục".
+ * hai. Sau mỗi lần nạp focus về nút "Xóa" của dòng vừa thao tác nếu dòng còn, không thì nút "Thêm danh mục". Sau lỗi
+ * lạ của lần nạp đầu (D6, QĐ12) màn hiện khối lỗi thay bảng và focus ở "Thử lại"; nạp lại xong thì focus về "Thêm
+ * danh mục".
  *
  * <p>Id cố định cho test: {@code adminCategoriesScreen}, {@code categoriesTitle}, {@code addCategory},
+ * {@code adminCategoriesLoadError}, {@code adminCategoriesRetry},
  * {@code categoriesLoading}, {@code categoryRows}, {@code categoryRow-{id}}, {@code editCategory-{id}},
  * {@code deleteCategory-{id}}, {@code categoryBusy-{id}}, {@code categoriesEmpty}; cộng các id của thanh bên
  * ({@link AdminScreen}).
@@ -65,6 +69,8 @@ final class AdminCategoriesScreen extends AdminScreen {
     private final Map<Long, Button> deleteButtons = new HashMap<>();
     /** Đích focus đã nhận nhưng chưa đặt được vì nội dung chưa vào Scene. */
     private FocusTarget waitingFocus;
+    private final VBox loadError;
+    private boolean retryFocusPending;
 
     AdminCategoriesScreen(AdminCategoriesPresenter presenter, AdminNavPresenter nav) {
         super(AdminSection.CATEGORIES, nav);
@@ -99,7 +105,17 @@ final class AdminCategoriesScreen extends AdminScreen {
         card.getStyleClass().addAll("summary-card", "admin-table-card");
         show(card, presenter.loadedProperty());
 
-        setBody(page(head, loadingBox, card));
+        loadError = LoadError.create("adminCategories", presenter::retry);
+        show(loadError, presenter.loadFailedProperty());
+
+        setBody(page(head, loadingBox, loadError, card));
+
+        presenter.loadFailedProperty().addListener((observable, wasFailed, isFailed) -> {
+            if (isFailed) {
+                retryFocusPending = true;
+                Platform.runLater(this::focusRetry);
+            }
+        });
 
         presenter.rows().addListener((ListChangeListener<Row>) change -> renderRows());
         presenter.writingIds().addListener((SetChangeListener<Long>) change -> {
@@ -208,8 +224,22 @@ final class AdminCategoriesScreen extends AdminScreen {
         node.requestFocus();
     }
 
+    /** Sau lỗi nạp đầu: focus vào "Thử lại" (QĐ12), đúng chỗ màn vẫn đặt focus sau khi nạp xong. */
+    private void focusRetry() {
+        if (!retryFocusPending || getScene() == null || !presenter.loadFailedProperty().get()) {
+            return;
+        }
+        Button retry = LoadError.retryButton(loadError);
+        if (retry.getScene() != null) {
+            retryFocusPending = false;
+            retry.requestFocus();
+        }
+        // Chưa vào Scene (skin chưa dựng): onBodyAttached thử lại
+    }
+
     @Override
     protected void onBodyAttached() {
+        focusRetry();
         FocusTarget target = waitingFocus;
         if (target != null) {
             applyFocus(target);

@@ -1,8 +1,10 @@
 package com.minishop.catalog;
 
+import com.minishop.desktop.CreditsDialog;
 import com.minishop.desktop.EvenRows;
 import com.minishop.desktop.ImageLoader;
 import com.minishop.desktop.ImageTile;
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.ScreenFactory;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -16,6 +18,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.FlowPane;
@@ -38,6 +41,11 @@ import java.util.Locale;
  * "Giao hàng và thanh toán", rồi dòng cuối. Chưa có sản phẩm nào thì chỉ còn đầu trang, thẻ giao hàng và dòng cuối.
  * Chỉ dựng node và gắn vào {@link HomePresenter}; không gọi service.
  *
+ * <p><b>Dòng cuối (D6, QĐ11):</b> "Dự án học tập, không bán hàng thật." · nút dạng liên kết "Nguồn ảnh"
+ * ({@code #creditsLink}) mở {@link CreditsDialog}. <b>Lỗi nạp lần đầu (QĐ12):</b> khối "Thử lại"
+ * ({@code #homeLoadError}) thay cho nội dung; trang chủ không đặt focus sau khi nạp nên khối lỗi cũng không giành
+ * focus (ô tìm kiếm ở thanh trên vẫn giữ focus nếu người dùng đang gõ).
+ *
  * <p><b>Bố cục:</b> từ {@value CatalogScreen#MEDIUM_COLUMNS_FROM} px (cùng ngưỡng với danh sách) thẻ lớn và khối tối
  * nằm cạnh nhau (khối tối rộng cố định) và hàng "Hàng mới" có 3 cột; hẹp hơn thì khối tối xuống dưới thẻ lớn và hàng
  * có 2 cột. Thẻ giao hàng là ô cuối của hàng. Không dùng {@code GridPane} cho các hàng này, xem {@link EvenRows}.
@@ -47,7 +55,8 @@ import java.util.Locale;
  *
  * <p>Id cố định cho test: {@code homeScreen}, {@code homeLead}, {@code featuredCard}, {@code featuredAdd},
  * {@code featuredDetails}, {@code lowStockBlock}, {@code lowStockRow-{id}}, {@code moreNew} ({@link EvenRows} của hàng
- * "Hàng mới": các {@code productCard-{id}} cùng {@code deliveryCard}), {@code deliveryCard}, {@code homeLoading}.
+ * "Hàng mới": các {@code productCard-{id}} cùng {@code deliveryCard}), {@code deliveryCard}, {@code homeLoading},
+ * {@code homeFooter}, {@code creditsLink}, {@code homeLoadError}, {@code homeRetry}.
  */
 final class HomeScreen extends ScrollPane {
 
@@ -60,6 +69,8 @@ final class HomeScreen extends ScrollPane {
     static final String NEW_ARRIVALS_TITLE = "Hàng mới";
     static final String DELIVERY_TITLE = "Giao hàng và thanh toán";
     static final String FOOTER_TEXT = "Dự án học tập, không bán hàng thật.";
+    static final String CREDITS_TEXT = "Nguồn ảnh";
+    static final String CREDITS_ACCESSIBLE_TEXT = "Nguồn ảnh và giấy phép";
 
     /** Các dòng của thẻ giao hàng: nhãn và nội dung (spec 005, câu hỏi 4 của D3). */
     static final List<String[]> DELIVERY_ROWS = List.of(
@@ -73,6 +84,8 @@ final class HomeScreen extends ScrollPane {
 
     private final HomePresenter presenter;
     private final ImageLoader images;
+    private final CreditsDialog creditsDialog;
+    private final VBox loadError;
 
     private final VBox page = new VBox();
     private final VBox topRow = new VBox();
@@ -85,9 +98,10 @@ final class HomeScreen extends ScrollPane {
     private final List<Node> newCards = new ArrayList<>();
     private double width;
 
-    HomeScreen(HomePresenter presenter, ImageLoader images) {
+    HomeScreen(HomePresenter presenter, ImageLoader images, CreditsDialog creditsDialog) {
         this.presenter = presenter;
         this.images = images;
+        this.creditsDialog = creditsDialog;
 
         setId("homeScreen");
         getStyleClass().add("screen-scroll");
@@ -106,13 +120,11 @@ final class HomeScreen extends ScrollPane {
         cardRow.setId("moreNew");
         show(cardRow, presenter.loadedProperty());
 
-        Label footer = new Label(FOOTER_TEXT);
-        footer.getStyleClass().add("page-footer");
-        footer.setMaxWidth(Double.MAX_VALUE);
-        footer.setAlignment(Pos.CENTER);
-        show(footer, presenter.loadedProperty());
+        HBox footer = buildFooter();
+        loadError = LoadError.create("home", presenter::retry);
+        show(loadError, presenter.loadFailedProperty());
 
-        page.getChildren().addAll(header, loadingBox, topRow, newTitle, cardRow, footer);
+        page.getChildren().addAll(header, loadingBox, loadError, topRow, newTitle, cardRow, footer);
         page.getStyleClass().add("page-root");
         setContent(page);
 
@@ -144,6 +156,35 @@ final class HomeScreen extends ScrollPane {
         VBox header = new VBox(hero, lead);
         header.getStyleClass().add("home-header");
         return header;
+    }
+
+    /** Chân trang: "Dự án học tập, không bán hàng thật." · nút dạng liên kết "Nguồn ảnh" (AC-009-15, QĐ11). */
+    private HBox buildFooter() {
+        Label text = new Label(FOOTER_TEXT);
+        text.getStyleClass().add("page-footer");
+
+        Label separator = new Label("·");
+        separator.getStyleClass().add("page-footer");
+
+        Button credits = new Button(CREDITS_TEXT);
+        credits.setId("creditsLink");
+        credits.getStyleClass().add("page-footer-link");
+        credits.setAccessibleText(CREDITS_ACCESSIBLE_TEXT);
+        credits.setOnAction(event -> creditsDialog.show());
+        credits.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
+            // Enter bấm nút đang có focus (JavaFX mặc định chỉ bấm bằng Space khi không có nút mặc định)
+            if (event.getCode() == KeyCode.ENTER) {
+                event.consume();
+                credits.fire();
+            }
+        });
+
+        HBox footer = new HBox(text, separator, credits);
+        footer.setId("homeFooter");
+        footer.setAlignment(Pos.CENTER);
+        footer.setMaxWidth(Double.MAX_VALUE);
+        show(footer, presenter.loadedProperty());
+        return footer;
     }
 
     private HBox buildLoading() {
@@ -479,10 +520,12 @@ final class HomeScreen extends ScrollPane {
 
         private final ObjectProvider<HomePresenter> presenters;
         private final ImageLoader images;
+        private final CreditsDialog creditsDialog;
 
-        Factory(ObjectProvider<HomePresenter> presenters, ImageLoader images) {
+        Factory(ObjectProvider<HomePresenter> presenters, ImageLoader images, CreditsDialog creditsDialog) {
             this.presenters = presenters;
             this.images = images;
+            this.creditsDialog = creditsDialog;
         }
 
         @Override
@@ -493,7 +536,7 @@ final class HomeScreen extends ScrollPane {
         @Override
         public Node create(HomeRoute route) {
             HomePresenter presenter = presenters.getObject();
-            HomeScreen screen = new HomeScreen(presenter, images);
+            HomeScreen screen = new HomeScreen(presenter, images, creditsDialog);
             presenter.load();
             return screen;
         }

@@ -3,6 +3,7 @@ package com.minishop.admin;
 import com.minishop.admin.AdminProductsPresenter.ProductRow;
 import com.minishop.desktop.ImageLoader;
 import com.minishop.desktop.ImageTile;
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.PageBar;
 import com.minishop.desktop.ScreenFactory;
 import java.util.HashMap;
@@ -44,9 +45,11 @@ import org.springframework.stereotype.Component;
  * khi nạp lại, focus trở về nút cùng loại của cùng hàng (nút "Ẩn" đổi thành "Hiện lại" cùng chỗ); hàng không còn
  * thì focus về "Thêm sản phẩm".
  *
- * <p><b>Focus:</b> sau lần nạp đầu focus ở ô tìm.
+ * <p><b>Focus:</b> sau lần nạp đầu focus ở ô tìm; sau lỗi lạ của lần nạp đầu (D6, QĐ12) màn hiện khối lỗi và focus ở
+ * "Thử lại" ("Thêm sản phẩm" và ô tìm vẫn dùng được).
  *
  * <p>Id cố định cho test: {@code adminProductsScreen}, {@code productsTitle}, {@code addProduct},
+ * {@code adminProductsLoadError}, {@code adminProductsRetry},
  * {@code productSearchField}, {@code productSearchButton}, {@code productsLoading}, {@code productRows} (bảng),
  * {@code productRow-{id}}, {@code editProduct-{id}}, {@code hideProduct-{id}}, {@code showProduct-{id}},
  * {@code productsEmpty}, {@code pageBar}; cộng các id của thanh bên ({@link AdminScreen}).
@@ -97,7 +100,9 @@ final class AdminProductsScreen extends AdminScreen {
     private final Map<Long, GridPane> rowNodes = new HashMap<>();
     private final Map<Long, Button> editButtons = new HashMap<>();
     private final Map<Long, Button> toggleButtons = new HashMap<>();
+    private final VBox loadError;
     private boolean pendingFocus = true;
+    private boolean retryFocusPending;
 
     AdminProductsScreen(AdminProductsPresenter presenter, AdminNavPresenter nav, ImageLoader images) {
         super(AdminSection.PRODUCTS, nav);
@@ -117,7 +122,17 @@ final class AdminProductsScreen extends AdminScreen {
         VBox emptyBox = buildEmptyState();
         pageBar.setId("pageBar");
 
-        setBody(page(head, toolbar, loadingBox, tableCard, pageBar, emptyBox));
+        loadError = LoadError.create("adminProducts", presenter::retry);
+        show(loadError, presenter.loadFailedProperty());
+
+        setBody(page(head, toolbar, loadingBox, loadError, tableCard, pageBar, emptyBox));
+
+        presenter.loadFailedProperty().addListener((observable, wasFailed, isFailed) -> {
+            if (isFailed) {
+                retryFocusPending = true;
+                Platform.runLater(this::tryFocus);
+            }
+        });
 
         presenter.rows().addListener((ListChangeListener<ProductRow>) change -> render());
         presenter.pageNavProperty().addListener((observable, oldNav, newNav) -> renderPages());
@@ -362,7 +377,19 @@ final class AdminProductsScreen extends AdminScreen {
     }
 
     private void tryFocus() {
-        if (!pendingFocus || getScene() == null || !presenter.loadedProperty().get()) {
+        if (getScene() == null) {
+            return;
+        }
+        if (retryFocusPending && presenter.loadFailedProperty().get()) {
+            // Sau lỗi nạp đầu: focus vào "Thử lại" (QĐ12), đúng chỗ màn vẫn đặt focus sau khi nạp xong
+            Button retry = LoadError.retryButton(loadError);
+            if (retry.getScene() != null) {
+                retryFocusPending = false;
+                retry.requestFocus();
+            }
+            return;
+        }
+        if (!pendingFocus || !presenter.loadedProperty().get()) {
             return;
         }
         if (searchField.getScene() != null) {

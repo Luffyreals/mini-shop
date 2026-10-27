@@ -114,7 +114,6 @@ class AuthDialog {
         stage.show();
         stage.toFront();
         fit();
-        centerOnOwner();
         focusSuggested();
     }
 
@@ -226,7 +225,10 @@ class AuthDialog {
         return false;
     }
 
-    /** Co giãn cửa sổ vừa nội dung, giữ nguyên tâm theo chiều dọc. Chạy trên luồng giao diện. */
+    /**
+     * Co giãn cửa sổ vừa nội dung. Không tự đặt vị trí: {@link ModalDialogs} căn giữa lại theo cửa sổ chủ (có giới
+     * hạn trong màn hình) mỗi khi cỡ đổi. Chạy trên luồng giao diện.
+     */
     private void fit() {
         if (stage == null || !stage.isShowing()) {
             return;
@@ -238,18 +240,7 @@ class AuthDialog {
         if (Math.abs(needed - scene.getHeight()) <= FIT_TOLERANCE) {
             return;
         }
-        double centerY = stage.getY() + stage.getHeight() / 2;
         stage.sizeToScene();
-        stage.setY(centerY - stage.getHeight() / 2);
-    }
-
-    private void centerOnOwner() {
-        Window owner = stage.getOwner();
-        if (owner == null || !owner.isShowing()) {
-            return;
-        }
-        stage.setX(owner.getX() + (owner.getWidth() - stage.getWidth()) / 2);
-        stage.setY(owner.getY() + (owner.getHeight() - stage.getHeight()) / 2);
     }
 
     /**

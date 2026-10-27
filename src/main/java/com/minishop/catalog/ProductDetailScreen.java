@@ -2,6 +2,7 @@ package com.minishop.catalog;
 
 import com.minishop.desktop.ImageLoader;
 import com.minishop.desktop.ImageTile;
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.ScreenFactory;
 import javafx.application.Platform;
 import javafx.beans.value.ObservableBooleanValue;
@@ -50,10 +51,15 @@ import java.util.Locale;
  * bằng Enter từ thẻ sản phẩm không vô tình thêm hàng khi giữ phím). Khi nạp lại làm sản phẩm hết hàng, khối mua bị
  * bỏ và focus quay về nút đó.
  *
+ * <p><b>Lỗi nạp lần đầu (QĐ12):</b> khối "Thử lại" ({@code #productDetailLoadError}) nằm dưới nút "Về danh sách sản
+ * phẩm" (nút này vẫn dùng được) và thay cho phần thông tin; focus vào "Thử lại" (trừ khi người dùng đang gõ ở ô
+ * tìm kiếm), và sau khi thử lại thành công về "Về danh sách sản phẩm" như trên.
+ *
  * <p>Id cố định cho test: {@code productDetailScreen}, {@code productName}, {@code productCategory},
  * {@code productPrice}, {@code productStock}, {@code productDescription}, {@code productImage},
  * {@code quantityField} (ô nhập của {@code Spinner}; chính {@code Spinner} là {@code quantitySpinner}),
- * {@code addToCart}, {@code backToList}, {@code detailLoading}.
+ * {@code addToCart}, {@code backToList}, {@code detailLoading}, {@code productDetailLoadError},
+ * {@code productDetailRetry}.
  */
 final class ProductDetailScreen extends ScrollPane {
 
@@ -80,6 +86,7 @@ final class ProductDetailScreen extends ScrollPane {
     private final VBox purchase = new VBox();
     private final Spinner<Integer> quantity = new Spinner<>();
     private final Button add = new Button(ADD_TEXT);
+    private VBox loadError;
     private boolean stacked;
     private boolean pendingFocus = true;
     private boolean hadAddFocus;
@@ -180,7 +187,15 @@ final class ProductDetailScreen extends ScrollPane {
         show(details, presenter.productProperty().isNotNull());
 
         info.getStyleClass().add("detail-info");
-        info.getChildren().addAll(back, loadingBox, details);
+        loadError = LoadError.create("productDetail", presenter::retry);
+        show(loadError, presenter.loadFailedProperty());
+        presenter.loadFailedProperty().addListener((observable, wasFailed, isFailed) -> {
+            if (isFailed) {
+                Platform.runLater(this::tryFocus);
+            }
+        });
+
+        info.getChildren().addAll(back, loadingBox, loadError, details);
     }
 
     private void buildPurchase() {
@@ -317,7 +332,21 @@ final class ProductDetailScreen extends ScrollPane {
     // ------------------------------------------------------------------ focus
 
     private void tryFocus() {
-        if (!pendingFocus || back.getScene() == null || presenter.productProperty().get() == null) {
+        if (!pendingFocus || back.getScene() == null) {
+            return;
+        }
+        if (presenter.loadFailedProperty().get()) {
+            // Khối lỗi: focus ở "Thử lại" (trừ khi người dùng đang gõ ở ô tìm kiếm); pendingFocus còn đó để khi
+            // thử lại thành công focus về "Về danh sách sản phẩm"
+            Button retry = LoadError.retryButton(loadError);
+            Node owner = back.getScene().getFocusOwner();
+            boolean typingInSearch = owner != null && "searchField".equals(owner.getId());
+            if (retry.getScene() != null && !typingInSearch) {
+                retry.requestFocus();
+            }
+            return;
+        }
+        if (presenter.productProperty().get() == null) {
             return;
         }
         pendingFocus = false;

@@ -80,6 +80,7 @@ class CartDrawerPresenter {
 
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loaded = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final ObservableList<CartLineView> lines = FXCollections.observableArrayList();
     private final StringProperty totalText = new SimpleStringProperty(PRICE.format(BigDecimal.ZERO));
     private final BooleanProperty empty = new SimpleBooleanProperty(false);
@@ -146,6 +147,7 @@ class CartDrawerPresenter {
         empty.set(view.isEmpty());
         orderable.set(view.isOrderable());
         showNotOrderableNotice.set(!view.isEmpty() && !view.isOrderable());
+        loadFailed.set(false);
         loaded.set(true);
         loading.set(false);
         unlockUpTo(generation);
@@ -156,8 +158,23 @@ class CartDrawerPresenter {
             return;
         }
         loading.set(false);
+        if (!loaded.get()) {
+            loadFailed.set(true);   // lần nạp đầu lỗi: thân drawer hiện khối lỗi thay vì để trống
+        }
         unlockUpTo(generation);
         errors.report(failure);
+    }
+
+    /**
+     * "Thử lại" sau một lỗi lạ ở lần nạp đầu (QĐ12): tắt {@link #loadFailedProperty()} rồi nạp lại giỏ của chủ giỏ
+     * hiện tại. Bỏ qua khi đã {@link #dispose}, khi đang nạp hoặc khi chưa có lỗi.
+     */
+    void retry() {
+        if (disposed || loading.get() || !loadFailed.get()) {
+            return;
+        }
+        loadFailed.set(false);
+        reload(currentOwner.get(), null);
     }
 
     private void unlockUpTo(long generation) {
@@ -372,6 +389,11 @@ class CartDrawerPresenter {
     /** {@code true} trong lúc đang nạp (lần đầu hoặc sau một lần ghi). */
     ReadOnlyBooleanProperty loadingProperty() {
         return loading;
+    }
+
+    /** {@code true} khi lần nạp đầu lỗi vì một lỗi lạ (thân drawer hiện khối "Thử lại"). */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** {@code true} từ lần nạp thành công đầu tiên; trước đó màn chưa biết giỏ trống hay không. */

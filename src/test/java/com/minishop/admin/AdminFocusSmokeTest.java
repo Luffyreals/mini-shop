@@ -270,6 +270,21 @@ class AdminFocusSmokeTest {
         });
     }
 
+    /**
+     * Waits until the loaded form has been laid out taller than the viewport. {@code stockCurrent} being shown only
+     * means the data arrived: the layout pass (and the window resize to 700) may still be pending, and a
+     * {@code setVvalue(1)} made while the content is still short is reset to 0 by the scroll pane when the layout
+     * grows (seen as a 251 px content in a 576 px viewport), which left the name field unscrolled.
+     */
+    private static void awaitScrollable(ScrollPane scroll) {
+        FxTestSupport.await("the form to be laid out taller than the viewport", () -> FxTestSupport.callOnFx(() -> {
+            scroll.applyCss();
+            scroll.layout();
+            return scroll.getViewportBounds().getHeight() > 0
+                    && scroll.getContent().getLayoutBounds().getHeight() > scroll.getViewportBounds().getHeight();
+        }));
+    }
+
     /** Top of the scroll pane's viewport in scene coordinates. */
     private static double viewportTop(ScrollPane scroll) {
         return FxTestSupport.callOnFx(() -> scroll.localToScene(0, 0).getY() + scroll.getInsets().getTop());
@@ -317,6 +332,7 @@ class AdminFocusSmokeTest {
             AdminScreen screen = (AdminScreen) ui.inContentRequired("productFormScreen");
             ScrollPane scroll = screen.bodyScroll();
             Label label = labelOf(name);
+            awaitScrollable(scroll);
 
             // The form focuses the name field when it opens, and focusing the owner again changes nothing: move the
             // focus elsewhere first, then scroll to the very bottom so that the name field and its label are above
@@ -369,6 +385,7 @@ class AdminFocusSmokeTest {
             FxTestSupport.await("the form to load", () -> ui.shownInContent("stockCurrent"));
             Node delta = smoke.node("stockDeltaField");
             ScrollPane scroll = ((AdminScreen) ui.inContentRequired("productFormScreen")).bodyScroll();
+            awaitScrollable(scroll);
 
             FxTestSupport.runOnFx(() -> scroll.setVvalue(0));
             layOut(scroll);

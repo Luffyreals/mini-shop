@@ -53,6 +53,7 @@ class AdminDashboardPresenter {
 
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loaded = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final ObservableList<CountTile> counts = FXCollections.observableArrayList();
     private final StringProperty revenueText = new SimpleStringProperty("");
     private final ObservableList<LowStockItem> lowStock = FXCollections.observableArrayList();
@@ -138,13 +139,30 @@ class AdminDashboardPresenter {
         List<LowStockItem> lowRows = data.lowStock().stream().map(AdminDashboardPresenter::toLowStock).toList();
         lowStock.setAll(lowRows);
         lowStockEmpty.set(lowRows.isEmpty());
+        loadFailed.set(false);
         loaded.set(true);
         loading.set(false);
     }
 
     private void loadFailed(Throwable failure) {
         loading.set(false);
-        failures.handle(failure);
+        boolean unexpected = failures.handle(failure);
+        // Chỉ lần nạp đầu mới thay màn bằng khối lỗi; có nội dung rồi thì giữ nội dung (QĐ12)
+        if (unexpected && !loaded.get()) {
+            loadFailed.set(true);
+        }
+    }
+
+    /**
+     * "Thử lại" sau lỗi lạ của lần nạp đầu (QĐ12): tắt {@code loadFailed} rồi nạp lại. Bỏ qua sau {@link #dispose},
+     * khi đang nạp hoặc khi không có lỗi nào để thử lại.
+     */
+    void retry() {
+        if (disposed || loading.get() || !loadFailed.get()) {
+            return;
+        }
+        loadFailed.set(false);
+        load();
     }
 
     private static CountTile toTile(StatusCount count) {
@@ -216,6 +234,11 @@ class AdminDashboardPresenter {
     /** {@code true} từ lần nạp thành công đầu tiên. */
     ReadOnlyBooleanProperty loadedProperty() {
         return loaded;
+    }
+
+    /** {@code true} khi lần nạp đầu lỗi vì một lỗi lạ (màn hiện khối "Thử lại"); xem {@link #retry()}. */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** Năm ô số theo thứ tự enum trạng thái (BR-005-9). */

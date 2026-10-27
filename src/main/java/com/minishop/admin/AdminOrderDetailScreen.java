@@ -2,6 +2,7 @@ package com.minishop.admin;
 
 import com.minishop.admin.AdminOrderDetailPresenter.Detail;
 import com.minishop.admin.AdminOrderDetailPresenter.LineRow;
+import com.minishop.desktop.LoadError;
 import com.minishop.desktop.ScreenFactory;
 import com.minishop.order.StatusAction;
 import java.util.List;
@@ -40,8 +41,11 @@ import org.springframework.stereotype.Component;
  * dựng lại nên nút vừa bấm biến mất) focus về "Quay lại danh sách đơn" và trang cuộn lên đầu, như màn chi tiết đơn
  * của khách (D4).
  * Nút đang có focus không bị khóa trong lúc gửi; presenter tự bỏ qua lần bấm thứ hai và màn hiện vòng quay nhỏ.
+ * Sau lỗi lạ của lần nạp đầu (D6, QĐ12) màn hiện khối lỗi thay các thẻ và focus ở "Thử lại"; "Quay lại danh sách
+ * đơn" ở đầu trang vẫn dùng được.
  *
  * <p>Id cố định cho test: {@code adminOrderDetailScreen}, {@code adminOrderTitle}, {@code adminOrderStatus},
+ * {@code adminOrderDetailLoadError}, {@code adminOrderDetailRetry},
  * {@code adminBackToOrders}, {@code adminOrderReceiver}, {@code adminOrderPhone}, {@code adminOrderAddress},
  * {@code adminOrderNote}, {@code adminOrderPayment}, {@code adminOrderCreated}, {@code adminOrderUpdated},
  * {@code adminOrderAccount}, {@code adminOrderLines} (bảng), {@code adminOrderTotal}, {@code adminOrderActions}
@@ -92,7 +96,9 @@ final class AdminOrderDetailScreen extends AdminScreen {
     private final VBox lines = new VBox();
     private final HBox actionButtons = new HBox();
     private final Label finalText = new Label(FINAL_TEXT);
+    private final VBox loadError;
     private boolean pendingFocus = true;
+    private boolean retryFocusPending;
     private boolean actionHadFocus;
     private Detail detailAtAction;
 
@@ -123,7 +129,17 @@ final class AdminOrderDetailScreen extends AdminScreen {
             show(card, presenter.detailProperty().isNotNull());
         }
 
-        setBody(page(head, loadingBox, receiverCard, infoCard, linesCard, statusCard));
+        loadError = LoadError.create("adminOrderDetail", presenter::retry);
+        show(loadError, presenter.loadFailedProperty());
+
+        setBody(page(head, loadingBox, loadError, receiverCard, infoCard, linesCard, statusCard));
+
+        presenter.loadFailedProperty().addListener((observable, wasFailed, isFailed) -> {
+            if (isFailed) {
+                retryFocusPending = true;
+                Platform.runLater(this::tryFocus);
+            }
+        });
 
         presenter.detailProperty().addListener((observable, oldDetail, newDetail) -> render());
         presenter.busyProperty().addListener((observable, wasBusy, isBusy) -> {
@@ -399,6 +415,15 @@ final class AdminOrderDetailScreen extends AdminScreen {
     }
 
     private void tryFocus() {
+        if (retryFocusPending && presenter.loadFailedProperty().get()) {
+            // Sau lỗi nạp đầu: focus vào "Thử lại" (QĐ12); "Quay lại danh sách đơn" ở đầu trang vẫn dùng được
+            Button retry = LoadError.retryButton(loadError);
+            if (retry.getScene() != null) {
+                retryFocusPending = false;
+                retry.requestFocus();
+            }
+            return;
+        }
         if (!pendingFocus || back.getScene() == null || presenter.detailProperty().get() == null) {
             return;
         }

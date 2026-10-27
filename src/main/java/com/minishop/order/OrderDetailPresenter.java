@@ -74,6 +74,7 @@ class OrderDetailPresenter {
     private final StringProperty bannerText = new SimpleStringProperty("");
     private final BooleanProperty cancellable = new SimpleBooleanProperty(false);
     private final BooleanProperty busy = new SimpleBooleanProperty(false);
+    private final BooleanProperty loadFailed = new SimpleBooleanProperty(false);
     private final ObservableList<LineRow> lines = FXCollections.observableArrayList();
 
     private OrderDetailRoute route;
@@ -142,6 +143,7 @@ class OrderDetailPresenter {
                 .toList());
         cancellable.set(view.cancellable());
         order.set(view);
+        loadFailed.set(false);
         busy.set(false);
         loading.set(false);
     }
@@ -153,7 +155,22 @@ class OrderDetailPresenter {
             gone();
             return;
         }
+        if (order.get() == null) {
+            loadFailed.set(true);   // lần nạp đầu lỗi: màn hiện khối lỗi thay vì để trống
+        }
         errors.report(failure);
+    }
+
+    /**
+     * "Thử lại" sau một lỗi lạ ở lần nạp đầu (QĐ12): tắt {@link #loadFailedProperty()} rồi nạp lại đúng route. Bỏ
+     * qua khi đã {@link #dispose}, khi đang nạp hoặc khi chưa có lỗi.
+     */
+    void retry() {
+        if (disposed || route == null || loading.get() || !loadFailed.get()) {
+            return;
+        }
+        loadFailed.set(false);
+        reload();
     }
 
     /** Đơn không còn hoặc không phải của người này: báo rồi về danh sách (AC-009-13). */
@@ -239,6 +256,11 @@ class OrderDetailPresenter {
 
     ReadOnlyBooleanProperty loadingProperty() {
         return loading;
+    }
+
+    /** {@code true} khi lần nạp đầu của route này lỗi vì một lỗi lạ (màn hiện khối "Thử lại"). */
+    ReadOnlyBooleanProperty loadFailedProperty() {
+        return loadFailed;
     }
 
     /** Đơn đang hiện; {@code null} tới lần nạp thành công đầu tiên. */

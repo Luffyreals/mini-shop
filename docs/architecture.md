@@ -12,6 +12,7 @@ Tài liệu cho người muốn đọc code: công nghệ, cách chia package, c
 | Cơ sở dữ liệu | H2 lưu ra file (chế độ tương thích PostgreSQL), Flyway |
 | Kiểm thử | JUnit, Mockito, AssertJ, ArchUnit, TestFX (vài smoke test mở cửa sổ thật) |
 | Build | Maven Wrapper |
+| Đóng gói | `jpackage` của JDK 25 (profile Maven `jpackage`, chỉ trên Windows): thư mục app có `MiniShop.exe` và runtime Java riêng |
 
 ## Kiến trúc
 
@@ -31,6 +32,8 @@ Tài liệu cho người muốn đọc code: công nghệ, cách chia package, c
 - Khu quản trị (`admin`) chỉ có màn hình và form; mỗi màn kế thừa `admin.AdminScreen` (thanh bên trong vùng nội dung) và là một route như phía khách. Vai trò được kiểm ở **service**: mọi phương thức public của ba service quản trị gọi `common.AdminAccess.requireAdmin()` trước tiên (do `user.AppSession` cài đặt), nên ẩn mục menu chỉ là gọn giao diện, không phải lớp bảo vệ. `ArchitectureTest` cấm code ngoài `admin` dùng ba service này
 - Admin đổi danh mục thì menu "Danh mục" của thanh trên phải làm mới, nhưng `StorefrontPresenter` là chi tiết của `catalog`: `catalog` khai báo cổng `CategoriesMenu`, `admin` chỉ gọi `refresh()`
 - JavaFX không đọc được WebP: `desktop.WebpDecoder` đọc bằng `javax.imageio` với thư viện TwelveMonkeys `imageio-webp` (scope `runtime`), ngoài luồng giao diện, từ chối ảnh trên 24 triệu điểm ảnh
+- Màn nạp lỗi bất ngờ ở lần đầu thì presenter bật `loadFailed`, màn hiện khối `desktop.LoadError` với nút "Thử lại" (gọi `retry()` của presenter, nạp lại đúng route); hộp thoại lỗi và dòng log vẫn như cũ. Nạp lại lỗi khi đã có nội dung thì giữ nội dung
+- Thành phần không thuộc tính năng nào nằm ở `desktop`: `Tables` và `StatusPill` (bảng, nhãn trạng thái, dùng chung cho "Đơn hàng của tôi" và khu quản trị), `ModalDialogs` (hộp thoại căn giữa cửa sổ chủ), `CreditsDialog` (đọc `images/credits.tsv` qua `Credits`) và `ExternalLinks` (mở link `https://` bằng `HostServices` của JavaFX)
 
 **Luồng khởi động:**
 
@@ -38,6 +41,22 @@ Tài liệu cho người muốn đọc code: công nghệ, cách chia package, c
 2. `MiniShopApp.init()` (ngoài luồng giao diện) dựng Spring context: Flyway, seed. Nếu H2 báo file đang bị khóa (mã 90020), app hiện "Mini Shop đang chạy ở một cửa sổ khác." rồi thoát.
 3. `start()` nạp phông, theme và `ui/main-window.fxml`; controller FXML lấy từ Spring (`controllerFactory = context::getBean`).
 4. `stop()` đóng context: executor nền dừng, H2 nhả khóa file.
+
+**Đóng gói (`./mvnw -Pjpackage -DskipTests package`, chỉ trên Windows):**
+
+1. Profile `jpackage` trong `pom.xml` gom đầu vào ở `target/jpackage-input/`: jar thường của app (không dùng fat jar, vì kiểu nạp lớp của nó dễ làm hỏng việc nạp native của JavaFX), mọi jar phụ thuộc phạm vi `runtime`, `THIRD-PARTY.txt` (do `license-maven-plugin` sinh) và `src/packaging/licenses/`.
+2. `exec-maven-plugin` gọi `${java.home}/bin/jpackage --type app-image`. jlink tạo runtime chỉ gồm các module trong property `jpackage.modules` (từ `jdeps`, cộng `jdk.localedata` cho `Collator` tiếng Việt, `--include-locales=en,vi`). JavaFX vẫn nằm trên classpath như lúc chạy từ mã nguồn, nên lần mở đầu nó chép DLL ra `%USERPROFILE%\.openjfx\cache`.
+3. `--java-options -Dapp.packaged=true`: `config.DataDirectory` (một `EnvironmentPostProcessor`, chạy trước khi Boot dựng log) chọn thư mục dữ liệu theo thứ tự `DATA_DIR` > `%LOCALAPPDATA%\MiniShop` (khi `app.packaged`) > `./data`, và chỉ khi đóng gói thì đặt `logging.file.name` vào `logs/mini-shop.log` trong thư mục đó. Không đặt thẳng `-Dapp.data-dir` vì system property sẽ thắng `DATA_DIR`.
+4. `--description` và `--copyright` nằm trong `src/packaging/windows/metadata.args` (UTF-8): truyền thẳng qua dòng lệnh thì Windows đổi chữ có dấu sang code page ANSI và mất dấu. Biểu tượng là `src/packaging/windows/MiniShop.ico`, vẽ bằng `MakeIcon.java`.
+
+```
+target/dist/MiniShop/
+├── MiniShop.exe        launcher (không console)
+├── app/                jar của app và thư viện, MiniShop.cfg, THIRD-PARTY.txt, licenses/
+└── runtime/            Java 25 đã jlink (không có java.exe)
+```
+
+Job CI `package-windows` build thư mục này, mở thử `MiniShop.exe` với `DATA_DIR` tạm và chờ dòng log `MiniShopApp : Main window shown` (Boot không ghi dòng "Started …", vì `MiniShopApp.createContext` tắt logger khởi động của Boot để exception thô không bao giờ in ra log), rồi tải lên làm artifact.
 
 Lỗi không lường trước đi qua một uncaught handler: một dòng log (thông điệp SQL đã bị lọc, vì H2 đưa cả dòng dữ liệu vào đó) và hộp thoại "Đã có lỗi xảy ra. Vui lòng thử lại.".
 
@@ -165,10 +184,13 @@ mini-shop/
 │   ├── db/migration/    Schema (Flyway)
 │   └── application.yml  Cấu hình
 ├── src/test/            Test (JUnit, ArchUnit, TestFX)
+├── src/packaging/
+│   ├── windows/         Biểu tượng .ico, MakeIcon.java, metadata.args của MiniShop.exe
+│   └── licenses/        Giấy phép thư viện phải chép kèm bản đóng gói (TwelveMonkeys)
 ├── docs/
 │   ├── architecture.md  Tài liệu này
 │   └── adr/             Các quyết định kiến trúc
-├── .github/             CI: build, test, kiểm không có test bị bỏ qua
+├── .github/             CI: build, test, kiểm không có test bị bỏ qua; đóng gói và mở thử bản Windows
 ├── pom.xml, mvnw, mvnw.cmd   Maven và Maven Wrapper (không cần cài Maven)
 ├── CHANGELOG.md
 └── LICENSE

@@ -982,4 +982,131 @@ class CartDrawerPresenterTest {
 
         assertThat(presenter.lines()).hasSize(1);
     }
+
+    // ------------------------------------------------------------------ load failure and retry (QĐ12, AC-009-12)
+
+    @Test
+    void load_firstLoadFails_setsLoadFailed_reportsOnce_andStopsLoading() {
+        RuntimeException failure = new IllegalStateException("database is down");
+        when(cartService.view(any())).thenThrow(failure);
+        CartDrawerPresenter presenter = presenter();
+
+        presenter.load();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isFalse();
+        assertThat(presenter.lines()).isEmpty();
+        verify(errors, times(1)).report(failure);
+        verifyNoInteractions(toasts, badge, navigator, drawerHost, checkoutEntry);
+    }
+
+    @Test
+    void retry_afterAFailedFirstLoad_loadsTheCartAgain_clearsLoadFailed_andShowsTheLines() {
+        logIn();
+        when(cartService.view(USER_CART)).thenThrow(new IllegalStateException("down"))
+                .thenReturn(view(keyboard(2)));
+        CartDrawerPresenter presenter = presenter();
+        presenter.load();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.lines()).extracting(CartLineView::productId).containsExactly(KEYBOARD);
+        verify(cartService, times(2)).view(USER_CART);
+        verify(errors, times(1)).report(any());
+    }
+
+    @Test
+    void retry_readsTheCartOwnerWhenRetrying_notTheOwnerOfTheFailedLoad() {
+        when(cartService.view(any())).thenThrow(new IllegalStateException("down"));
+        CartDrawerPresenter presenter = presenter();
+        presenter.load();
+        logIn();
+        org.mockito.Mockito.doReturn(view(mouse(1))).when(cartService).view(USER_CART);
+
+        presenter.retry();
+
+        verify(cartService, times(1)).view(guestCart);
+        verify(cartService, times(1)).view(USER_CART);
+        assertThat(presenter.lines()).extracting(CartLineView::productId).containsExactly(MOUSE);
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_whenTheRetryFailsToo_setsLoadFailedAgain_andReportsEachFailureOnce() {
+        RuntimeException failure = new IllegalStateException("down");
+        when(cartService.view(any())).thenThrow(failure);
+        CartDrawerPresenter presenter = presenter();
+        presenter.load();
+
+        presenter.retry();
+
+        assertThat(presenter.loadFailedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        verify(errors, times(2)).report(failure);
+    }
+
+    @Test
+    void retry_whileTheRetryIsLoading_isIgnored() {
+        logIn();
+        when(cartService.view(USER_CART)).thenThrow(new IllegalStateException("down"))
+                .thenReturn(view(keyboard(1)));
+        ManualBackgroundTasks manual = ManualBackgroundTasks.honoringCancel();
+        CartDrawerPresenter presenter = presenter(manual);
+        presenter.load();
+        manual.run(0);
+        presenter.retry();
+
+        presenter.retry();
+
+        assertThat(manual.submittedCount()).isEqualTo(2);
+        assertThat(presenter.loadingProperty().get()).isTrue();
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_afterDispose_doesNothing() {
+        when(cartService.view(any())).thenThrow(new IllegalStateException("down"));
+        CartDrawerPresenter presenter = presenter();
+        presenter.load();
+        presenter.dispose();
+
+        presenter.retry();
+
+        verify(cartService, times(1)).view(any());
+        assertThat(presenter.loadedProperty().get()).isFalse();
+    }
+
+    @Test
+    void retry_whenNothingFailed_doesNothing() {
+        CartDrawerPresenter presenter = loadedPresenter(view(keyboard(1)));
+
+        presenter.retry();
+
+        verify(cartService, times(1)).view(USER_CART);
+    }
+
+    @Test
+    void reload_failsAfterTheCartWasShown_keepsTheLines_andLoadFailedStaysFalse() {
+        RuntimeException failure = new IllegalStateException("down");
+        logIn();
+        when(cartService.view(USER_CART)).thenReturn(view(keyboard(2))).thenThrow(failure);
+        when(cartService.update(USER_CART, KEYBOARD, 3)).thenReturn(new CartChange(CartChange.Outcome.OK, 3));
+        CartDrawerPresenter presenter = presenter();
+        presenter.load();
+
+        presenter.increase(KEYBOARD);
+
+        assertThat(presenter.loadFailedProperty().get()).isFalse();
+        assertThat(presenter.loadedProperty().get()).isTrue();
+        assertThat(presenter.loadingProperty().get()).isFalse();
+        assertThat(presenter.lines()).singleElement().extracting(CartLineView::quantity).isEqualTo(2);
+        assertThat(presenter.writingIds()).isEmpty();
+        verify(errors, times(1)).report(failure);
+        presenter.retry();
+        verify(cartService, times(2)).view(USER_CART);
+    }
 }
