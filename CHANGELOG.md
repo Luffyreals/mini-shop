@@ -55,6 +55,7 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - `CONTRIBUTING.md`, template issue và PR, Dependabot.
 
 ### Sửa
+- Trên database mới, sau khoảng 30 phút chạy app thì đặt hàng, đăng ký và đổi trạng thái đơn đều lỗi cho tới khi mở lại app. Nguyên nhân là lỗi của H2 2.4.240: ràng buộc `CHECK (… in (…))` gắn với kết nối Flyway đã tạo nó, và hỏng khi pool thay kết nối đó. Nâng H2 lên 2.5.252 (ghi đè bản của Spring Boot); file database cũ vẫn mở được. Hai test mới tái hiện lỗi: `H2CheckConstraintSessionTest` và `PoolConnectionRetireIntegrationTest`.
 - `DATA_DIR` là đường dẫn tương đối không có `./` (ví dụ `data2`, `target/x`) làm app không khởi động vì H2 từ chối đường dẫn tương đối ngầm; `config.DataDirectory` tự thêm `./`.
 - Test chống session fixation chạy trên Tomcat thật (`SessionFixationTest`) thay cho bản MockMvc phụ thuộc thứ tự chạy test.
 

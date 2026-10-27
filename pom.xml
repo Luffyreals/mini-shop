@@ -28,6 +28,10 @@
         <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
         <testfx.version>4.0.18</testfx.version>
         <imageio-webp.version>3.15.3</imageio-webp.version>
+        <!-- Ghi đè bản 2.4.240 của Spring Boot BOM: 2.4.240 gắn CHECK (… in (…)) với kết nối đã tạo nó (kết nối
+             Flyway), nên sau khi Hikari thay kết nối đó (maxLifetime 30 phút) mọi lệnh ghi bị CHECK đó kiểm đều lỗi.
+             Đã sửa từ 2.5.250 (H2 issue #4302), xem PoolConnectionRetireIntegrationTest. Bỏ dòng này khi Boot lên 2.5.x. -->
+        <h2.version>2.5.252</h2.version>
     </properties>
 
     <dependencies>
