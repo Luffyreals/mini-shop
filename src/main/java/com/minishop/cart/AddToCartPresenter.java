@@ -4,6 +4,9 @@ import com.minishop.catalog.AddToCart;
 import com.minishop.catalog.AddToCartResult;
 import com.minishop.common.NotFoundException;
 import com.minishop.desktop.BackgroundTasks;
+import com.minishop.desktop.ShellPresenter;
+import com.minishop.desktop.ShellPresenter.ShellAction;
+import com.minishop.desktop.ToastAction;
 import com.minishop.desktop.ToastKind;
 import com.minishop.desktop.Toasts;
 import com.minishop.desktop.UnexpectedErrors;
@@ -28,6 +31,7 @@ import java.util.function.Consumer;
 class AddToCartPresenter implements AddToCart {
 
     static final String MSG_ADDED = "Đã thêm vào giỏ hàng.";
+    static final String VIEW_CART_LABEL = "Xem giỏ hàng";
     static final String MSG_OUT_OF_STOCK = "Sản phẩm này đã hết hàng.";
     static final String MSG_INVALID_QUANTITY = "Số lượng không hợp lệ.";
     static final String MSG_MAX = "Số lượng tối đa cho mỗi sản phẩm là " + CartService.MAX_LINE_QUANTITY + ".";
@@ -38,15 +42,17 @@ class AddToCartPresenter implements AddToCart {
     private final Toasts toasts;
     private final CartBadgePresenter badge;
     private final UnexpectedErrors errors;
+    private final ShellPresenter shell;
 
     AddToCartPresenter(CartService cartService, CurrentCartOwner currentOwner, BackgroundTasks tasks, Toasts toasts,
-                       CartBadgePresenter badge, UnexpectedErrors errors) {
+                       CartBadgePresenter badge, UnexpectedErrors errors, ShellPresenter shell) {
         this.cartService = cartService;
         this.currentOwner = currentOwner;
         this.tasks = tasks;
         this.toasts = toasts;
         this.badge = badge;
         this.errors = errors;
+        this.shell = shell;
     }
 
     @Override
@@ -83,7 +89,9 @@ class AddToCartPresenter implements AddToCart {
     /** Hiện toast của kết quả và trả về kết quả cho màn hình. */
     private AddToCartResult show(CartChange change) {
         switch (change.outcome()) {
-            case OK -> toasts.show(MSG_ADDED, ToastKind.SUCCESS);
+            // "Xem giỏ hàng" mở drawer qua nút giỏ của thanh trên (AC-004-2); toast không nhận focus bàn phím
+            case OK -> toasts.show(MSG_ADDED, ToastKind.SUCCESS,
+                    new ToastAction(VIEW_CART_LABEL, () -> shell.trigger(ShellAction.CART)));
             case CAPPED_AT_STOCK -> toasts.show(stockMessage(change.quantity()), ToastKind.INFO);
             case CAPPED_AT_MAX -> toasts.show(MSG_MAX, ToastKind.INFO);
             case OUT_OF_STOCK -> {
@@ -97,7 +105,8 @@ class AddToCartPresenter implements AddToCart {
         return AddToCartResult.ADDED;
     }
 
-    private static String stockMessage(int stock) {
+    /** "Chỉ còn n sản phẩm trong kho."; dùng chung với drawer giỏ hàng. */
+    static String stockMessage(int stock) {
         return "Chỉ còn " + stock + " sản phẩm trong kho.";
     }
 }

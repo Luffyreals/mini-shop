@@ -14,7 +14,7 @@
 <StackPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
            fx:controller="com.minishop.desktop.MainWindow" styleClass="window">
 
-    <VBox spacing="16">
+    <VBox fx:id="shell" spacing="16">
         <padding>
             <Insets top="16" right="16" bottom="16" left="16"/>
         </padding>
@@ -86,6 +86,10 @@
         <!-- Vùng nội dung; Navigator (F2) thay node ở đây -->
         <StackPane fx:id="content" styleClass="content" VBox.vgrow="ALWAYS"/>
     </VBox>
+
+    <!-- Lớp drawer (D4): nằm trên thanh trên và nội dung, dưới lớp toast để toast hiện trên drawer. Khi đóng
+         lớp này rỗng và không nhận chuột (pickOnBounds="false"); DrawerHost thêm lớp phủ mờ và thẻ drawer -->
+    <StackPane fx:id="drawerLayer" styleClass="drawer-layer" pickOnBounds="false"/>
 
     <!-- Lớp phủ cho toast (F2); chỉ các toast nhận chuột -->
     <StackPane fx:id="toastLayer" styleClass="toast-layer" pickOnBounds="false"/>

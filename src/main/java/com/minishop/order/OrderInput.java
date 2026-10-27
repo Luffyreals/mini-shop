@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/** Parses raw request parameters for the order endpoints; a bad value must never become a 500. */
+/** Parses raw text for the order services (id, status, page, amount); a bad value never becomes an error. */
 final class OrderInput {
 
     static final int MAX_PAGE = 10_000;

@@ -23,6 +23,7 @@
     -ms-dark: #1B1B1F;          /* khối tối, nút "Thêm" */
     -ms-success: #12A150;       /* chấm "Còn hàng" */
     -ms-danger: #D92D20;        /* lỗi, "Hết hàng" */
+    -ms-scrim: rgba(22, 22, 26, 0.32);  /* lớp phủ mờ sau drawer (ink, độ trong 32%) */
 
     /* Màu mặc định của Modena (focus, chọn) đổi sang accent */
     -fx-accent: -ms-accent;
@@ -864,16 +865,387 @@
     -fx-spacing: 12px;
 }
 
+/* info-key / info-value: cặp nhãn/giá trị ở chi tiết đơn. Cả hai là Label nên dùng -fx-text-fill (Label bỏ qua
+   -fx-fill). Nhãn muted (5,3:1 trên nền trắng), giá trị ink để dữ liệu nổi hơn nhãn */
 .info-key {
-    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-family: "Plus Jakarta Sans Medium";
     -fx-font-size: 15px;
     -fx-font-weight: normal;
-    -fx-fill: -ms-ink;
+    -fx-text-fill: -ms-muted;
 }
 
 .info-value {
     -fx-font-family: "Plus Jakarta Sans";
     -fx-font-size: 15px;
     -fx-font-weight: normal;
-    -fx-fill: -ms-muted;
+    -fx-text-fill: -ms-ink;
+}
+
+/* =====================================================================================================
+   D4: drawer giỏ hàng, thanh toán, đơn hàng. Chỉ dùng token; không mã màu ngoài khối token ở đầu file.
+   ===================================================================================================== */
+
+/* ---- Drawer (desktop.DrawerHost): lớp phủ mờ + thẻ trắng bo 28 canh phải, cách mép cửa sổ 16 px.
+   .drawer-slot là khung trong suốt giữ khoảng cách 16 px (lớp phủ vẫn phủ kín cửa sổ, kể cả phần lề).
+   Khi mở, khối phía sau bị khóa (để Tab và chuột không lọt qua); khóa làm Modena giảm độ mờ của nút và ô
+   nhập, nên .drawer-open đưa độ mờ về 1 (lớp phủ đã làm tối khối phía sau) ---- */
+/* .drawer-layer không có nền: một nền trong suốt vẫn nhận chuột và sẽ chặn cả cửa sổ khi drawer đóng */
+
+.drawer-scrim {
+    -fx-background-color: -ms-scrim;
+}
+
+.drawer-slot {
+    -fx-padding: 16px;
+}
+
+.drawer-panel {
+    -fx-background-color: -ms-surface;
+    -fx-background-radius: 28px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 32, 0, -4, 8);
+    -fx-min-width: 400px;
+    -fx-pref-width: 400px;
+    -fx-max-width: 400px;
+}
+
+.drawer-header {
+    -fx-alignment: center-left;
+    -fx-spacing: 12px;
+    -fx-padding: 24px 24px 12px 24px;
+}
+
+.drawer-footer {
+    -fx-spacing: 12px;
+    -fx-padding: 16px 24px 24px 24px;
+    -fx-border-color: -ms-surface-muted transparent transparent transparent;
+    -fx-border-width: 2px 0 0 0;
+}
+
+.drawer-open .button:disabled,
+.drawer-open .text-field:disabled,
+.drawer-open .search-box:disabled {
+    -fx-opacity: 1;
+}
+
+/* cart-lines: VBox các dòng giỏ trong thân cuộn của drawer; đệm ngang 24 bằng .drawer-header và .drawer-footer */
+.cart-lines {
+    -fx-spacing: 8px;
+    -fx-padding: 4px 24px 16px 24px;
+}
+
+/* ---- Dòng giỏ hàng (trong drawer): thẻ surface-muted bo 20 ---- */
+.cart-line {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-radius: 20px;
+    -fx-padding: 12px;
+    -fx-spacing: 12px;
+}
+
+/* Dòng đang ghi: chỉ làm mờ, điều khiển vẫn nhận focus (Enter lặp lại không làm focus nhảy sang nút khác) */
+.cart-line-writing {
+    -fx-opacity: 0.6;
+}
+
+/* cart-line-name: tên sản phẩm là nút dạng chữ (mở chi tiết); gạch chân khi trỏ chuột hoặc có focus */
+.cart-line-name {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-padding: 0;
+    -fx-alignment: center-left;
+    -fx-text-alignment: left;
+    -fx-wrap-text: true;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+}
+
+.cart-line-name:hover,
+.cart-line-name:focused {
+    -fx-underline: true;
+}
+
+/* cart-line-title: tên của dòng ngừng bán (Label, không bấm được); cùng chữ với .cart-line-name, không gạch chân */
+.cart-line-title {
+    -fx-padding: 0;
+    -fx-wrap-text: true;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+}
+
+/* "Xóa" cùng hàng với đơn giá: đệm hẹp để chữ thẳng mép phải với thành tiền bên dưới */
+.cart-line .link-button {
+    -fx-padding: 4px 4px;
+}
+
+.cart-line-meta {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+    -fx-wrap-text: true;
+}
+
+/* quantity-stepper: nút − / ô số / nút + trong một viên thuốc nền surface (nổi trên dòng surface-muted) */
+.quantity-stepper {
+    -fx-background-color: -ms-surface;
+    -fx-background-radius: 999px;
+    -fx-alignment: center;
+    -fx-spacing: 2px;
+    -fx-padding: 2px;
+}
+
+.stepper-button {
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+    -fx-padding: 0;
+    -fx-min-width: 32px;
+    -fx-min-height: 32px;
+    -fx-pref-width: 32px;
+    -fx-pref-height: 32px;
+    -fx-max-width: 32px;
+    -fx-max-height: 32px;
+    -fx-alignment: center;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-size: 20px;
+    -fx-font-weight: normal;
+}
+
+.stepper-button:hover {
+    -fx-background-color: -ms-surface-muted;
+}
+
+/* quantity-input: ô số gõ được, không nền (nền là của .quantity-stepper); viền focus accent từ .text-field:focused */
+.quantity-input {
+    -fx-background-color: transparent;
+    -fx-padding: 6px 4px;
+    -fx-alignment: center;
+    -fx-min-width: 48px;
+    -fx-pref-width: 48px;
+    -fx-max-width: 48px;
+}
+
+/* line-label: nhãn trạng thái dòng giỏ ("Hết hàng", "Chỉ còn 3 sản phẩm"); chữ luôn ink, màu chỉ ở chấm
+   .stock-dot (graphic của nhãn). Biến thể: -out và -gone (danger), -low (accent) */
+.line-label {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-content-display: left;
+    -fx-graphic-text-gap: 8px;
+}
+
+.line-label-out .stock-dot,
+.line-label-gone .stock-dot {
+    -fx-background-color: -ms-danger;
+}
+
+.line-label-low .stock-dot {
+    -fx-background-color: -ms-accent;
+}
+
+.cart-total-row {
+    -fx-alignment: center-left;
+    -fx-spacing: 12px;
+}
+
+/* ---- Biểu mẫu nhiều dòng (TextArea): cùng kiểu .text-field nhưng bo 20 thay vì pill ---- */
+.text-area {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-insets: 0;
+    -fx-background-radius: 20px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 20px;
+    -fx-padding: 0;
+    -fx-prompt-text-fill: -ms-muted;
+    -fx-text-fill: -ms-ink;
+}
+
+.text-area .scroll-pane,
+.text-area .scroll-pane > .viewport {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.text-area .content {
+    -fx-background-color: transparent;
+    -fx-padding: 9px 16px;
+}
+
+.text-area:focused {
+    -fx-border-color: -ms-accent;
+}
+
+.text-area:disabled {
+    -fx-opacity: 0.55;
+}
+
+.form-grid {
+    -fx-hgap: 16px;
+    -fx-vgap: 16px;
+}
+
+/* form-notice: biến thể chỉ đổi màu biểu tượng (chữ vẫn ink); mặc định (không biến thể) là success */
+.form-notice-error .form-notice-icon {
+    -fx-stroke: -ms-danger;
+}
+
+.form-notice-success .form-notice-icon {
+    -fx-stroke: -ms-success;
+}
+
+/* ---- Nút nguy hiểm ("Hủy đơn hàng"): nền danger, chữ surface (~4,8:1). Viền focus màu ink vì accent cam
+   khó thấy trên nền đỏ ---- */
+.button-danger {
+    -fx-background-color: -ms-danger;
+    -fx-padding: 11px 24px;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-surface;
+}
+
+.button-danger:hover {
+    -fx-background-color: derive(-ms-danger, -10%);
+}
+
+.button-danger:focused {
+    -fx-border-color: -ms-ink;
+}
+
+/* toast-action: nút trong toast (nền ink) nên là viên thuốc surface với chữ ink */
+.toast-action {
+    -fx-background-color: -ms-surface;
+    -fx-padding: 4px 14px;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+}
+
+.toast-action:hover {
+    -fx-background-color: -ms-surface-muted;
+}
+
+/* ---- Bảng dữ liệu (tóm tắt thanh toán, dòng hàng của đơn, danh sách đơn): GridPane, không dùng TableView.
+   Hàng tiêu đề và hàng dữ liệu cùng đệm ngang 18 px (16 + viền 2) để cột thẳng hàng ---- */
+.data-table {
+    -fx-hgap: 16px;
+    -fx-vgap: 4px;
+}
+
+.data-table-header {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+    -fx-padding: 0 18px 8px 18px;
+}
+
+/* data-table-row: hàng bo 20; trỏ chuột nền surface-muted, focus viền accent (viền trong suốt giữ chỗ) */
+.data-table-row {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 20px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 20px;
+    -fx-padding: 12px 16px;
+    -fx-alignment: center-left;
+    -fx-spacing: 16px;
+}
+
+/* order-row: hàng danh sách đơn bấm được (mở chi tiết): con trỏ tay, nền khi trỏ chuột, viền focus. Hàng tĩnh
+   (dòng hàng ở chi tiết đơn) chỉ có .data-table-row nên không có hiệu ứng nào */
+.order-row {
+    -fx-cursor: hand;
+}
+
+.order-row:hover {
+    -fx-background-color: -ms-surface-muted;
+}
+
+.order-row:focused {
+    -fx-border-color: -ms-accent;
+}
+
+/* order-table: VBox hàng tiêu đề + các hàng đơn; khe 4 px để hai viền focus không dính nhau */
+.order-table {
+    -fx-spacing: 4px;
+}
+
+/* summary-cell: ô của bảng tóm tắt thanh toán (GridPane .data-table); đệm dọc cho hàng thoáng hơn vgap 4 */
+.summary-cell {
+    -fx-padding: 6px 0;
+}
+
+/* summary-table: ghép với .data-table cho bảng tóm tắt (cột phải hẹp hơn danh sách đơn): khe cột 12 để cột tên
+   còn chỗ. Đứng sau .data-table nên thắng */
+.summary-table {
+    -fx-hgap: 12px;
+}
+
+/* ---- Nhãn trạng thái đơn: viên thuốc chữ ink kèm chấm màu (.status-dot, graphic của nhãn); chữ luôn là tên
+   trạng thái nên không chỉ dựa vào màu. Lớp kèm theo: status-pending | confirmed | shipping | delivered | cancelled ---- */
+.status-pill {
+    -fx-background-color: derive(-ms-surface-muted, -4%);
+    -fx-background-radius: 999px;
+    -fx-padding: 4px 12px 4px 10px;
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-content-display: left;
+    -fx-graphic-text-gap: 8px;
+}
+
+.status-dot {
+    -fx-background-radius: 999px;
+    -fx-min-width: 8px;
+    -fx-min-height: 8px;
+    -fx-pref-width: 8px;
+    -fx-pref-height: 8px;
+    -fx-max-width: 8px;
+    -fx-max-height: 8px;
+}
+
+.status-pending .status-dot   { -fx-background-color: -ms-accent; }
+.status-confirmed .status-dot { -fx-background-color: -ms-ink; }
+.status-shipping .status-dot  { -fx-background-color: -ms-ink; }
+.status-delivered .status-dot { -fx-background-color: -ms-success; }
+.status-cancelled .status-dot { -fx-background-color: -ms-danger; }
+
+/* table-total-row: hàng "Tổng cộng" dưới bảng .data-table-row; đệm ngang 18 (16 + viền 2) để chữ thẳng cột với
+   các hàng phía trên */
+.table-total-row {
+    -fx-padding: 8px 18px 0 18px;
+}
+
+/* info-section: tiêu đề nhóm trong thẻ thông tin (cách nhóm trước thêm 12 px) */
+.info-section {
+    -fx-padding: 12px 0 0 0;
+}
+
+/* ---- Thanh toán: hai cột (form trái, tóm tắt phải) hoặc xếp chồng khi hẹp (GridPane) ---- */
+.checkout-layout {
+    -fx-hgap: 20px;
+    -fx-vgap: 20px;
+}
+
+/* summary-card: thẻ "Đơn hàng của bạn" (dùng một mình hoặc ghép với .card) */
+.summary-card {
+    -fx-background-color: -ms-surface;
+    -fx-background-radius: 28px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 24, 0, 0, 8);
+    -fx-padding: 24px;
+    -fx-spacing: 12px;
+}
+
+/* info-list: GridPane cặp nhãn/giá trị ở chi tiết đơn; ô dùng .info-key / .info-value */
+.info-list {
+    -fx-hgap: 16px;
+    -fx-vgap: 8px;
 }

@@ -5,8 +5,8 @@ import java.util.OptionalInt;
 import java.util.regex.Pattern;
 
 /**
- * Parses raw request parameters for the cart endpoints. Parameters arrive as strings and a bad value must
- * never become a 500 (same approach as the catalog's {@code ProductFilter}).
+ * Parses raw text typed into the cart screens (product id, quantity). Input arrives as strings and a bad value
+ * must never become an unexpected error (same approach as the catalog's {@code ProductFilter}).
  */
 final class CartInput {
 

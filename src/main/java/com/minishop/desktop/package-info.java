@@ -24,6 +24,13 @@
  *       {@link com.minishop.desktop.ImageTile#flexible} là ô ảnh co giãn theo chiều rộng, giữ tỉ lệ (thẻ sản phẩm).</li>
  *   <li>{@link com.minishop.desktop.ModalDialogs}: dựng {@code Stage} modal theo token cho mọi hộp thoại
  *       (lỗi, đăng nhập, xác nhận).</li>
+ *   <li>{@link com.minishop.desktop.DrawerHost} (D4): drawer trượt từ phải trong cửa sổ chính (giỏ hàng). Tính
+ *       năng dựng nội dung rồi gọi {@code open(panel, onClosed)}; Esc, bấm ra ngoài hoặc {@code close()} đóng,
+ *       Tab không ra khỏi drawer, focus trở về nút đã mở. Lớp drawer nằm dưới lớp toast.</li>
+ *   <li>{@link com.minishop.desktop.ConfirmDialog} (D4): hộp xác nhận dùng chung cho việc không hoàn tác được
+ *       (hủy đơn, xóa); focus bắt đầu ở nút từ chối, Enter không xác nhận thay người dùng.</li>
+ *   <li>{@link com.minishop.desktop.ToastAction} (D4): nút hành động trong toast
+ *       ({@code Toasts.show(text, kind, action)}), ví dụ "Xem giỏ hàng".</li>
  * </ul>
  * <p>
  * <b>Luật JavaFX:</b> chỉ {@code desktop..} và các lớp {@code *Screen}, {@code *Drawer}, {@code *Dialog}

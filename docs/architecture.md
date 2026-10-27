@@ -25,6 +25,9 @@ Tài liệu cho người muốn đọc code: công nghệ, cách chia package, c
 - Phiên đăng nhập là bean `user.AppSession` (một `CurrentUser` bất biến, chỉ đổi trên luồng giao diện). `AuthService.login` chạy ngoài giao dịch; việc gộp giỏ khách cắm vào qua `user.LoginHook` (do `cart` cài đặt) nên `user` không phụ thuộc `cart`, và gộp lỗi không làm hỏng đăng nhập
 - Mỗi màn là một `Route` bất biến (`catalog.CatalogRoute` mang từ khóa, danh mục, sắp xếp, trang, như URL của bản web); đổi bộ lọc là điều hướng tới route mới, nên kết quả cũ không đè được kết quả mới. Mỗi `XScreen` có lớp lồng `XScreen.Factory` dựng màn và một `XPresenter` mới
 - Nút "Thêm vào giỏ" nằm trong màn của `catalog`, nhưng `catalog` không được phụ thuộc `cart`: `catalog` khai báo interface `AddToCart`, `cart.AddToCartPresenter` cài đặt nó (cùng cách đảo phụ thuộc như `LoginHook`)
+- Giỏ hàng là một ngăn trượt trong cửa sổ (`desktop.DrawerHost`, nằm giữa nội dung và lớp toast), không phải màn riêng; Thanh toán, Đơn hàng của tôi và chi tiết đơn là các route (`order.CheckoutRoute`, `OrdersRoute`, `OrderDetailRoute`)
+- `order` được dùng `cart`, không có chiều ngược lại, nhưng ngăn giỏ cần mở màn Thanh toán và màn Thanh toán cần làm mới số trên nút giỏ: `cart` khai báo `CheckoutEntry` (do `order.OrdersMenuPresenter` cài đặt, đòi đăng nhập trước) và `CartBadge`; `order` chỉ được dùng bốn tên của `cart` (`CartCheckout`, `CheckoutLine`, `CheckoutEntry`, `CartBadge`), `ArchitectureTest` kiểm điều này
+- Đặt hàng trên desktop: màn Thanh toán gửi `userId` (đọc trên luồng giao diện) và tổng đang hiện; `OrderService.placeOrder` vẫn là một giao dịch khóa `users` rồi `products`. Lỗi nghiệp vụ (`PlaceOrderException`) được màn đổi thành câu tiếng Việt sau khi giao dịch đã rollback
 - JavaFX không đọc được WebP: `desktop.WebpDecoder` đọc bằng `javax.imageio` với thư viện TwelveMonkeys `imageio-webp` (scope `runtime`), ngoài luồng giao diện, từ chối ảnh trên 24 triệu điểm ảnh
 
 **Luồng khởi động:**
@@ -44,7 +47,7 @@ flowchart LR
     admin --> order
     admin --> storage
     admin --> user
-    order -->|"chỉ CartCheckout"| cart
+    order -->|"chỉ CartCheckout, CheckoutEntry, CartBadge"| cart
     order --> catalog
     order --> user
     cart --> catalog

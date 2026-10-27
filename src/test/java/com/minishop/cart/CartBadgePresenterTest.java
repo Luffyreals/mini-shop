@@ -154,6 +154,36 @@ class CartBadgePresenterTest {
         assertThat(shell.cartBadgeTextBinding().get()).isEqualTo("99+");
     }
 
+    // ------------------------------------------------------------------ the CartBadge port (QĐ4 of D4)
+
+    @Test
+    void refresh_throughTheCartBadgeInterface_givesTheSameResultAsTheDirectCall() {
+        CartBadgePresenter presenter = presenterWith(new DirectBackgroundTasks());
+        presenter.contribute(shell);
+        logInAs(USER);
+        when(cartService.totalQuantity(USER_CART)).thenReturn(6);
+        CartBadge badge = presenter;
+
+        badge.refresh();
+
+        assertThat(shell.cartCountProperty().get()).isEqualTo(6);
+        assertThat(shell.cartBadgeTextBinding().get()).isEqualTo("6");
+        verify(cartService).totalQuantity(USER_CART);
+        verifyNoInteractions(errors);
+    }
+
+    @Test
+    void refresh_throughTheCartBadgeInterface_forAGuest_readsTheGuestCart() {
+        CartBadgePresenter presenter = presenterWith(new DirectBackgroundTasks());
+        presenter.contribute(shell);
+        when(cartService.totalQuantity(new CartOwner.Guest(store))).thenReturn(2);
+        CartBadge badge = presenter;
+
+        badge.refresh();
+
+        assertThat(shell.cartCountProperty().get()).isEqualTo(2);
+    }
+
     // ------------------------------------------------------------------ before the top bar exists
 
     @Test

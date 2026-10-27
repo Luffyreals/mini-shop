@@ -4,6 +4,9 @@ import com.minishop.catalog.AddToCartResult;
 import com.minishop.common.NotFoundException;
 import com.minishop.desktop.BackgroundTasks;
 import com.minishop.desktop.DirectBackgroundTasks;
+import com.minishop.desktop.ShellPresenter;
+import com.minishop.desktop.ShellPresenter.ShellAction;
+import com.minishop.desktop.ToastAction;
 import com.minishop.desktop.ToastKind;
 import com.minishop.desktop.Toasts;
 import com.minishop.desktop.UnexpectedErrors;
@@ -17,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -66,6 +71,8 @@ class AddToCartPresenterTest {
     private CartBadgePresenter badge;
     @Mock
     private UnexpectedErrors errors;
+    @Mock
+    private ShellPresenter shell;
 
     private final RecordingGuestCartStore store = new RecordingGuestCartStore();
     private final DirectBackgroundTasks direct = new DirectBackgroundTasks();
@@ -79,7 +86,14 @@ class AddToCartPresenterTest {
     }
 
     private AddToCartPresenter presenter(BackgroundTasks tasks) {
-        return new AddToCartPresenter(cartService, currentOwner, tasks, toasts, badge, errors);
+        return new AddToCartPresenter(cartService, currentOwner, tasks, toasts, badge, errors, shell);
+    }
+
+    /** The toast of an OK add carries the "Xem giỏ hàng" action; returns that action for the test to run. */
+    private ToastAction verifyAddedToastWithAction() {
+        ArgumentCaptor<ToastAction> action = ArgumentCaptor.forClass(ToastAction.class);
+        verify(toasts).show(eq(AddToCartPresenter.MSG_ADDED), eq(ToastKind.SUCCESS), action.capture());
+        return action.getValue();
     }
 
     private Consumer<AddToCartResult> recorder() {
@@ -98,8 +112,34 @@ class AddToCartPresenterTest {
 
         presenter(direct).add(PRODUCT, "2", recorder());
 
-        verify(toasts).show("Đã thêm vào giỏ hàng.", ToastKind.SUCCESS);
+        verifyAddedToastWithAction();
         assertThat(results).containsExactly(AddToCartResult.ADDED);
+    }
+
+    /** AC-004-2 */
+    @Test
+    void add_whenOk_toastOffersViewCartAndRunningItOpensTheCartDrawer() {
+        cartReturns(CartChange.Outcome.OK, 2);
+
+        presenter(direct).add(PRODUCT, "2", recorder());
+
+        ToastAction action = verifyAddedToastWithAction();
+        assertThat(action.label()).isEqualTo("Xem giỏ hàng").isEqualTo(AddToCartPresenter.VIEW_CART_LABEL);
+        verifyNoInteractions(shell);   // nothing opens until the customer presses the action
+        action.action().run();
+        verify(shell).trigger(ShellAction.CART);
+    }
+
+    @Test
+    void add_whenNotOk_showsNoViewCartAction() {
+        for (CartChange.Outcome outcome : List.of(CartChange.Outcome.CAPPED_AT_STOCK,
+                CartChange.Outcome.CAPPED_AT_MAX, CartChange.Outcome.OUT_OF_STOCK, CartChange.Outcome.NOT_IN_CART)) {
+            cartReturns(outcome, 1);
+            presenter(direct).add(PRODUCT, "1", recorder());
+        }
+
+        verify(toasts, never()).show(any(), any(), any(ToastAction.class));
+        verifyNoInteractions(shell);
     }
 
     @Test
@@ -171,11 +211,11 @@ class AddToCartPresenterTest {
     void add_withAnInvalidQuantity_neverTouchesTheCartTheOwnerTheTasksOrTheBadge(String raw) {
         BackgroundTasks tasks = mock(BackgroundTasks.class);
         CurrentCartOwner owner = mock(CurrentCartOwner.class);
-        AddToCartPresenter presenter = new AddToCartPresenter(cartService, owner, tasks, toasts, badge, errors);
+        AddToCartPresenter presenter = new AddToCartPresenter(cartService, owner, tasks, toasts, badge, errors, shell);
 
         presenter.add(PRODUCT, raw, recorder());
 
-        verifyNoInteractions(cartService, owner, tasks, badge, errors);
+        verifyNoInteractions(cartService, owner, tasks, badge, errors, shell);
         verify(toasts).show("Số lượng không hợp lệ.", ToastKind.ERROR);
         assertThat(results).containsExactly(AddToCartResult.INVALID_QUANTITY);
     }
@@ -185,11 +225,11 @@ class AddToCartPresenterTest {
     void add_withANullQuantity_isInvalidAndTouchesNothing(String raw) {
         BackgroundTasks tasks = mock(BackgroundTasks.class);
         CurrentCartOwner owner = mock(CurrentCartOwner.class);
-        AddToCartPresenter presenter = new AddToCartPresenter(cartService, owner, tasks, toasts, badge, errors);
+        AddToCartPresenter presenter = new AddToCartPresenter(cartService, owner, tasks, toasts, badge, errors, shell);
 
         presenter.add(PRODUCT, raw, recorder());
 
-        verifyNoInteractions(cartService, owner, tasks, badge, errors);
+        verifyNoInteractions(cartService, owner, tasks, badge, errors, shell);
         verify(toasts).show("Số lượng không hợp lệ.", ToastKind.ERROR);
         assertThat(results).containsExactly(AddToCartResult.INVALID_QUANTITY);
     }
@@ -285,7 +325,7 @@ class AddToCartPresenterTest {
     void add_showsTheToastBeforeRefreshingTheBadgeAndThenCallsOnFinished() {
         cartReturns(CartChange.Outcome.OK, 1);
         List<String> order = new ArrayList<>();
-        doAnswer(invocation -> order.add("toast")).when(toasts).show(any(), any());
+        doAnswer(invocation -> order.add("toast")).when(toasts).show(any(), any(), any(ToastAction.class));
         doAnswer(invocation -> order.add("badge")).when(badge).refresh();
 
         presenter(direct).add(PRODUCT, "1", result -> order.add("finished"));
@@ -351,7 +391,7 @@ class AddToCartPresenterTest {
 
         verify(cartService).add(new CartOwner.Guest(store), PRODUCT, 2);
         assertThat(results).containsExactly(AddToCartResult.ADDED);
-        verify(toasts).show("Đã thêm vào giỏ hàng.", ToastKind.SUCCESS);
+        verifyAddedToastWithAction();
         // reading the owner must not create a store entry; only the cart service writes
         assertThat(store.getOrCreateCalls()).isZero();
     }

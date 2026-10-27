@@ -45,6 +45,15 @@ class OrderService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * Everything the checkout screen needs in one read-only transaction: the cart at current prices and the
+     * prefilled form. No lock, no write.
+     */
+    @Transactional(readOnly = true)
+    CheckoutPage checkoutPage(long userId) {
+        return new CheckoutPage(prepareCheckout(userId), prefilledForm(userId));
+    }
+
     /** The checkout page at current prices. No lock, no write. */
     @Transactional(readOnly = true)
     CheckoutView prepareCheckout(long userId) {

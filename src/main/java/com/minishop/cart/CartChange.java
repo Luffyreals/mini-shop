@@ -1,7 +1,7 @@
 package com.minishop.cart;
 
 /**
- * Kết quả của một thao tác thêm/sửa giỏ. Service không trả chữ hiển thị; tầng web đổi kết quả thành thông báo.
+ * Kết quả của một thao tác thêm/sửa giỏ. Service không trả chữ hiển thị; màn hình đổi kết quả thành thông báo.
  *
  * @param outcome  điều gì đã xảy ra
  * @param quantity số lượng của dòng sau thao tác (là n trong "Chỉ còn n sản phẩm trong kho")
