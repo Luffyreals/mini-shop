@@ -453,6 +453,75 @@ class OrderIntegrationTest {
         assertThat(statements).isLessThanOrEqualTo(2).isEqualTo(1);
     }
 
+    // ------------------------------------------------------- AC-005-3 (D4, QĐ10)
+
+    @Test
+    void checkoutPage_returnsCartAtCurrentPricesAndProfilePrefill() {
+        var u = data.createUser();
+        long a = data.createProduct("A", 100_000, 5);
+        long b = data.createProduct("B", 250_000, 1);
+        data.createCart(u.id(), new long[]{a, 2}, new long[]{b, 1});
+        data.setPrice(a, 110_000);
+
+        CheckoutPage page = orderService.checkoutPage(u.id());
+
+        assertThat(page.checkout().lines()).hasSize(2);
+        assertThat(page.checkout().total()).isEqualByComparingTo("470000");
+        assertThat(page.checkout().orderable()).isTrue();
+        assertThat(page.prefill().receiverName()).isEqualTo("Order Tester");
+        assertThat(page.prefill().phone()).isEmpty();
+        assertThat(page.prefill().shippingAddress()).isEmpty();
+    }
+
+    @Test
+    void checkoutPage_withEmptyCart_isEmptyAndNotOrderable() {
+        var u = data.createUser();
+
+        CheckoutPage page = orderService.checkoutPage(u.id());
+
+        assertThat(page.checkout().isEmpty()).isTrue();
+        assertThat(page.checkout().orderable()).isFalse();
+    }
+
+    @Test
+    void checkoutPage_forUnknownUser_throwsNotFound() {
+        assertThatThrownBy(() -> orderService.checkoutPage(999_999_999L)).isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void checkoutPage_isReadOnly_cartStockAndOrdersStayUnchanged() {
+        var u = data.createUser();
+        long a = data.createProduct("A", 100_000, 5);
+        long b = data.createProduct("B", 250_000, 1);
+        data.createCart(u.id(), new long[]{a, 2}, new long[]{b, 1});
+
+        orderService.checkoutPage(u.id());
+
+        assertThat(data.cartLines(u.id())).containsExactly(Map.entry(a, 2), Map.entry(b, 1));
+        assertThat(data.stock(a)).isEqualTo(5);
+        assertThat(data.stock(b)).isEqualTo(1);
+        assertThat(data.orderCount(u.id())).isZero();
+    }
+
+    /** One read-only transaction: the number of statements does not grow with the number of cart lines. */
+    @Test
+    void checkoutPage_issuesTheSameNumberOfStatementsForOneLineAndForThreeLines() {
+        var one = data.createUser();
+        var three = data.createUser();
+        long a = data.createProduct("A", 100_000, 50);
+        long b = data.createProduct("B", 100_000, 50);
+        long c = data.createProduct("C", 100_000, 50);
+        data.createCart(one.id(), new long[]{a, 1});
+        data.createCart(three.id(), new long[]{a, 1}, new long[]{b, 1}, new long[]{c, 1});
+
+        long forOne = statementsOf(() -> orderService.checkoutPage(one.id()));
+        long forThree = statementsOf(() -> assertThat(orderService.checkoutPage(three.id()).checkout().lines())
+                .hasSize(3));
+
+        assertThat(forThree).isEqualTo(forOne);
+        assertThat(forOne).isLessThanOrEqualTo(3);
+    }
+
     private long statementsOf(Runnable action) {
         Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         statistics.setStatisticsEnabled(true);

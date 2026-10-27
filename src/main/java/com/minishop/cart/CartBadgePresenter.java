@@ -32,7 +32,7 @@ import java.util.Objects;
  */
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE)
-class CartBadgePresenter implements SessionListener, ShellContributor {
+class CartBadgePresenter implements SessionListener, ShellContributor, CartBadge {
 
     private final CartService cartService;
     private final CurrentCartOwner currentOwner;
@@ -65,9 +65,11 @@ class CartBadgePresenter implements SessionListener, ShellContributor {
 
     /**
      * Đọc lại tổng số lượng của giỏ hiện tại và đặt vào thanh trên. D3 và D4 gọi sau mỗi lần ghi giỏ. Chưa có
-     * thanh trên thì chưa có gì để cập nhật.
+     * thanh trên thì chưa có gì để cập nhật. Là phương thức của {@link CartBadge}, để {@code order} làm mới số sau
+     * khi đặt hàng mà không biết lớp này (QĐ4 của D4).
      */
-    void refresh() {
+    @Override
+    public void refresh() {
         if (shell == null) {
             return;
         }

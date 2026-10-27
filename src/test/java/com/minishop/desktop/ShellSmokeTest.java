@@ -111,10 +111,29 @@ class ShellSmokeTest {
     }
 
     @Test
-    @Order(4)
-    void start_leavesTheCartButtonDisabledUntilAFeatureAttachesIt() {
-        // The account button is not checked here: the login (D2) attaches its action, see the test below.
-        assertThat(isDisabled("cartButton")).as("#cartButton is disabled (D4 attaches it)").isTrue();
+    @Order(3)
+    void start_enablesTheCartButtonBecauseTheCartDrawerAttachedItsAction() {
+        assertThat(isDisabled("cartButton")).as("#cartButton is enabled").isFalse();
+    }
+
+    @Test
+    @Order(3)
+    void start_hasTheDrawerLayerBetweenTheShellAndTheToastLayer_soToastsShowAboveTheDrawer() {
+        Node shell = lookup("shell");
+        Node drawerLayer = lookup("drawerLayer");
+        Node toastLayer = lookup("toastLayer");
+        List<Node> siblings = FxTestSupport.callOnFx(() -> List.copyOf(((Pane) shell.getParent()).getChildren()));
+
+        assertThat(drawerLayer.getParent()).as("same parent").isSameAs(shell.getParent());
+        assertThat(toastLayer.getParent()).as("same parent").isSameAs(shell.getParent());
+        assertThat(siblings.indexOf(drawerLayer)).as("the drawer layer is above the shell")
+                .isGreaterThan(siblings.indexOf(shell));
+        assertThat(siblings.indexOf(toastLayer)).as("the toast layer is above the drawer layer")
+                .isGreaterThan(siblings.indexOf(drawerLayer));
+        assertThat(FxTestSupport.callOnFx(() -> ((Pane) drawerLayer).getChildren().isEmpty()))
+                .as("no drawer is open at start").isTrue();
+        assertThat(FxTestSupport.callOnFx(() -> ((Pane) drawerLayer).isPickOnBounds()))
+                .as("the empty layer does not catch the mouse").isFalse();
     }
 
     @Test
@@ -123,7 +142,6 @@ class ShellSmokeTest {
         for (String id : List.of("navStore", "navNew", "navCategories", "searchField")) {
             assertThat(isDisabled(id)).as("#" + id + " is disabled").isFalse();
         }
-        assertThat(isDisabled("cartButton")).as("#cartButton stays disabled until D4").isTrue();
     }
 
     @Test
@@ -236,6 +254,55 @@ class ShellSmokeTest {
         assertThat(account.getText()).isEqualTo("Đăng nhập");
         assertThat(account.getAccessibleText()).isEqualTo("Đăng nhập");
         assertThat(((Label) lookup("cartBadge")).getText()).as("a guest's cart is empty").isEqualTo("0");
+    }
+
+    /** The centre of {@code #id} converted into the local coordinates of {@code layer}. */
+    private static javafx.geometry.Point2D centreOfInto(String id, Node layer) {
+        return FxTestSupport.callOnFx(() -> {
+            Node target = stage.getScene().lookup("#" + id);
+            javafx.geometry.Bounds bounds = target.getLayoutBounds();
+            javafx.geometry.Point2D inScene = target.localToScene(bounds.getCenterX(), bounds.getCenterY());
+            return layer.sceneToLocal(inScene);
+        });
+    }
+
+    @Test
+    @Order(9)
+    void drawerClosed_theEmptyDrawerAndToastLayersDoNotCoverTheWindow_soClicksReachTheShell() {
+        // A transparent background fill still counts for hit-testing, so the layers must have no fill at all
+        for (String id : List.of("cartButton", "navStore", "searchField", "accountButton")) {
+            for (String layerId : List.of("drawerLayer", "toastLayer")) {
+                Node layer = lookup(layerId);
+                javafx.geometry.Point2D local = centreOfInto(id, layer);
+                assertThat(FxTestSupport.callOnFx(() -> layer.contains(local)))
+                        .as("#" + layerId + " must not contain the centre of #" + id).isFalse();
+            }
+        }
+        assertThat(FxTestSupport.callOnFx(() -> ((Pane) lookup("drawerLayer")).getBackground()))
+                .as("the drawer layer has no background").isNull();
+    }
+
+    @Test
+    @Order(9)
+    void drawerOpen_theScrimCatchesTheClicksOverTheShell_andTheLayerIsEmptyAgainAfterClosing() {
+        DrawerHost host = app.context().getBean(DrawerHost.class);
+        Pane layer = (Pane) lookup("drawerLayer");
+        try {
+            FxTestSupport.runOnFx(() -> host.open(new StackPane(), null));
+            FxTestSupport.flushFx();
+
+            Node scrim = lookup("drawerScrim");
+            // The scrim is laid out on the next pulse, so wait for it instead of asserting at once
+            FxTestSupport.await("the scrim to cover #cartButton while the drawer is open",
+                    () -> FxTestSupport.callOnFx(() -> scrim.contains(centreOfInto("cartButton", scrim))));
+        } finally {
+            FxTestSupport.runOnFx(host::close);
+            FxTestSupport.await("the drawer layer to be empty again",
+                    () -> FxTestSupport.callOnFx(() -> layer.getChildren().isEmpty()));
+        }
+        javafx.geometry.Point2D local = centreOfInto("cartButton", layer);
+        assertThat(FxTestSupport.callOnFx(() -> layer.contains(local)))
+                .as("after closing, #drawerLayer does not contain the centre of #cartButton").isFalse();
     }
 
     @Test

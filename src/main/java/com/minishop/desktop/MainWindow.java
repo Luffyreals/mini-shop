@@ -39,10 +39,12 @@ class MainWindow {
     private final ShellPresenter presenter;
     private final Navigator navigator;
     private final Toasts toasts;
+    private final DrawerHost drawerHost;
     private final ObjectProvider<ShellContributor> contributors;
     private ContextMenu accountMenu;
     private ContextMenu categoriesMenu;
 
+    @FXML private Pane shell;
     @FXML private Pane topBar;
     @FXML private Pane logo;
     @FXML private Button navStore;
@@ -54,19 +56,22 @@ class MainWindow {
     @FXML private Label cartBadge;
     @FXML private Button accountButton;
     @FXML private StackPane content;
+    @FXML private StackPane drawerLayer;
     @FXML private StackPane toastLayer;
 
-    public MainWindow(ShellPresenter presenter, Navigator navigator, Toasts toasts,
+    public MainWindow(ShellPresenter presenter, Navigator navigator, Toasts toasts, DrawerHost drawerHost,
                       ObjectProvider<ShellContributor> contributors) {
         this.presenter = presenter;
         this.navigator = navigator;
         this.toasts = toasts;
+        this.drawerHost = drawerHost;
         this.contributors = contributors;
     }
 
     @FXML
     private void initialize() {
         navigator.attach(content);
+        drawerHost.attach(drawerLayer, shell);
         toasts.attach(toastLayer);
 
         bindButton(navStore, ShellAction.STORE);
@@ -200,6 +205,11 @@ class MainWindow {
     /** Vùng nội dung giữa thanh trên; {@link Navigator} thay node ở đây. */
     StackPane content() {
         return content;
+    }
+
+    /** Lớp phủ cho {@link DrawerHost}: nằm trên thanh trên và nội dung, dưới lớp toast. */
+    StackPane drawerLayer() {
+        return drawerLayer;
     }
 
     /** Lớp phủ cho {@link Toasts}. Không chặn chuột ngoài các toast. */

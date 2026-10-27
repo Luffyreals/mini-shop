@@ -150,12 +150,13 @@ class AccountMenuSmokeTest {
     }
 
     @Test
-    void firingTheAccountButton_asAUser_opensAMenuWithOnlyLogoutAndNotTheLoginDialog() {
+    void firingTheAccountButton_asAUser_opensAMenuWithOrdersAndLogoutAndNotTheLoginDialog() {
         signInAs(DemoAccounts.USER_EMAIL);
         ContextMenu menu = openAccountMenu();
 
-        assertThat(itemIds(menu)).containsExactly("accountMenuLogout");
-        assertThat(itemTexts(menu)).containsExactly("Đăng xuất");
+        // D4 attaches "Đơn hàng của tôi" (order.OrdersMenuPresenter)
+        assertThat(itemIds(menu)).containsExactly("accountMenuOrders", "accountMenuLogout");
+        assertThat(itemTexts(menu)).containsExactly("Đơn hàng của tôi", "Đăng xuất");
         assertThat(authDialogShowing()).as("a logged-in user does not get the login dialog").isFalse();
     }
 
@@ -189,7 +190,8 @@ class AccountMenuSmokeTest {
         FxTestSupport.runOnFx(() -> app.context().getBean(Navigator.class).navigateTo(CatalogRoute.all()));
         FxTestSupport.await("the catalog screen", () -> !homeScreenShowing());
         ContextMenu menu = openAccountMenu();
-        MenuItem logout = FxTestSupport.callOnFx(() -> menu.getItems().get(0));
+        MenuItem logout = FxTestSupport.callOnFx(() -> menu.getItems().stream()
+                .filter(item -> "accountMenuLogout".equals(item.getId())).findFirst().orElseThrow());
 
         FxTestSupport.runOnFx(logout::fire);
         FxTestSupport.flushFx();
@@ -215,14 +217,15 @@ class AccountMenuSmokeTest {
     }
 
     @Test
-    void signIn_asAnAdmin_getsAMenuWithOnlyLogoutBecauseNoFeatureAttachedAnAdminEntryYet() {
+    void signIn_asAnAdmin_getsOrdersAndLogoutBecauseNoFeatureAttachedAnAdminEntryYet() {
         signInAs(DemoAccounts.ADMIN_EMAIL);
 
         ContextMenu menu = openAccountMenu();
 
         assertThat(FxTestSupport.callOnFx(() -> accountButton().getText())).isEqualTo("Quản trị viên");
-        assertThat(itemTexts(menu)).as("no \"Quản trị\" and no dead entry in D2").containsExactly("Đăng xuất");
-        assertThat(itemIds(menu)).containsExactly("accountMenuLogout");
+        assertThat(itemTexts(menu)).as("no \"Quản trị\" and no dead entry before D5")
+                .containsExactly("Đơn hàng của tôi", "Đăng xuất");
+        assertThat(itemIds(menu)).containsExactly("accountMenuOrders", "accountMenuLogout");
         hideMenus();
         signOut();
     }

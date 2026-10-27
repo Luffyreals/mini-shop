@@ -4,7 +4,7 @@
 
 Ứng dụng bán hàng mini chạy trên Windows, viết 100% bằng Java: giao diện JavaFX, nghiệp vụ Spring (không có web server). Đây là **dự án học tập tập trung vào UI/UX**: không phải cửa hàng thật, không có thanh toán thật.
 
-> **Đang chuyển đổi.** Đến `v0.8.0`, Mini Shop là website (Spring MVC + Thymeleaf). Từ sau đó app được làm lại thành ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)), theo từng giai đoạn D1–D6. Hiện đã xong **D1** (cửa sổ khung với thanh trên cùng, database, dữ liệu mẫu, hộp thoại lỗi), **D2** (đăng nhập, đăng ký, đăng xuất, menu tài khoản, giỏ khách trong bộ nhớ) và **D3** (trang chủ, danh sách sản phẩm có tìm, lọc, sắp xếp, phân trang, trang chi tiết, thêm vào giỏ). Màn giỏ hàng, đặt hàng và quản trị được làm lại ở D4–D5; bản web vẫn xem được ở tag `v0.8.0`.
+> **Đang chuyển đổi.** Đến `v0.8.0`, Mini Shop là website (Spring MVC + Thymeleaf). Từ sau đó app được làm lại thành ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)), theo từng giai đoạn D1–D6. Hiện đã xong **D1** (cửa sổ khung với thanh trên cùng, database, dữ liệu mẫu, hộp thoại lỗi), **D2** (đăng nhập, đăng ký, đăng xuất, menu tài khoản, giỏ khách trong bộ nhớ), **D3** (trang chủ, danh sách sản phẩm có tìm, lọc, sắp xếp, phân trang, trang chi tiết, thêm vào giỏ) và **D4** (ngăn giỏ hàng, đặt hàng COD, đơn hàng của tôi, hủy đơn). Khu quản trị được làm lại ở D5; bản web vẫn xem được ở tag `v0.8.0`.
 
 Clone về là chạy được, **chỉ cần JDK 25**: không cần Docker, không cần cài database. Dữ liệu lưu trong thư mục `data/` trên máy bạn, nên tắt app mở lại vẫn còn.
 
@@ -39,7 +39,8 @@ Các tính năng của bản web được giữ nguyên ở tầng nghiệp vụ
 ## Giao diện (UI/UX)
 
 - Phong cách "soft modern": nền xám rất nhạt, thẻ trắng bo góc lớn, nút dạng viên thuốc, một màu nhấn cam, phông Plus Jakarta Sans đóng gói kèm app (đủ dấu tiếng Việt). Token màu và cỡ chữ nằm ở đầu [`ui/theme.css`](src/main/resources/ui/theme.css).
-- Bàn phím: `Ctrl+K` đưa con trỏ vào ô tìm kiếm; Tab đi qua bộ lọc, các thẻ sản phẩm và thanh trang, Enter trên thẻ mở chi tiết.
+- Bàn phím: `Ctrl+K` đưa con trỏ vào ô tìm kiếm; Tab đi qua bộ lọc, các thẻ sản phẩm và thanh trang, Enter trên thẻ mở chi tiết. Ngăn giỏ hàng trượt ra trong cửa sổ, đóng bằng Esc, "Đóng" hoặc bấm ra ngoài; con trỏ quay về nút giỏ.
+- Hành động khó hoàn tác (hủy đơn) luôn hỏi lại, và nút được chọn sẵn là nút không làm gì ("Giữ đơn hàng"), nên lỡ nhấn Enter cũng không hủy đơn.
 - Không gọi database trên luồng giao diện: mọi lời gọi service chạy nền, nên cửa sổ không bị "Not responding".
 - Mỗi lần chỉ chạy được một cửa sổ app (H2 chỉ cho một tiến trình mở `data/`); mở lần hai sẽ có thông báo "Mini Shop đang chạy ở một cửa sổ khác.".
 
@@ -74,7 +75,8 @@ App dùng **H2**, một database viết bằng Java chạy bên trong app, lưu 
 - [x] D1: nền tảng desktop JavaFX (cửa sổ khung, chạy nền, lỗi, một cửa sổ)
 - [x] D2: tài khoản và giỏ khách (đăng nhập, đăng ký, đăng xuất, gộp giỏ khách khi đăng nhập)
 - [x] D3: cửa hàng (trang chủ, danh sách sản phẩm, chi tiết, thêm vào giỏ, đọc ảnh WebP)
-- [ ] D4: giỏ hàng và đặt hàng · D5: quản trị · D6: hoàn thiện và đóng gói `MiniShop.exe`
+- [x] D4: giỏ hàng và đặt hàng (ngăn giỏ, thanh toán COD, đơn hàng của tôi, hủy đơn có xác nhận)
+- [ ] D5: quản trị · D6: hoàn thiện và đóng gói `MiniShop.exe`
 
 ## Đóng góp
 

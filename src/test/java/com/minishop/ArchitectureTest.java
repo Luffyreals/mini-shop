@@ -61,11 +61,17 @@ class ArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage(
                     "com.minishop.admin..", "com.minishop.config..", "com.minishop.storage..");
 
-    /** QĐ1: order chỉ thấy API công khai hẹp của cart, không thấy CartService, CartRepository hay entity của cart. */
+    /**
+     * QĐ1: order chỉ thấy API công khai hẹp của cart, không thấy CartService, CartRepository hay entity của cart.
+     * D4 QĐ3, QĐ4: thêm đúng hai cổng do {@code cart} định nghĩa, {@code order} cài đặt hoặc gọi:
+     * {@code CheckoutEntry} (mở màn Thanh toán) và {@code CartBadge} (làm mới badge sau khi đặt hàng).
+     * Luật dùng tên lớp nên vẫn đúng khi viết trước hai interface này.
+     */
     @ArchTest
     static final ArchRule order_usesOnlyCartCheckoutApi = noClasses().that().resideInAPackage("com.minishop.order..")
             .should().dependOnClassesThat(resideInAPackage("com.minishop.cart..")
-                    .and(not(simpleName("CartCheckout"))).and(not(simpleName("CheckoutLine"))));
+                    .and(not(simpleName("CartCheckout"))).and(not(simpleName("CheckoutLine")))
+                    .and(not(simpleName("CheckoutEntry"))).and(not(simpleName("CartBadge"))));
 
     /**
      * Spec 006 §8, QĐ3: chỉ {@code order} trừ và cộng kho theo đơn hàng; ngay cả {@code catalog} (nơi định nghĩa

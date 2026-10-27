@@ -105,4 +105,78 @@ class ToastQueueTest {
     void maxWaiting_isFive() {
         assertThat(ToastQueue.MAX_WAITING).isEqualTo(5);
     }
+
+    // ------------------------------------------------------------------ toasts with an action (QĐ5 of D4)
+
+    @Test
+    void offer_sameTextAndKindWithAnotherAction_isADuplicateOfTheShowingToast() {
+        queue.offer(new Entry("a", ToastKind.INFO, new ToastAction("Xem giỏ hàng", () -> { })));
+
+        Entry other = new Entry("a", ToastKind.INFO, new ToastAction("Mở", () -> { }));
+
+        assertThat(queue.offer(other)).isNull();
+        assertThat(queue.waitingCount()).isZero();
+    }
+
+    @Test
+    void offer_sameTextAndKindWithoutActionAfterOneWithAction_isDropped() {
+        queue.offer(info("shown"));
+        queue.offer(new Entry("a", ToastKind.INFO, new ToastAction("Xem giỏ hàng", () -> { })));
+
+        queue.offer(info("a"));
+
+        assertThat(queue.waitingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void entryEquality_ignoresTheActionButNotTheText() {
+        Entry withAction = new Entry("a", ToastKind.INFO, new ToastAction("Xem giỏ hàng", () -> { }));
+
+        assertThat(withAction).isEqualTo(info("a")).hasSameHashCodeAs(info("a"));
+        assertThat(withAction).isNotEqualTo(info("b"));
+    }
+
+    @Test
+    void offer_aToastWithAnAction_keepsTheActionWhenItWaitsAndWhenItShows() {
+        ToastAction action = new ToastAction("Xem giỏ hàng", () -> { });
+        queue.offer(info("shown"));
+
+        queue.offer(new Entry("Đã thêm vào giỏ hàng.", ToastKind.SUCCESS, action));
+        Entry next = queue.finished();
+
+        assertThat(next.action()).isSameAs(action);
+        assertThat(next.text()).isEqualTo("Đã thêm vào giỏ hàng.");
+    }
+
+    @Test
+    void offer_aToastWithAnAction_returnedForImmediateDisplayStillHasItsAction() {
+        ToastAction action = new ToastAction("Xem giỏ hàng", () -> { });
+
+        Entry shown = queue.offer(new Entry("a", ToastKind.SUCCESS, action));
+
+        assertThat(shown.action()).isSameAs(action);
+    }
+
+    @Test
+    void holdMillis_withAnAction_isAtLeastFiveSeconds() {
+        ToastAction action = new ToastAction("Xem giỏ hàng", () -> { });
+
+        assertThat(ToastQueue.ACTION_HOLD_MILLIS).isEqualTo(5_000);
+        assertThat(new Entry("a", ToastKind.SUCCESS, action).holdMillis()).isEqualTo(5_000);
+        assertThat(new Entry("a", ToastKind.INFO, action).holdMillis()).isEqualTo(5_000);
+    }
+
+    @Test
+    void holdMillis_withAnActionOnAnErrorToast_keepsTheLongerKindDuration() {
+        ToastAction action = new ToastAction("Thử lại", () -> { });
+
+        assertThat(new Entry("a", ToastKind.ERROR, action).holdMillis())
+                .isEqualTo(Math.max(ToastKind.ERROR.displayMillis(), ToastQueue.ACTION_HOLD_MILLIS));
+    }
+
+    @Test
+    void holdMillis_withoutAnAction_isTheKindDuration() {
+        assertThat(info("a").holdMillis()).isEqualTo(ToastKind.INFO.displayMillis());
+        assertThat(new Entry("a", ToastKind.ERROR).holdMillis()).isEqualTo(ToastKind.ERROR.displayMillis());
+    }
 }

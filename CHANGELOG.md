@@ -5,7 +5,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
-Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)). Sau đó Mini Shop chuyển từ website sang ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)); giai đoạn D1 dựng nền tảng, D2 làm lại tài khoản, D3 làm lại cửa hàng, các màn còn lại được làm lại ở D4–D5.
+Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)). Sau đó Mini Shop chuyển từ website sang ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)); giai đoạn D1 dựng nền tảng, D2 làm lại tài khoản, D3 làm lại cửa hàng, D4 làm lại giỏ hàng và đặt hàng, khu quản trị được làm lại ở D5.
 
 ### Thêm
 - Trang chủ chỉ dùng dữ liệu thật: sản phẩm mới nhất (thêm vào giỏ, xem chi tiết), hai sản phẩm mới kế tiếp, khối "Sắp hết hàng" (còn 1–5 cái, ẩn khi không có) và thẻ "Giao hàng và thanh toán". App mở vào trang chủ; nút "Cửa hàng" và đăng xuất cũng về đó.
@@ -14,6 +14,10 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - Thêm vào giỏ (cả khi chưa đăng nhập) từ trang chi tiết, từ nút "+ Thêm" trên thẻ sản phẩm và từ thẻ lớn ở trang chủ; thông báo theo đúng quy tắc giỏ hàng (kẹp theo tồn kho, tối đa 99) và badge giỏ cập nhật sau mỗi lần thêm.
 - Phím tắt `Ctrl+K` đưa con trỏ vào ô tìm kiếm.
 - Đọc ảnh WebP bằng thư viện TwelveMonkeys `imageio-webp` (BSD-3-Clause), giải mã ngoài luồng giao diện; ảnh khai kích thước quá lớn hoặc file hỏng hiện ô giữ chỗ.
+- Ngăn giỏ hàng mở từ nút giỏ trên thanh trên: ảnh, tên, đơn giá, thành tiền, nhãn dòng (ngừng bán, hết hàng, sắp hết), sửa số lượng bằng −/+ hoặc gõ số rồi Enter, nút "Xóa", "Tổng cộng" và "Đặt hàng". Đóng bằng Esc, "Đóng" hoặc bấm ra ngoài. Toast "Đã thêm vào giỏ hàng." có nút "Xem giỏ hàng".
+- Màn Thanh toán (COD): tóm tắt giỏ, form người nhận điền sẵn họ tên, lỗi theo từng ô. "Đặt hàng" khi chưa đăng nhập mở hộp thoại đăng nhập rồi đi tiếp. Hết hàng hoặc giá vừa đổi lúc xác nhận thì báo đúng câu của quy tắc đặt hàng; đóng ngăn giỏ thì tóm tắt được nạp lại, chữ đã nhập được giữ.
+- "Đơn hàng của tôi" trong menu tài khoản: danh sách đơn có phân trang, chi tiết đơn (đặt xong hiện "Đặt hàng thành công. Mã đơn của bạn là #{id}."), tự hủy đơn đang chờ xác nhận qua hộp thoại "Bạn có chắc muốn hủy đơn hàng này?".
+- Thành phần dùng chung trong `desktop`: `DrawerHost` (ngăn trượt trong cửa sổ, nằm dưới lớp toast), `ConfirmDialog` (hộp xác nhận, focus sẵn ở nút từ chối), `ToastAction` (nút trong toast).
 
 ### Thay đổi
 - App là ứng dụng desktop JavaFX 25 chạy bằng `./mvnw javafx:run`; Spring chạy không có web server. Cửa sổ khung có thanh trên cùng (logo, mục điều hướng, ô tìm kiếm, nút giỏ, nút đăng nhập; các nút bật dần ở D2–D4), theme "soft modern" và phông Plus Jakarta Sans đóng gói kèm.
@@ -24,6 +28,7 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - Giỏ khách nằm trong bộ nhớ của app (mất khi đóng app); khi đăng nhập được gộp vào giỏ của tài khoản theo quy tắc cũ, và badge giỏ cập nhật theo phiên.
 - Hộp thoại đăng ký không còn cao hơn cửa sổ: phần ô nhập cuộn được, tiêu đề và nút "Đăng ký" luôn hiện. Nút tài khoản có độ rộng tối đa để tên dài không làm chật ô tìm kiếm.
 - `PageNav` chỉ còn số trang (không còn URL); `desktop.PageBar` vẽ thanh trang dùng chung.
+- `OrderService.checkoutPage` trả tóm tắt giỏ và form điền sẵn trong một lần đọc, cho màn Thanh toán.
 - Ảnh sản phẩm mẫu chuyển sang `images/products/` (đường dẫn lưu trong DB không đổi); nguồn và giấy phép ảnh chuyển từ `credits.html` sang `images/credits.tsv`. Thay 5 ảnh sản phẩm chưa đúng chủ thể và thêm ảnh cho 2 cuốn sách.
 - `CurrentUser` là record không chứa hash mật khẩu; chỉ còn `spring-security-crypto` để băm mật khẩu.
 - Test web (MockMvc, Tomcat thật) được bỏ; các quy tắc nghiệp vụ chúng kiểm được chuyển xuống test service. CI chạy test giao diện dưới màn hình ảo `xvfb`.

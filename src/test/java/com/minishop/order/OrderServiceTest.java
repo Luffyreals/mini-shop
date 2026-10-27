@@ -217,6 +217,80 @@ class OrderServiceTest {
         assertThat(service.prefilledForm(USER_ID).phone()).isEmpty();
     }
 
+    // ---------- checkoutPage (D4, QĐ10) ----------
+
+    /** AC-005-3 */
+    @Test
+    void checkoutPage_withLinesAndUserWithoutPhone_returnsViewAndPrefilledForm() {
+        when(cartCheckout.read(USER_ID)).thenReturn(twoLines());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+        CheckoutPage page = service.checkoutPage(USER_ID);
+
+        assertThat(page.checkout().lines()).containsExactly(
+                new CheckoutLineView("Áo thun", new BigDecimal("100000"), 2, new BigDecimal("200000")),
+                new CheckoutLineView("Quần jean", new BigDecimal("250000"), 1, new BigDecimal("250000")));
+        assertThat(page.checkout().total()).isEqualByComparingTo("450000");
+        assertThat(page.checkout().orderable()).isTrue();
+        assertThat(page.prefill().receiverName()).isEqualTo("Nguyễn Văn An");
+        assertThat(page.prefill().phone()).isEmpty();
+        assertThat(page.prefill().shippingAddress()).isEmpty();
+    }
+
+    /** AC-005-3 */
+    @Test
+    void checkoutPage_whenUserHasPhone_prefillsIt() {
+        user.setPhone("0987654321");
+        when(cartCheckout.read(USER_ID)).thenReturn(twoLines());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+        assertThat(service.checkoutPage(USER_ID).prefill().phone()).isEqualTo("0987654321");
+    }
+
+    /** AC-005-4 */
+    @Test
+    void checkoutPage_withEmptyCart_isEmptyAndNotOrderableButStillPrefilled() {
+        when(cartCheckout.read(USER_ID)).thenReturn(List.of());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+        CheckoutPage page = service.checkoutPage(USER_ID);
+
+        assertThat(page.checkout().isEmpty()).isTrue();
+        assertThat(page.checkout().orderable()).isFalse();
+        assertThat(page.prefill().receiverName()).isEqualTo("Nguyễn Văn An");
+    }
+
+    /** AC-005-5 */
+    @Test
+    void checkoutPage_withDiscontinuedLine_isNotOrderable() {
+        when(cartCheckout.read(USER_ID)).thenReturn(List.of(hiddenLine(9, "B", "1000", 1, 5)));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+        assertThat(service.checkoutPage(USER_ID).checkout().orderable()).isFalse();
+    }
+
+    @Test
+    void checkoutPage_whenUserDoesNotExist_throwsNotFound() {
+        lenient().when(cartCheckout.read(USER_ID)).thenReturn(twoLines());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.checkoutPage(USER_ID)).isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void checkoutPage_readsWithoutLockingOrWriting() {
+        when(cartCheckout.read(USER_ID)).thenReturn(twoLines());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+        service.checkoutPage(USER_ID);
+
+        verify(cartCheckout).read(USER_ID);
+        verify(cartCheckout, never()).lockAndRead(anyLong());
+        verify(cartCheckout, never()).clear(anyLong());
+        verifyNothingWritten();
+        verifyNoInteractions(orderRepository, productRepository);
+    }
+
     // ---------- placeOrder: success ----------
 
     /** AC-005-7, AC-005-10, BR-005-3, BR-005-12, BR-005-13 */
