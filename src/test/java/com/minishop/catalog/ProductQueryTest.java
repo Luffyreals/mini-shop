@@ -17,6 +17,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -358,6 +359,186 @@ class ProductQueryTest {
 
         assertThat(view.products()).isNotEmpty();
         return statistics.getPrepareStatementCount();
+    }
+
+    // ---- trang chủ (QĐ5, D3: AC-009-1, AC-002-3, AC-002-18)
+
+    private static final Instant T0 = Instant.parse("2026-01-01T00:00:00Z");
+
+    private Product saveWithStock(Category category, String name, int stock, boolean active) {
+        Product p = new Product(category, name, "Mô tả " + name, BigDecimal.valueOf(1000), stock);
+        p.setActive(active);
+        return products.saveAndFlush(p);
+    }
+
+    /** {@code created_at} do @PrePersist đặt và {@code updatable = false}, nên đổi bằng SQL để điều khiển thứ tự. */
+    private void setCreatedAt(Product product, Instant createdAt) {
+        em.createNativeQuery("update products set created_at = :t where id = :id")
+                .setParameter("t", createdAt)
+                .setParameter("id", product.getId())
+                .executeUpdate();
+        em.flush();
+        em.clear();
+    }
+
+    private static List<Long> ids(List<Product> list) {
+        return list.stream().map(Product::getId).toList();
+    }
+
+    @Test
+    void findTop3Newest_ordersByCreatedAtDescThenIdDescAndLimitsToThree() {
+        Product oldest = save(fashion, "Cũ nhất", 1000, true);
+        Product older = save(fashion, "Cũ hơn", 1000, true);
+        Product tiedLowerId = save(fashion, "Cùng giờ id nhỏ", 1000, true);
+        Product tiedHigherId = save(fashion, "Cùng giờ id lớn", 1000, true);
+        setCreatedAt(oldest, T0);
+        setCreatedAt(older, T0.plusSeconds(3600));
+        setCreatedAt(tiedLowerId, T0.plusSeconds(7200));
+        setCreatedAt(tiedHigherId, T0.plusSeconds(7200));
+
+        List<Product> newest = products.findTop3ByActiveTrueOrderByCreatedAtDescIdDesc();
+
+        assertThat(tiedHigherId.getId()).isGreaterThan(tiedLowerId.getId());
+        assertThat(ids(newest)).containsExactly(tiedHigherId.getId(), tiedLowerId.getId(), older.getId());
+    }
+
+    @Test
+    void findTop3Newest_excludesInactiveProductsEvenWhenNewest() {
+        Product visibleOld = save(fashion, "Đang bán cũ", 1000, true);
+        Product visibleNew = save(fashion, "Đang bán mới", 1000, true);
+        Product hiddenNewest = save(fashion, "Ẩn mới nhất", 1000, false);
+        setCreatedAt(visibleOld, T0);
+        setCreatedAt(visibleNew, T0.plusSeconds(60));
+        setCreatedAt(hiddenNewest, T0.plusSeconds(600));
+
+        List<Product> newest = products.findTop3ByActiveTrueOrderByCreatedAtDescIdDesc();
+
+        assertThat(ids(newest)).containsExactly(visibleNew.getId(), visibleOld.getId());
+    }
+
+    @Test
+    void findTop3Newest_loadsCategoryInTheSameStatement() {
+        save(fashion, "Áo", 1000, true);
+        save(electronics, "Tai nghe", 1000, true);
+        em.flush();
+        em.clear();
+        Statistics statistics = emf.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        List<Product> newest = products.findTop3ByActiveTrueOrderByCreatedAtDescIdDesc();
+        newest.forEach(p -> p.getCategory().getName());
+
+        assertThat(newest).hasSize(2);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    @Test
+    void findTop3LowStock_includesOnlyStockOneToFive() {
+        saveWithStock(fashion, "Hết hàng", 0, true);
+        Product one = saveWithStock(fashion, "Còn 1", 1, true);
+        Product five = saveWithStock(fashion, "Còn 5", 5, true);
+        saveWithStock(fashion, "Còn 6", 6, true);
+        saveWithStock(fashion, "Còn nhiều", 100, true);
+
+        List<Product> low = products.findTop3ByActiveTrueAndStockBetweenOrderByStockAscIdAsc(1, 5);
+
+        assertThat(ids(low)).containsExactly(one.getId(), five.getId());
+    }
+
+    @Test
+    void findTop3LowStock_excludesInactiveProductWithLowStock() {
+        saveWithStock(fashion, "Ẩn còn 2", 2, false);
+        Product visible = saveWithStock(fashion, "Bán còn 4", 4, true);
+
+        List<Product> low = products.findTop3ByActiveTrueAndStockBetweenOrderByStockAscIdAsc(1, 5);
+
+        assertThat(ids(low)).containsExactly(visible.getId());
+    }
+
+    @Test
+    void findTop3LowStock_returnsAtMostThreeOrderedByStockThenId() {
+        Product four = saveWithStock(fashion, "Còn 4", 4, true);
+        Product threeFirst = saveWithStock(fashion, "Còn 3 trước", 3, true);
+        Product two = saveWithStock(fashion, "Còn 2", 2, true);
+        Product threeSecond = saveWithStock(fashion, "Còn 3 sau", 3, true);
+        Product five = saveWithStock(fashion, "Còn 5", 5, true);
+
+        List<Product> low = products.findTop3ByActiveTrueAndStockBetweenOrderByStockAscIdAsc(1, 5);
+
+        assertThat(threeFirst.getId()).isLessThan(threeSecond.getId());
+        assertThat(ids(low)).containsExactly(two.getId(), threeFirst.getId(), threeSecond.getId());
+        assertThat(ids(low)).doesNotContain(four.getId(), five.getId());
+    }
+
+    @Test
+    void home_buildsFeaturedMoreNewAndLowStockFromRealData() {
+        Product oldest = saveWithStock(fashion, "Cũ nhất", 50, true);
+        Product middle = saveWithStock(electronics, "Giữa", 3, true);
+        Product newest = saveWithStock(fashion, "Mới nhất", 50, true);
+        Product hiddenNewest = saveWithStock(fashion, "Ẩn", 2, false);
+        Product soldOut = saveWithStock(fashion, "Hết hàng", 0, true);
+        setCreatedAt(soldOut, T0.minusSeconds(60));
+        setCreatedAt(oldest, T0);
+        setCreatedAt(middle, T0.plusSeconds(60));
+        setCreatedAt(newest, T0.plusSeconds(120));
+        setCreatedAt(hiddenNewest, T0.plusSeconds(180));
+
+        HomeView view = service.home();
+
+        assertThat(view.featured().id()).isEqualTo(newest.getId());
+        assertThat(view.featured().categoryName()).isEqualTo("Thời trang");
+        assertThat(view.moreNew()).extracting(ProductCardView::id).containsExactly(middle.getId(), oldest.getId());
+        assertThat(view.lowStock()).containsExactly(
+                new LowStockCardView(middle.getId(), "Giữa", 3, null));
+        assertThat(view.categories()).extracting(CategoryOption::name).containsExactly("Điện tử", "Thời trang");
+    }
+
+    @Test
+    void home_runsExactlyThreeStatementsEvenWithThreeProductsInThreeCategories() {
+        Category books = categories.save(new Category("Sách", null));
+        saveWithStock(fashion, "Áo", 3, true);
+        saveWithStock(electronics, "Tai nghe", 2, true);
+        saveWithStock(books, "Truyện", 4, true);
+        em.flush();
+        em.clear();
+        Statistics statistics = emf.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        HomeView view = service.home();
+
+        assertThat(view.featured()).isNotNull();
+        assertThat(view.moreNew()).hasSize(2);
+        assertThat(view.lowStock()).hasSize(3);
+        assertThat(view.categories()).hasSize(3);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+    }
+
+    @Test
+    void home_whenNoProducts_hasNoFeaturedAndEmptyProductLists() {
+        HomeView view = service.home();
+
+        assertThat(view.featured()).isNull();
+        assertThat(view.moreNew()).isEmpty();
+        assertThat(view.lowStock()).isEmpty();
+        assertThat(view.categories()).extracting(CategoryOption::name).containsExactly("Điện tử", "Thời trang");
+    }
+
+    @Test
+    void home_whenDatabaseHasNoProductsAndNoCategories_isCompletelyEmpty() {
+        categories.deleteAllInBatch();
+        em.clear();
+
+        HomeView view = service.home();
+
+        assertThat(view.featured()).isNull();
+        assertThat(view.moreNew()).isEmpty();
+        assertThat(view.lowStock()).isEmpty();
+        assertThat(view.categories()).isEmpty();
+    }
+
+    @Test
+    void categories_returnsAllCategoriesInVietnameseOrder() {
+        assertThat(service.categories()).extracting(CategoryOption::name).containsExactly("Điện tử", "Thời trang");
     }
 
     // ---- chi tiết (AC-002-14, 15)

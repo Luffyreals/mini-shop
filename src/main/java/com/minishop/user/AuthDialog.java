@@ -4,13 +4,18 @@ import com.minishop.desktop.ModalDialogs;
 import com.minishop.user.AuthDialogPresenter.Mode;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.property.SimpleDoubleProperty;
+import javafx.geometry.Bounds;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.input.KeyCode;
@@ -20,6 +25,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.SVGPath;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.springframework.stereotype.Component;
@@ -33,6 +39,10 @@ import org.springframework.stereotype.Component;
  * <p>
  * Enter trong ô nhập hoặc trên nút thì gửi; Esc và nút "Đóng" gọi {@code presenter.close()}, bị từ chối khi đang
  * đăng nhập hoặc đăng ký (Alt+F4 cũng vậy). Cửa sổ tự co giãn theo nội dung khi lỗi hiện ra hoặc đổi chế độ.
+ * <p>
+ * Chiều cao thẻ bị chặn ở (chiều cao cửa sổ chủ - lề bóng hai phía): form đăng ký cao hơn cửa sổ tối thiểu
+ * 1024×700, nên bốn ô nhập nằm trong một ScrollPane co lại khi thiếu chỗ, còn tiêu đề, nút "Đăng ký" và liên
+ * kết "Đã có tài khoản? Đăng nhập" ở ngoài vùng cuộn, luôn nhìn thấy.
  * <p>
  * Id cố định cho test: {@code #authDialog}, {@code #authTitle}, {@code #authNotice}, {@code #authClose};
  * đăng nhập {@code #loginEmail}, {@code #loginPassword}, {@code #loginError}, {@code #loginSubmit},
@@ -54,12 +64,24 @@ class AuthDialog {
     private static final double FIT_TOLERANCE = 0.5;
     /** Đệm ngang (12) và viền (2) của nút chữ: dịch ngược để chữ thẳng hàng với mép ô nhập, viền focus vẫn đủ chỗ. */
     private static final double LINK_INSET = 14;
+    /** Lề trong suốt quanh thẻ (chừa chỗ cho bóng) ở mỗi cạnh: khớp {@code .dialog-root} trong theme.css. */
+    private static final double SHADOW_MARGIN = 32;
+    /** Dư vài điểm ảnh: {@code sizeToScene} làm tròn lên, nên cửa sổ không được chạm đúng chiều cao cửa sổ chủ. */
+    private static final double ROUNDING_SLACK = 2;
+    /** Thẻ không bao giờ thấp hơn mức này, kể cả khi cửa sổ chủ rất thấp (vùng cuộn vẫn đủ dùng). */
+    private static final double MIN_CARD_HEIGHT = 360;
+    private static final double MIN_SCROLL_HEIGHT = 120;
+    private static final double SCROLL_EDGE = 4;
 
     private final AuthDialogPresenter presenter;
 
     private Stage stage;
     private Region card;
     private boolean fitScheduled;
+    /** Chiều cao tối đa của thẻ; đồng bộ với chiều cao cửa sổ chủ khi cửa sổ được dựng. */
+    private final DoubleProperty cardHeightLimit = new SimpleDoubleProperty(Double.MAX_VALUE);
+    private ScrollPane regScroll;
+    private VBox regFields;
     private TextField loginEmail;
     private PasswordField loginPassword;
     private TextField regFullName;
@@ -99,6 +121,9 @@ class AuthDialog {
     private Stage build() {
         card = buildCard();
         Stage dialog = ModalDialogs.create(card);
+        limitCardToOwner(dialog);
+        // Tạo skin (ScrollPane) ngay, để mọi node của cả hai chế độ tra cứu được trước lần hiện đầu tiên.
+        dialog.getScene().getRoot().applyCss();
         dialog.setOnCloseRequest(event -> {
             event.consume();
             presenter.close();
@@ -125,16 +150,80 @@ class AuthDialog {
             }
         });
         // Nội dung đổi kích thước (lỗi hiện ra, đổi chế độ) thì cửa sổ phải theo.
-        card.needsLayoutProperty().addListener((observable, was, now) -> {
-            if (now && !fitScheduled) {
-                fitScheduled = true;
-                Platform.runLater(() -> {
-                    fitScheduled = false;
-                    fit();
-                });
-            }
-        });
+        // Phần ô nhập nằm trong ScrollPane, nên cũng nghe riêng nó phòng khi yêu cầu bố cục không lan lên thẻ.
+        card.needsLayoutProperty().addListener((observable, was, now) -> scheduleFit(now));
+        regFields.needsLayoutProperty().addListener((observable, was, now) -> scheduleFit(now));
+        // Tab sang ô đang bị cuộn khuất thì cuộn ô đó vào vùng nhìn thấy.
+        scene.focusOwnerProperty().addListener((observable, was, now) -> scrollIntoView(now));
         return dialog;
+    }
+
+    private void scheduleFit(boolean needsLayout) {
+        if (needsLayout && !fitScheduled) {
+            fitScheduled = true;
+            Platform.runLater(() -> {
+                fitScheduled = false;
+                fit();
+            });
+        }
+    }
+
+    /**
+     * Thẻ không cao quá (chiều cao cửa sổ chủ - lề bóng hai phía): chiều cao ưa thích của thẻ bị chặn ở mức đó, và
+     * vùng cuộn của form đăng ký co lại cho vừa. Tiêu đề, nút "Đăng ký" và liên kết đổi chế độ nằm ngoài vùng cuộn
+     * nên luôn nhìn thấy. Không có cửa sổ chủ thì lấy chiều cao vùng làm việc của màn hình chính.
+     */
+    private void limitCardToOwner(Stage dialog) {
+        Window owner = dialog.getOwner();
+        if (owner != null) {
+            cardHeightLimit.bind(Bindings.createDoubleBinding(() -> limitFor(owner.getHeight()),
+                    owner.heightProperty()));
+        } else {
+            cardHeightLimit.set(limitFor(Screen.getPrimary().getVisualBounds().getHeight()));
+        }
+        cardHeightLimit.addListener((observable, was, now) -> card.requestLayout());
+    }
+
+    private static double limitFor(double windowHeight) {
+        return Math.max(MIN_CARD_HEIGHT, windowHeight - 2 * SHADOW_MARGIN - ROUNDING_SLACK);
+    }
+
+    /** Cuộn vùng ô nhập của form đăng ký vừa đủ để {@code focused} (nếu nằm trong đó) nhìn thấy trọn. */
+    private void scrollIntoView(Node focused) {
+        if (focused == null || regScroll == null || !isInside(focused, regFields)) {
+            return;
+        }
+        double contentHeight = regFields.getLayoutBounds().getHeight();
+        double viewportHeight = regScroll.getViewportBounds().getHeight();
+        double scrollable = contentHeight - viewportHeight;
+        if (scrollable <= 0) {
+            return;
+        }
+        Bounds bounds = regFields.sceneToLocal(focused.localToScene(focused.getBoundsInLocal()));
+        if (bounds == null) {
+            return;
+        }
+        double top = bounds.getMinY() - SCROLL_EDGE;
+        double bottom = bounds.getMaxY() + SCROLL_EDGE;
+        double visibleTop = regScroll.getVvalue() * scrollable;
+        double target;
+        if (top < visibleTop) {
+            target = top;
+        } else if (bottom > visibleTop + viewportHeight) {
+            target = bottom - viewportHeight;
+        } else {
+            return;
+        }
+        regScroll.setVvalue(Math.max(0, Math.min(1, target / scrollable)));
+    }
+
+    private static boolean isInside(Node node, Node ancestor) {
+        for (Node current = node; current != null; current = current.getParent()) {
+            if (current == ancestor) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Co giãn cửa sổ vừa nội dung, giữ nguyên tâm theo chiều dọc. Chạy trên luồng giao diện. */
@@ -219,7 +308,12 @@ class AuthDialog {
         close.setOnAction(event -> presenter.close());
         enterFires(close);
 
-        StackPane root = new StackPane(content, close);
+        StackPane root = new StackPane(content, close) {
+            @Override
+            protected double computePrefHeight(double width) {
+                return Math.min(super.computePrefHeight(width), cardHeightLimit.get());
+            }
+        };
         StackPane.setAlignment(close, Pos.TOP_RIGHT);
         root.setId("authDialog");
         root.getStyleClass().addAll("card", "dialog-card");
@@ -268,19 +362,43 @@ class AuthDialog {
             input.setOnAction(event -> presenter.submitRegister());
         }
 
-        VBox form = new VBox(14,
+        regFields = new VBox(14,
                 field("Họ và tên", regFullName, "regFullName", presenter.regFullNameErrorProperty(),
                         regFullNameError, null),
                 field("Email", regEmail, "regEmail", presenter.regEmailErrorProperty(), regEmailError, null),
                 field("Mật khẩu", regPassword, "regPassword", presenter.regPasswordErrorProperty(),
                         regPasswordError, PASSWORD_HINT),
                 field("Nhập lại mật khẩu", regConfirmPassword, "regConfirmPassword",
-                        presenter.regConfirmPasswordErrorProperty(), regConfirmPasswordError, null),
+                        presenter.regConfirmPasswordErrorProperty(), regConfirmPasswordError, null));
+        regScroll = fieldScroller(regFields);
+
+        // Vùng cuộn chỉ chứa các ô nhập; nút "Đăng ký" và liên kết đổi chế độ ở ngoài, luôn nhìn thấy.
+        VBox form = new VBox(14, regScroll,
                 actions(primaryButton("regSubmit", REGISTER_TITLE, presenter::submitRegister)),
                 linkButton("toLogin", "Đã có tài khoản? Đăng nhập", presenter::showLogin));
         form.setAlignment(Pos.TOP_LEFT);
         showWhenMode(form, Mode.REGISTER);
         return form;
+    }
+
+    /**
+     * Vùng cuộn dọc cho các ô nhập: vừa chiều rộng (không cuộn ngang), không viền và không nền riêng (nền thẻ
+     * lộ ra), không nhận Tab (Tab đi thẳng giữa các ô, {@link #scrollIntoView} lo việc cuộn). Cao đúng nội dung
+     * khi đủ chỗ; thiếu chỗ thì VBox cha thu nó lại, tới {@code MIN_SCROLL_HEIGHT}.
+     */
+    private static ScrollPane fieldScroller(VBox content) {
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroll.setFocusTraversable(false);
+        scroll.setPannable(false);
+        scroll.setMinHeight(MIN_SCROLL_HEIGHT);
+        // Chiều cao ưa thích = chiều cao thật của nội dung (0 trước lần bố cục đầu: ScrollPane tự tính).
+        scroll.prefViewportHeightProperty().bind(content.heightProperty());
+        // Bỏ viền, nền và đệm mặc định của ScrollPane và viewport (Modena) bằng lớp CSS dùng chung
+        scroll.getStyleClass().add("screen-scroll");
+        return scroll;
     }
 
     /**

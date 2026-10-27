@@ -30,9 +30,12 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 @AnalyzeClasses(packages = "com.minishop", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
-    /** GĐ6 (QĐ2): catalog chỉ được dùng storage (ảnh) và common; không biết cart, order, user, admin, config. */
+    /**
+     * GĐ6 (QĐ2), D3 (QĐ14): catalog được dùng storage (ảnh), common và desktop (cho màn hình của nó); không bao giờ
+     * dùng cart (nó dùng {@code catalog.AddToCart} để cart cắm vào), order, user, admin, config.
+     */
     @ArchTest
-    static final ArchRule catalog_dependsOnlyOnStorageAndCommon = noClasses().that().resideInAPackage("com.minishop.catalog..")
+    static final ArchRule catalog_dependsOnlyOnStorageCommonAndDesktop = noClasses().that().resideInAPackage("com.minishop.catalog..")
             .should().dependOnClassesThat().resideInAnyPackage(
                     "com.minishop.cart..", "com.minishop.order..", "com.minishop.user..", "com.minishop.admin..",
                     "com.minishop.config..");

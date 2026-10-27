@@ -27,6 +27,7 @@
         <javafx.version>25.0.5</javafx.version>
         <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
         <testfx.version>4.0.18</testfx.version>
+        <imageio-webp.version>3.15.3</imageio-webp.version>
     </properties>
 
     <dependencies>
@@ -63,6 +64,16 @@
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <!-- Bộ đọc WebP cho javax.imageio (TwelveMonkeys, giấy phép BSD-3-Clause). Cần vì JavaFX không giải mã
+                 được WebP mà admin được tải ảnh WebP lên (spec 006); desktop.WebpDecoder giải mã ngoài luồng FX.
+                 Không có trong Spring Boot BOM nên ghim phiên bản. Scope runtime: code chỉ dùng API javax.imageio,
+                 nên không ai import nhầm lớp của TwelveMonkeys. -->
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>${imageio-webp.version}</version>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <!-- Chỉ PasswordEncoder (băm mật khẩu), không kéo theo Spring Security đầy đủ. Version do BOM quản lý -->

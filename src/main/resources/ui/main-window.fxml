@@ -20,15 +20,15 @@
         </padding>
 
         <!-- Thanh trên nổi: nền surface, bo 28, bóng theo token. minWidth="-Infinity" là USE_PREF_SIZE:
-             chữ không bị co thành "…" khi cửa sổ hẹp (1024 px), chỉ ô tìm kiếm co lại -->
+             chữ không bị co thành "…" khi cửa sổ hẹp (1024 px). Ngân sách ở 1024 px (thanh trong 956 px):
+             logo + 3 nút điều hướng + giỏ + khoảng cách khoảng 519 px, nút tài khoản tối đa 136 px (CSS, tên dài
+             bị cắt bằng "…"), còn khoảng 301 px cho ô tìm kiếm (minWidth 280, prefWidth 296) để chữ gợi ý hiện đủ -->
         <HBox fx:id="topBar" styleClass="card, top-bar" alignment="CENTER_LEFT" spacing="8">
             <HBox fx:id="logo" styleClass="logo" alignment="CENTER_LEFT" spacing="4">
                 <Label text="mini shop" styleClass="logo-text" minWidth="-Infinity"/>
                 <Region styleClass="logo-dot" minWidth="8" minHeight="8" prefWidth="8" prefHeight="8"
                         maxWidth="8" maxHeight="8"/>
             </HBox>
-
-            <Region minWidth="12" prefWidth="12" maxWidth="12"/>
 
             <HBox alignment="CENTER_LEFT" spacing="2">
                 <Button fx:id="navStore" text="Cửa hàng" styleClass="nav-link" minWidth="-Infinity"/>
@@ -44,10 +44,11 @@
             <Region HBox.hgrow="ALWAYS"/>
 
             <!-- Ô tìm kiếm dạng pill; biểu tượng chồng lên trên ô nhập -->
-            <StackPane fx:id="searchBox" styleClass="search-box" minWidth="160" prefWidth="340"
+            <StackPane fx:id="searchBox" styleClass="search-box" minWidth="280" prefWidth="296"
                        maxWidth="420">
                 <TextField fx:id="searchField" styleClass="search-field, pill"
-                           promptText="Tìm sản phẩm theo tên…" accessibleText="Tìm sản phẩm theo tên"/>
+                           promptText="Tìm sản phẩm theo tên…" accessibleText="Tìm sản phẩm theo tên"
+                           accessibleHelp="Ctrl K"/>
                 <SVGPath content="M9.5 2.5a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M14.5 14.5 L19 19"
                          styleClass="icon-stroke, search-icon" mouseTransparent="true"
                          StackPane.alignment="CENTER_LEFT">
@@ -55,6 +56,13 @@
                         <Insets left="16"/>
                     </StackPane.margin>
                 </SVGPath>
+                <!-- Gợi ý phím tắt Ctrl+K; không nhận chuột, chuột xuyên qua tới ô nhập -->
+                <Label fx:id="searchShortcut" text="Ctrl K" styleClass="search-shortcut, text-caption"
+                       mouseTransparent="true" StackPane.alignment="CENTER_RIGHT">
+                    <StackPane.margin>
+                        <Insets right="14"/>
+                    </StackPane.margin>
+                </Label>
             </StackPane>
 
             <Region HBox.hgrow="ALWAYS"/>
@@ -72,7 +80,7 @@
                        mouseTransparent="true" StackPane.alignment="TOP_RIGHT"/>
             </StackPane>
 
-            <Button fx:id="accountButton" text="Đăng nhập" styleClass="account-button, pill" minWidth="-Infinity"/>
+            <Button fx:id="accountButton" text="Đăng nhập" styleClass="account-button, pill" minWidth="96"/>
         </HBox>
 
         <!-- Vùng nội dung; Navigator (F2) thay node ở đây -->

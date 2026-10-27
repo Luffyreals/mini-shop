@@ -126,6 +126,8 @@ public class MiniShopApp extends Application {
         stage.setMinHeight(Math.min(MIN_HEIGHT, screen.getHeight()));
         stage.setScene(scene);
         stage.show();
+        // Một lần sau khi context đã dựng và cửa sổ đã hiện: nạp sẵn ImageIO ngoài luồng giao diện
+        context.getBeanProvider(ImageLoader.class).ifAvailable(ImageLoader::warmUp);
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.minishop.support.FxTestSupport;
 import com.minishop.support.StandaloneApp;
 import com.minishop.support.TestShellApp;
 import javafx.application.Application;
+import javafx.geometry.Bounds;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
@@ -240,6 +241,71 @@ class AuthDialogSmokeTest {
         fire(dialog, "toLogin");
         FxTestSupport.flushFx();
         assertThat(text(dialog, "authTitle")).isEqualTo("Đăng nhập");
+    }
+
+    @Test
+    void registerMode_inTheMinimumMainWindow_fitsInsideTheMainWindowAndKeepsTheSubmitButtonVisible() {
+        double originalWidth = FxTestSupport.callOnFx(mainStage::getWidth);
+        double originalHeight = FxTestSupport.callOnFx(mainStage::getHeight);
+        FxTestSupport.runOnFx(() -> {
+            mainStage.setWidth(1024);
+            mainStage.setHeight(700);
+        });
+        try {
+            FxTestSupport.await("the main window to be 1024 x 700",
+                    () -> FxTestSupport.callOnFx(() -> mainStage.getHeight() == 700 && mainStage.getWidth() == 1024));
+            Stage dialog = openDialog();
+
+            fire(dialog, "toRegister");
+            settle(dialog);
+
+            assertThat(visible(dialog, "regFullName")).isTrue();
+            assertFitsInside(dialog, "after switching to register mode");
+
+            fire(dialog, "regSubmit");
+            settle(dialog);
+
+            assertThat(text(dialog, "regFullNameError")).isEqualTo("Vui lòng nhập họ và tên.");
+            assertFitsInside(dialog, "after an empty submit showed the errors");
+            assertNoErrorDialog();
+        } finally {
+            FxTestSupport.runOnFx(() -> {
+                mainStage.setWidth(originalWidth);
+                mainStage.setHeight(originalHeight);
+            });
+        }
+    }
+
+    /** Waits until the dialog has stopped resizing (the stage is fitted to its content in a later pulse). */
+    private static void settle(Stage dialog) {
+        double last = -1;
+        int stableRounds = 0;
+        for (int round = 0; round < 100 && stableRounds < 3; round++) {
+            FxTestSupport.flushFx();
+            double height = FxTestSupport.callOnFx(dialog::getHeight);
+            stableRounds = height == last ? stableRounds + 1 : 0;
+            last = height;
+        }
+        assertThat(stableRounds).as("the dialog stopped resizing").isGreaterThanOrEqualTo(3);
+    }
+
+    private static void assertFitsInside(Stage dialog, String when) {
+        double dialogHeight = FxTestSupport.callOnFx(dialog::getHeight);
+        double mainHeight = FxTestSupport.callOnFx(mainStage::getHeight);
+        assertThat(dialogHeight).as("dialog height %s (main window %.0f)", when, mainHeight)
+                .isLessThanOrEqualTo(mainHeight);
+
+        Bounds submit = FxTestSupport.callOnFx(() -> {
+            Node button = dialog.getScene().lookup("#regSubmit");
+            return button.localToScene(button.getBoundsInLocal());
+        });
+        double sceneHeight = FxTestSupport.callOnFx(() -> dialog.getScene().getHeight());
+        double sceneWidth = FxTestSupport.callOnFx(() -> dialog.getScene().getWidth());
+        assertThat(submit.getMinX()).as("#regSubmit left edge %s", when).isGreaterThanOrEqualTo(0);
+        assertThat(submit.getMinY()).as("#regSubmit top edge %s", when).isGreaterThanOrEqualTo(0);
+        assertThat(submit.getMaxX()).as("#regSubmit right edge %s", when).isLessThanOrEqualTo(sceneWidth);
+        assertThat(submit.getMaxY()).as("#regSubmit bottom edge %s (scene height %.1f)", when, sceneHeight)
+                .isLessThanOrEqualTo(sceneHeight);
     }
 
     @Test

@@ -222,8 +222,9 @@
     -fx-text-fill: -ms-ink;
 }
 
-/* ---- Menu của nút tài khoản (MainWindow): thẻ trắng bo 20, mục dạng pill ---- */
-.account-menu {
+/* ---- Menu của thanh trên (MainWindow): nút tài khoản và nút "Danh mục"; thẻ trắng bo 20, mục dạng pill.
+   Menu tài khoản còn có class .account-menu (không có luật CSS riêng, chỉ để test tra được) ---- */
+.shell-menu {
     -fx-background-color: -ms-surface;
     -fx-background-insets: 0;
     -fx-background-radius: 20px;
@@ -231,7 +232,7 @@
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 24, 0, 0, 8);
 }
 
-.account-menu .menu-item {
+.shell-menu .menu-item {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-background-radius: 999px;
@@ -241,24 +242,24 @@
     -fx-padding: 8px 18px;
 }
 
-.account-menu .menu-item .label {
+.shell-menu .menu-item .label {
     -fx-font-family: "Plus Jakarta Sans Medium";
     -fx-font-size: 15px;
     -fx-font-weight: normal;
     -fx-text-fill: -ms-ink;
 }
 
-.account-menu .menu-item:hover,
-.account-menu .menu-item:focused {
+.shell-menu .menu-item:hover,
+.shell-menu .menu-item:focused {
     -fx-background-color: -ms-surface-muted;
 }
 
-.account-menu .menu-item:focused {
+.shell-menu .menu-item:focused {
     -fx-border-color: -ms-accent;
 }
 
-.account-menu .menu-item:hover .label,
-.account-menu .menu-item:focused .label {
+.shell-menu .menu-item:hover .label,
+.shell-menu .menu-item:focused .label {
     -fx-text-fill: -ms-ink;
 }
 
@@ -282,6 +283,7 @@
 .nav-link {
     -fx-background-radius: 999px;
     -fx-border-radius: 999px;
+    -fx-padding: 8px 12px;   /* hẹp hơn .button (14px) để chừa chỗ cho ô tìm kiếm ở cửa sổ 1024 px */
 }
 
 .nav-link:hover {
@@ -310,13 +312,21 @@
     -fx-background-insets: 0;
     -fx-border-color: transparent;
     -fx-border-width: 2px;
-    -fx-padding: 11px 20px 11px 46px;
+    -fx-padding: 11px 72px 11px 44px;   /* trái: chừa biểu tượng; phải: chừa nhãn "Ctrl K" */
     -fx-prompt-text-fill: -ms-muted;
     -fx-text-fill: -ms-ink;
 }
 
 .search-icon {
     -fx-stroke: -ms-muted;
+}
+
+/* search-shortcut: gợi ý "Ctrl K" ở mép phải ô tìm kiếm; chip trắng chữ muted (5.3:1 trên trắng) */
+.search-shortcut {
+    -fx-background-color: -ms-surface;
+    -fx-background-radius: 999px;
+    -fx-padding: 2px 8px 2px 8px;
+    -fx-text-fill: -ms-muted;
 }
 
 /* Nút giỏ: tròn 44px, nền ink; badge accent */
@@ -358,7 +368,8 @@
 
 .account-button {
     -fx-background-color: -ms-surface-muted;
-    -fx-padding: 11px 20px;
+    -fx-padding: 11px 16px;
+    -fx-max-width: 136px;   /* tên dài bị cắt bằng "…"; đọc đủ chữ qua accessibleText (ngân sách 1024 px ở main-window.fxml) */
     -fx-font-family: "Plus Jakarta Sans SemiBold";
     -fx-font-weight: normal;
 }
@@ -392,4 +403,477 @@
 
 .button-primary:hover {
     -fx-background-color: -ms-dark;
+}
+
+/* =====================================================================================================
+   D3: cửa hàng (danh sách, chi tiết, trang chủ). Chỉ dùng token; không mã màu.
+   Các class .price, .page-title... hạn chế đặt cỡ chữ để màn ghép được với .text-* (ví dụ "price text-h2").
+   ===================================================================================================== */
+
+/* ---- Khung màn hình: ScrollPane cuộn dọc, trong suốt trên nền .window (không viền, không nền của Modena);
+   .page-root là cột nội dung bên trong. Bóng của thẻ (24 px) bị cắt ở mép khung, nên chừa 8 px hai bên ---- */
+.screen-scroll,
+.screen-scroll > .viewport {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.page-root {
+    -fx-padding: 8px 8px 32px 8px;
+    -fx-spacing: 20px;
+}
+
+/* filter-row: hàng pill danh mục, xuống dòng khi hết chỗ (FlowPane) */
+.filter-row {
+    -fx-hgap: 8px;
+    -fx-vgap: 8px;
+}
+
+/* toolbar-row: "Sắp xếp" + ô chọn + số kết quả trên một hàng */
+.toolbar-row {
+    -fx-alignment: center-left;
+    -fx-spacing: 12px;
+}
+
+/* ---- Tiêu đề trang và chân trang ---- */
+.page-title    { -fx-font-size: 32px; -fx-font-weight: 700; -fx-text-fill: -ms-ink; }  /* h1 32 */
+.section-title { -fx-font-family: "Plus Jakarta Sans SemiBold"; -fx-font-size: 20px; -fx-font-weight: normal; -fx-text-fill: -ms-ink; }  /* h2 20 */
+.page-footer   { -fx-font-family: "Plus Jakarta Sans Medium"; -fx-font-size: 12px; -fx-font-weight: normal; -fx-text-fill: -ms-muted; }  /* caption, muted */
+
+/* ---- Thẻ sản phẩm (lưới xếp bằng EvenRows, khoảng cách 20 px) ---- */
+
+/* product-card: thẻ trắng bo 28; trỏ chuột thì nâng nhẹ; viền focus accent 2px (viền trong suốt giữ chỗ).
+   .home-feature dùng chung khung, hover và focus. */
+.product-card,
+.home-feature {
+    -fx-background-color: -ms-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 28px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 28px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 24, 0, 0, 8);
+    -fx-cursor: hand;
+}
+
+.product-card {
+    -fx-padding: 10px 10px 16px 10px;
+}
+
+.product-card:hover,
+.home-feature:hover {
+    -fx-translate-y: -2px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 28, 0, 0, 12);
+}
+
+.product-card:focused,
+.home-feature:focused {
+    -fx-border-color: -ms-accent;
+}
+
+/* tên danh mục trên thẻ: caption muted (chữ hoa do màn đổi bằng toUpperCase(Locale), CSS không có text-transform) */
+.product-card-category {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+    -fx-padding: 6px 6px 0 6px;
+}
+
+.product-card-name {
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-wrap-text: true;
+    -fx-padding: 0 6px 0 6px;
+}
+
+/* product-card-footer: hàng giá + "+ Thêm" / "Hết hàng" ở đáy thẻ */
+.product-card-footer {
+    -fx-padding: 2px 6px 0 6px;
+    -fx-min-height: 37px;   /* bằng nút "+ Thêm", để giá thẳng hàng giữa thẻ còn hàng và thẻ hết hàng */
+}
+
+/* price: đậm, màu ink; không đặt cỡ chữ (ghép với .text-h1/.text-h2 ở màn chi tiết) */
+.price {
+    -fx-font-family: "Plus Jakarta Sans";
+    -fx-font-weight: 700;
+    -fx-text-fill: -ms-ink;
+}
+
+/* ---- Kho: chữ luôn ink, màu chỉ ở chấm (.stock-dot là graphic của nhãn) ---- */
+.stock-label {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+    -fx-content-display: left;
+    -fx-graphic-text-gap: 8px;
+}
+
+.stock-dot {
+    -fx-background-radius: 999px;
+    -fx-min-width: 8px;
+    -fx-min-height: 8px;
+    -fx-pref-width: 8px;
+    -fx-pref-height: 8px;
+    -fx-max-width: 8px;
+    -fx-max-height: 8px;
+}
+
+.stock-in .stock-dot  { -fx-background-color: -ms-success; -fx-fill: -ms-success; }
+.stock-out .stock-dot { -fx-background-color: -ms-danger;  -fx-fill: -ms-danger; }
+
+/* ---- Bộ lọc danh mục và sắp xếp ---- */
+/* filter-pill: ToggleButton dạng pill; được chọn thì nền ink, chữ trắng */
+.filter-pill {
+    -fx-background-color: -ms-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 999px;
+    -fx-padding: 8px 18px;
+    -fx-cursor: hand;
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-ink;
+}
+
+.filter-pill:hover {
+    -fx-background-color: -ms-surface-muted;
+}
+
+.filter-pill:selected {
+    -fx-background-color: -ms-ink;
+    -fx-text-fill: -ms-surface;
+}
+
+.filter-pill:selected:hover {
+    -fx-background-color: -ms-dark;
+}
+
+.filter-pill:focused {
+    -fx-border-color: -ms-accent;
+}
+
+/* sort-box: ComboBox dạng pill; danh sách thả xuống là thẻ trắng bo 20 như .shell-menu */
+.sort-box {
+    -fx-background-color: -ms-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 999px;
+    -fx-padding: 2px 6px 2px 10px;
+    -fx-cursor: hand;
+}
+
+.sort-box:focused {
+    -fx-background-color: -ms-surface;
+    -fx-border-color: -ms-accent;
+}
+
+.sort-box .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -ms-ink;
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-weight: normal;
+}
+
+.sort-box .arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.sort-box .arrow {
+    -fx-background-color: -ms-ink;
+}
+
+.combo-box-popup > .list-view {
+    -fx-background-color: -ms-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 20px;
+    -fx-padding: 8px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 24, 0, 0, 8);
+}
+
+.combo-box-popup > .list-view .list-cell {
+    -fx-background-color: transparent;
+    -fx-background-radius: 999px;
+    -fx-padding: 8px 18px;
+    -fx-text-fill: -ms-ink;
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-weight: normal;
+}
+
+.combo-box-popup > .list-view .list-cell:filled:hover,
+.combo-box-popup > .list-view .list-cell:filled:selected,
+.combo-box-popup > .list-view .list-cell:filled:focused {
+    -fx-background-color: -ms-surface-muted;
+    -fx-text-fill: -ms-ink;
+}
+
+/* ---- Thanh phân trang (PageBar): trang hiện tại là nhãn ink không bấm được ---- */
+.page-bar {
+    -fx-alignment: center;
+    -fx-spacing: 8px;
+}
+
+.page-button {
+    -fx-background-color: -ms-surface;
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+    -fx-padding: 8px 16px;
+    -fx-min-width: 40px;
+}
+
+.page-button:hover {
+    -fx-background-color: -ms-surface-muted;
+}
+
+.page-current {
+    -fx-background-color: -ms-ink;
+    -fx-background-radius: 999px;
+    -fx-padding: 10px 16px;
+    -fx-min-width: 40px;
+    -fx-alignment: center;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-surface;
+}
+
+/* ---- Chi tiết sản phẩm ---- */
+/* detail-layout: GridPane (.card) với ảnh bên trái, thông tin bên phải; xếp chồng khi hẹp */
+.detail-layout {
+    -fx-padding: 28px;
+    -fx-hgap: 32px;
+    -fx-vgap: 24px;
+}
+
+.detail-info {
+    -fx-spacing: 12px;
+}
+
+.detail-category {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+}
+
+.detail-description {
+    -fx-padding: 4px 0 0 0;
+}
+
+.detail-purchase {
+    -fx-spacing: 6px;
+    -fx-padding: 12px 0 0 0;
+}
+
+.detail-buy-row {
+    -fx-spacing: 12px;
+}
+
+/* button-secondary: nút phụ dạng pill nền surface-muted, chữ ink (ví dụ "Về danh sách sản phẩm") */
+.button-secondary {
+    -fx-background-color: -ms-surface-muted;
+    -fx-padding: 8px 18px;
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+}
+
+.button-secondary:hover {
+    -fx-background-color: derive(-ms-surface-muted, -6%);
+}
+
+/* quantity-spinner: Spinner dạng pill nền surface-muted; viền focus accent nằm ở ô nhập bên trong */
+.quantity-spinner {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 999px;
+}
+
+.quantity-spinner .text-field {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 9px 12px;
+    -fx-alignment: center;
+}
+
+.quantity-spinner .text-field:focused {
+    -fx-border-color: -ms-accent;
+}
+
+.quantity-spinner .increment-arrow-button,
+.quantity-spinner .decrement-arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999px;
+    -fx-cursor: hand;
+}
+
+.quantity-spinner .increment-arrow,
+.quantity-spinner .decrement-arrow {
+    -fx-background-color: -ms-ink;
+}
+
+/* ---- Trang chủ ---- */
+/* home-hero: tiêu đề display 56 */
+.home-hero {
+    -fx-font-size: 56px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -ms-ink;
+    -fx-wrap-text: true;
+}
+
+/* home-feature: thẻ sản phẩm nổi bật (khung, hover và focus dùng chung với .product-card ở trên) */
+.home-feature {
+    -fx-padding: 20px;
+}
+
+/* dark-block: khối tối chữ trắng; chữ phụ sáng hơn -ms-muted (muted trên nền tối chỉ ~3.5:1) */
+.dark-block {
+    -fx-background-color: -ms-dark;
+    -fx-background-radius: 28px;
+    -fx-padding: 28px;
+}
+
+.dark-block .label,
+.dark-block .text {
+    -fx-text-fill: -ms-surface;
+}
+
+.dark-block .text-muted {
+    -fx-text-fill: derive(-ms-surface, -30%);
+}
+
+/* info-card: thẻ chữ tĩnh (ví dụ "Giao hàng và thanh toán"), không bấm được */
+.info-card {
+    -fx-background-color: -ms-surface;
+    -fx-background-radius: 28px;
+    -fx-padding: 24px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 24, 0, 0, 8);
+}
+
+/* button-compact: ghép với .button-primary cho nút nhỏ trong thẻ ("+ Thêm"); đứng sau .button-primary nên thắng */
+.button-compact {
+    -fx-padding: 6px 16px;
+}
+
+/* ---- Trạng thái rỗng và đang tải ---- */
+.empty-state {
+    -fx-alignment: center;
+    -fx-spacing: 12px;
+    -fx-padding: 48px;
+}
+
+.loading {
+    -fx-alignment: center;
+    -fx-padding: 48px;
+}
+
+.loading .progress-indicator {
+    -fx-progress-color: -ms-ink;
+}
+
+/* ---- Trang chủ: đầu trang, thẻ lớn, khối "Sắp hết hàng", thẻ giao hàng (F5) ---- */
+.home-header {
+    -fx-spacing: 6px;
+    -fx-padding: 8px 4px 4px 4px;
+}
+
+.home-lead {
+    -fx-max-width: 680px;
+}
+
+.home-top-row {
+    -fx-spacing: 20px;
+    -fx-alignment: top-left;
+}
+
+.home-feature-grid {
+    -fx-spacing: 28px;
+    -fx-alignment: top-left;
+}
+
+.home-feature-info {
+    -fx-spacing: 10px;
+    -fx-padding: 8px 8px 8px 0;
+}
+
+.home-feature-badge {
+    -fx-background-color: -ms-surface-muted;
+    -fx-background-radius: 999px;
+    -fx-padding: 4px 12px;
+    -fx-text-fill: -ms-ink;
+}
+
+.home-feature-category {
+    -fx-font-family: "Plus Jakarta Sans Medium";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -ms-muted;
+}
+
+.home-feature-actions {
+    -fx-hgap: 12px;
+    -fx-vgap: 10px;
+    -fx-padding: 8px 0 0 0;
+}
+
+.home-low-stock {
+    -fx-spacing: 16px;
+}
+
+.home-low-stock-list {
+    -fx-spacing: 10px;
+}
+
+/* low-stock-row: dòng bấm được trong khối tối; nền sáng hơn -ms-dark một chút, viền focus accent */
+.low-stock-row {
+    -fx-background-color: derive(-ms-dark, 14%);
+    -fx-background-insets: 0;
+    -fx-background-radius: 20px;
+    -fx-border-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 20px;
+    -fx-padding: 12px 16px;
+    -fx-spacing: 2px;
+    -fx-cursor: hand;
+}
+
+.low-stock-row:hover {
+    -fx-background-color: derive(-ms-dark, 24%);
+}
+
+.low-stock-row:focused {
+    -fx-border-color: -ms-accent;
+}
+
+.low-stock-name {
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-weight: normal;
+}
+
+.home-delivery {
+    -fx-spacing: 12px;
+}
+
+.info-key {
+    -fx-font-family: "Plus Jakarta Sans SemiBold";
+    -fx-font-size: 15px;
+    -fx-font-weight: normal;
+    -fx-fill: -ms-ink;
+}
+
+.info-value {
+    -fx-font-family: "Plus Jakarta Sans";
+    -fx-font-size: 15px;
+    -fx-font-weight: normal;
+    -fx-fill: -ms-muted;
 }

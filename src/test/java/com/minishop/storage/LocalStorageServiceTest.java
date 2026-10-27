@@ -1,5 +1,8 @@
 package com.minishop.storage;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import com.minishop.support.LogCapture;
 import com.minishop.support.TestImages;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,11 +11,13 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -326,16 +331,90 @@ class LocalStorageServiceTest {
 
     // ---------- toUrl ----------
 
+    private static final String UUID_NAME = "0b6f3c1e-9a52-4d7e-8f10-2c4a6e8b1d35";
+
     @Test
-    void toUrl_nullOrBlank_isNull() {
-        assertThat(storage.toUrl(null)).isNull();
-        assertThat(storage.toUrl("")).isNull();
-        assertThat(storage.toUrl("   ")).isNull();
+    void toUrl_aSeedImageThatExists_isAResourceUrlJavaFxCanLoad() {
+        String url = storage.toUrl("/images/products/ao-thun-cotton-co-tron.jpg");
+
+        assertThat(url).isNotNull();
+        assertThat(url).matches("^(file|jar):.*");
+        assertThat(url).endsWith("/images/products/ao-thun-cotton-co-tron.jpg");
     }
 
     @Test
-    void toUrl_aPath_isThePathItself() {
-        assertThat(storage.toUrl("/uploads/x.png")).isEqualTo("/uploads/x.png");
-        assertThat(storage.toUrl("/images/products/ao-thun.jpg")).isEqualTo("/images/products/ao-thun.jpg");
+    void toUrl_aSeedPatternPathWithoutResource_isNull() {
+        assertThat(storage.toUrl("/images/products/does-not-exist.jpg")).isNull();
+        assertThat(storage.toUrl("/images/products/does-not-exist.png")).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"jpg", "png", "webp"})
+    void toUrl_anUploadedImage_isTheFileUrlInsideTheUploadRoot(String extension) {
+        String name = UUID_NAME + "." + extension;
+
+        String url = storage.toUrl("/uploads/" + name);
+
+        assertThat(url).startsWith("file:");
+        assertThat(Path.of(URI.create(url))).isEqualTo(root.resolve(name));
+    }
+
+    @Test
+    void toUrl_anUploadedImageThatIsMissingOnDisk_stillReturnsItsUrl() {
+        String url = storage.toUrl("/uploads/" + UUID_NAME + ".png");
+
+        assertThat(root.resolve(UUID_NAME + ".png")).doesNotExist();
+        assertThat(url).isNotNull();
+    }
+
+    @Test
+    void toUrl_aStoredImage_roundTripsThroughStore() throws IOException {
+        String stored = storage.store(png("a.png", 8));
+
+        String url = storage.toUrl(stored);
+
+        assertThat(url).isNotNull();
+        assertThat(Path.of(URI.create(url))).isEqualTo(fileOf(stored)).exists();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {
+            "",
+            "   ",
+            "http://example.com/x.jpg",
+            "https://example.com/uploads/0b6f3c1e-9a52-4d7e-8f10-2c4a6e8b1d35.jpg",
+            "file:/etc/passwd",
+            "/uploads/../x.jpg",
+            "/uploads/abc.jpg",
+            "/uploads/0b6f3c1e-9a52-4d7e-8f10-2c4a6e8b1d35.gif",
+            "/uploads/0B6F3C1E-9A52-4D7E-8F10-2C4A6E8B1D35.jpg",
+            "/uploads/0b6f3c1e-9a52-4d7e-8f10-2c4a6e8b1d35.jpg\n",
+            "/uploads/0b6f3c1e-9a52-4d7e-8f10-2c4a6e8b1d35.jpg/../../x.jpg",
+            "C:\\x.jpg",
+            "/images/products/../../application.yml",
+            "/images/products/x.webp",
+            "/images/products/ao-thun-cotton-co-tron.jpg\n",
+            "/images/products/AO-THUN.jpg",
+            "/images/products/sub/x.jpg",
+            "ao-thun.jpg"
+    })
+    void toUrl_whateverIsNotASeedImageOrAnUpload_isNull(String imagePath) {
+        assertThat(storage.toUrl(imagePath)).isNull();
+    }
+
+    @Test
+    void toUrl_whenIgnoringAValue_logsOneDebugLineWithoutTheValue() {
+        String secret = "http://example.com/secret-token-123.jpg";
+
+        try (LogCapture log = LogCapture.of(LoggerFactory.getLogger(LocalStorageService.class))) {
+            assertThat(storage.toUrl(secret)).isNull();
+
+            List<ILoggingEvent> debug = log.events(Level.DEBUG);
+            assertThat(debug).hasSize(1);
+            assertThat(debug.get(0).getFormattedMessage()).doesNotContain(secret).doesNotContain("secret-token");
+            assertThat(log.events()).allSatisfy(event -> assertThat(event.getFormattedMessage())
+                    .doesNotContain("secret-token"));
+        }
     }
 }

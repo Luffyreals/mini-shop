@@ -5,7 +5,15 @@ Mọi thay đổi đáng chú ý của dự án được ghi ở đây.
 
 ## [Unreleased]
 
-Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)). Sau đó Mini Shop chuyển từ website sang ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)); giai đoạn D1 dựng nền tảng, D2 làm lại tài khoản, các màn còn lại được làm lại ở D3–D5.
+Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ với JDK 25 ([ADR-0013](docs/adr/0013-h2-file-database-no-docker.md)). Sau đó Mini Shop chuyển từ website sang ứng dụng desktop JavaFX ([ADR-0014](docs/adr/0014-javafx-desktop-app.md)); giai đoạn D1 dựng nền tảng, D2 làm lại tài khoản, D3 làm lại cửa hàng, các màn còn lại được làm lại ở D4–D5.
+
+### Thêm
+- Trang chủ chỉ dùng dữ liệu thật: sản phẩm mới nhất (thêm vào giỏ, xem chi tiết), hai sản phẩm mới kế tiếp, khối "Sắp hết hàng" (còn 1–5 cái, ẩn khi không có) và thẻ "Giao hàng và thanh toán". App mở vào trang chủ; nút "Cửa hàng" và đăng xuất cũng về đó.
+- Danh sách sản phẩm: tìm theo tên từ ô tìm kiếm trên thanh trên (giữ danh mục và sắp xếp đang chọn), lọc theo danh mục (hàng nút và menu "Danh mục ▾"), sắp xếp, phân trang 12 sản phẩm, "Tìm thấy N sản phẩm", trạng thái rỗng với "Xóa bộ lọc". Lưới 4/3/2 cột theo chiều rộng cửa sổ.
+- Trang chi tiết sản phẩm: ảnh, danh mục, giá, "Còn hàng"/"Hết hàng", mô tả, ô "Số lượng" và "Thêm vào giỏ"; "Về danh sách sản phẩm" quay lại đúng trang và bộ lọc cũ.
+- Thêm vào giỏ (cả khi chưa đăng nhập) từ trang chi tiết, từ nút "+ Thêm" trên thẻ sản phẩm và từ thẻ lớn ở trang chủ; thông báo theo đúng quy tắc giỏ hàng (kẹp theo tồn kho, tối đa 99) và badge giỏ cập nhật sau mỗi lần thêm.
+- Phím tắt `Ctrl+K` đưa con trỏ vào ô tìm kiếm.
+- Đọc ảnh WebP bằng thư viện TwelveMonkeys `imageio-webp` (BSD-3-Clause), giải mã ngoài luồng giao diện; ảnh khai kích thước quá lớn hoặc file hỏng hiện ô giữ chỗ.
 
 ### Thay đổi
 - App là ứng dụng desktop JavaFX 25 chạy bằng `./mvnw javafx:run`; Spring chạy không có web server. Cửa sổ khung có thanh trên cùng (logo, mục điều hướng, ô tìm kiếm, nút giỏ, nút đăng nhập; các nút bật dần ở D2–D4), theme "soft modern" và phông Plus Jakarta Sans đóng gói kèm.
@@ -14,6 +22,8 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - Đăng nhập và đăng ký trong một hộp thoại mở từ nút "Đăng nhập". Sai email hoặc mật khẩu báo "Email hoặc mật khẩu không đúng.", xóa ô mật khẩu và giữ email; đăng ký xong hộp thoại chuyển sang đăng nhập với email vừa đăng ký.
 - Đã đăng nhập thì nút tài khoản hiện họ tên và mở menu "Đăng xuất"; đăng xuất đưa app về trạng thái khách và báo "Bạn đã đăng xuất.".
 - Giỏ khách nằm trong bộ nhớ của app (mất khi đóng app); khi đăng nhập được gộp vào giỏ của tài khoản theo quy tắc cũ, và badge giỏ cập nhật theo phiên.
+- Hộp thoại đăng ký không còn cao hơn cửa sổ: phần ô nhập cuộn được, tiêu đề và nút "Đăng ký" luôn hiện. Nút tài khoản có độ rộng tối đa để tên dài không làm chật ô tìm kiếm.
+- `PageNav` chỉ còn số trang (không còn URL); `desktop.PageBar` vẽ thanh trang dùng chung.
 - Ảnh sản phẩm mẫu chuyển sang `images/products/` (đường dẫn lưu trong DB không đổi); nguồn và giấy phép ảnh chuyển từ `credits.html` sang `images/credits.tsv`. Thay 5 ảnh sản phẩm chưa đúng chủ thể và thêm ảnh cho 2 cuốn sách.
 - `CurrentUser` là record không chứa hash mật khẩu; chỉ còn `spring-security-crypto` để băm mật khẩu.
 - Test web (MockMvc, Tomcat thật) được bỏ; các quy tắc nghiệp vụ chúng kiểm được chuyển xuống test service. CI chạy test giao diện dưới màn hình ảo `xvfb`.
@@ -37,6 +47,7 @@ Tái cấu trúc để repo public: ai clone về cũng chạy được chỉ v�
 - Test chống session fixation chạy trên Tomcat thật (`SessionFixationTest`) thay cho bản MockMvc phụ thuộc thứ tự chạy test.
 
 ### Bảo mật
+- `StorageService.toUrl` chỉ đổi thành URL hai dạng đường dẫn do chính app tạo (ảnh mẫu trong app, ảnh upload trong `data/uploads/`); giá trị khác trong DB (`http://…`, `file:` bất kỳ, `..`) thành ô giữ chỗ, nên dữ liệu không khiến app tải từ mạng hay đọc file tùy ý.
 - Đăng nhập với email không tồn tại và với mật khẩu sai cho cùng một kết quả và tốn thời gian tương đương (luôn so khớp một hash), nên không dò được email nào đã đăng ký.
 - Mật khẩu dài hơn 72 byte bị từ chối trước khi so khớp: BCrypt chỉ xét 72 byte đầu, nên chuỗi dài hơn có cùng 72 byte đầu sẽ khớp nhầm.
 - Lỗi database ghi vào log 500 chỉ còn tên lớp và stack frame, không còn message: H2 đưa nguyên dòng dữ liệu (email, hash mật khẩu) vào thông báo lỗi. Tắt thêm logger `org.hibernate.orm.jdbc.error`.
