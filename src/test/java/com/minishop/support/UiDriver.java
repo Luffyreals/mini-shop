@@ -376,8 +376,9 @@ public final class UiDriver {
         // Carts of every user are emptied directly (test H2); orders stay, they only add rows to the history
         new JdbcTemplate(bean(DataSource.class)).update("delete from cart_items");
         FxTestSupport.runOnFx(() -> {
-            // A logout clears the guest cart and refreshes the badge; no session is opened here
-            app.context().getBeansOfType(SessionListener.class).values()
+            // A logout clears the guest cart and refreshes the badge; no session is opened here. Same @Order as
+            // AppSession, so the guest cart is cleared before the badge reads it
+            app.context().getBeanProvider(SessionListener.class).orderedStream()
                     .forEach(listener -> listener.sessionChanged(null, null));
             shell().setSearchText("");
             navigator().goHome();
