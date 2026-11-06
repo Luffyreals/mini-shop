@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Shop — Ứng dụng bán hàng desktop</title>
+  <meta name="description" content="Mini Shop là ứng dụng bán hàng chạy trên Windows, viết hoàn toàn bằng Java. Tải về, giải nén, nhấp đúp là chạy." />
+  <meta property="og:title" content="Mini Shop" />
+  <meta property="og:description" content="Ứng dụng bán hàng desktop — Java 25 + JavaFX + Spring Boot 4.1" />
+  <meta property="og:image" content="https://luffyreals.github.io/mini-shop/images/home.png" />
+  <meta property="og:url" content="https://luffyreals.github.io/mini-shop/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23222'/><text y='.9em' font-size='80' x='10' fill='white'>M</text><circle cx='70' cy='65' r='14' fill='%23F97316'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent: #F97316;
+      --accent-light: #FED7AA;
+      --accent-dark: #C2410C;
+      --bg: #F5F5F4;
+      --surface: #FFFFFF;
+      --text: #1C1917;
+      --muted: #78716C;
+      --border: #E7E5E4;
+      --radius-lg: 20px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 2px 12px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+    .nav-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 60px;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1.1rem; color: var(--text);
+      text-decoration: none;
+    }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: #222; display: flex; align-items: center; justify-content: center;
+      position: relative; flex-shrink: 0;
+    }
+    .logo-icon span { color: #fff; font-weight: 800; font-size: 1.1rem; }
+    .logo-icon::after {
+      content: ''; position: absolute; bottom: 4px; right: 4px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent);
+    }
+    .nav-links { display: flex; align-items: center; gap: 8px; }
+    .nav-links a {
+      padding: 7px 14px; border-radius: 999px;
+      font-size: .9rem; font-weight: 500;
+      color: var(--muted); text-decoration: none;
+      transition: color .15s, background .15s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--bg); }
+    .nav-links .btn-nav {
+      background: var(--accent); color: #fff;
+      padding: 7px 18px;
+    }
+    .nav-links .btn-nav:hover { background: var(--accent-dark); color: #fff; }
+
+    /* ── HERO ── */
+    .hero {
+      max-width: 1100px; margin: 0 auto;
+      padding: 80px 24px 60px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 14px; border-radius: 999px;
+      background: var(--accent-light); color: var(--accent-dark);
+      font-size: .8rem; font-weight: 600; margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; line-height: 1.15;
+      margin-bottom: 20px; letter-spacing: -.02em;
+    }
+    .hero h1 .accent { color: var(--accent); }
+    .hero p {
+      font-size: 1.1rem; color: var(--muted); margin-bottom: 32px; line-height: 1.7;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px; border-radius: 999px;
+      font-weight: 600; font-size: .95rem; text-decoration: none;
+      transition: transform .15s, box-shadow .15s, background .15s;
+      cursor: pointer;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-dark); }
+    .btn-outline {
+      background: var(--surface); color: var(--text);
+      border: 1.5px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+    .hero-img {
+      border-radius: var(--radius-lg); overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+    }
+    .hero-img img { width: 100%; display: block; }
+
+    /* ── CI BADGE ── */
+    .ci-row {
+      max-width: 1100px; margin: 0 auto;
+      padding: 0 24px 48px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .ci-row a img { height: 22px; }
+    .tech-pill {
+      padding: 4px 12px; border-radius: 999px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: .8rem; font-weight: 500; color: var(--muted);
+    }
+
+    /* ── SECTION WRAPPER ── */
+    section { padding: 72px 24px; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-size: .8rem; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800;
+      line-height: 1.25; margin-bottom: 16px;
+    }
+    .section-desc { color: var(--muted); font-size: 1.05rem; max-width: 600px; }
+
+    /* ── FEATURES ── */
+    .features-bg { background: var(--surface); }
+    .features-grid {
+      margin-top: 48px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;
+    }
+    .feature-card {
+      background: var(--bg); border-radius: var(--radius-lg);
+      padding: 28px; border: 1px solid var(--border);
+      transition: box-shadow .2s, transform .2s;
+    }
+    .feature-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-3px); }
+    .feature-icon {
+      width: 48px; height: 48px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; margin-bottom: 16px;
+    }
+    .feature-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+    .feature-card p { font-size: .9rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── SCREENSHOTS ── */
+    .screenshots-grid {
+      margin-top: 48px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .screenshot-card {
+      border-radius: var(--radius-lg); overflow: hidden;
+      box-shadow: var(--shadow); border: 1px solid var(--border);
+      background: var(--surface);
+      transition: box-shadow .2s, transform .2s;
+    }
+    .screenshot-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-4px); }
+    .screenshot-card img { width: 100%; display: block; }
+    .screenshot-card figcaption {
+      padding: 12px 16px; font-size: .88rem;
+      color: var(--muted); font-weight: 500;
+    }
+
+    /* ── STACK ── */
+    .stack-bg { background: var(--surface); }
+    .stack-table {
+      margin-top: 40px; width: 100%;
+      border-collapse: collapse; border-radius: var(--radius-md); overflow: hidden;
+      box-shadow: var(--shadow); border: 1px solid var(--border);
+    }
+    .stack-table th {
+      background: var(--bg); text-align: left;
+      padding: 14px 20px; font-size: .82rem; font-weight: 700;
+      letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+    }
+    .stack-table td { padding: 14px 20px; border-top: 1px solid var(--border); }
+    .stack-table tr:hover td { background: var(--bg); }
+    .stack-table td:first-child { font-weight: 600; white-space: nowrap; }
+    .stack-table td:last-child { color: var(--muted); font-size: .92rem; }
+    .tag {
+      display: inline-block; padding: 2px 10px; border-radius: 999px;
+      background: var(--accent-light); color: var(--accent-dark);
+      font-size: .78rem; font-weight: 600; margin-right: 4px; margin-bottom: 2px;
+    }
+
+    /* ── QUICKSTART ── */
+    .steps {
+      margin-top: 40px; display: flex; flex-direction: column; gap: 20px;
+    }
+    .step {
+      display: flex; gap: 20px; align-items: flex-start;
+    }
+    .step-num {
+      flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: .95rem;
+    }
+    .step-body h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .step-body p { color: var(--muted); font-size: .92rem; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .88em; background: var(--border); padding: 2px 6px;
+      border-radius: 4px;
+    }
+    pre {
+      background: #1C1917; color: #E7E5E4;
+      border-radius: var(--radius-md); padding: 20px 24px;
+      overflow-x: auto; margin-top: 12px;
+      font-size: .88rem; line-height: 1.7;
+    }
+    pre code { background: none; padding: 0; color: inherit; font-size: 1em; }
+
+    /* ── CREDENTIALS ── */
+    .cred-table {
+      margin-top: 24px; border-collapse: collapse; width: 100%;
+      max-width: 500px; border-radius: var(--radius-md); overflow: hidden;
+      box-shadow: var(--shadow); border: 1px solid var(--border);
+    }
+    .cred-table th {
+      background: var(--bg); padding: 10px 16px; text-align: left;
+      font-size: .82rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--muted);
+    }
+    .cred-table td { padding: 11px 16px; border-top: 1px solid var(--border); font-size: .9rem; }
+    .cred-table td:first-child { font-weight: 600; }
+
+    /* ── CTA ── */
+    .cta {
+      background: linear-gradient(135deg, #1C1917 0%, #292524 100%);
+      text-align: center;
+    }
+    .cta .section-inner { padding: 0; }
+    .cta .section-label { color: var(--accent-light); }
+    .cta .section-title { color: #fff; }
+    .cta .section-desc { color: #A8A29E; margin: 0 auto 36px; }
+    .cta-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+    .btn-white { background: #fff; color: var(--text); }
+    .btn-white:hover { background: var(--bg); }
+    .btn-ghost { background: transparent; color: #fff; border: 1.5px solid #57534E; }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: #1C1917; color: #57534E;
+      text-align: center; padding: 32px 24px;
+      font-size: .88rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 720px) {
+      .hero { grid-template-columns: 1fr; gap: 40px; padding: 56px 24px 40px; }
+      .hero-img { order: -1; }
+      .nav-links a:not(.btn-nav) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="#">
+      <div class="logo-icon"><span>M</span></div>
+      Mini Shop
+    </a>
+    <div class="nav-links">
+      <a href="#features">Tính năng</a>
+      <a href="#screenshots">Màn hình</a>
+      <a href="#quickstart">Cài đặt</a>
+      <a href="#stack">Công nghệ</a>
+      <a href="https://github.com/Luffyreals/mini-shop/releases/latest" class="btn-nav btn" target="_blank" rel="noopener">
+        ⬇ Tải về
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-text">
+    <div class="hero-badge">🛍️ Dự án học tập · Mã nguồn mở</div>
+    <h1>Ứng dụng bán hàng<br /><span class="accent">desktop</span> viết bằng Java</h1>
+    <p>
+      Mini Shop chạy trên Windows, không cần cài Java, database hay Docker.
+      Tải về, giải nén, nhấp đúp <code>MiniShop.exe</code> là chạy ngay.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="https://github.com/Luffyreals/mini-shop/releases/latest" target="_blank" rel="noopener">
+        ⬇ Tải bản Windows
+      </a>
+      <a class="btn btn-outline" href="https://github.com/Luffyreals/mini-shop" target="_blank" rel="noopener">
+        ★ Xem mã nguồn
+      </a>
+    </div>
+  </div>
+  <figure class="hero-img">
+    <img src="images/home.png" alt="Trang chủ Mini Shop" loading="lazy" />
+  </figure>
+</div>
+
+<!-- CI BADGE ROW -->
+<div class="ci-row">
+  <a href="https://github.com/Luffyreals/mini-shop/actions/workflows/ci.yml" target="_blank" rel="noopener">
+    <img src="https://github.com/Luffyreals/mini-shop/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status" />
+  </a>
+  <span class="tech-pill">Java 25</span>
+  <span class="tech-pill">JavaFX 25</span>
+  <span class="tech-pill">Spring Boot 4.1</span>
+  <span class="tech-pill">H2 · Flyway</span>
+  <span class="tech-pill">MIT License</span>
+</div>
+
+<!-- FEATURES -->
+<section class="features-bg" id="features">
+  <div class="section-inner">
+    <div class="section-label">Tính năng</div>
+    <h2 class="section-title">Đầy đủ cho cả khách hàng<br />lẫn quản trị viên</h2>
+    <p class="section-desc">Toàn bộ luồng mua hàng và quản lý đơn hàng trong một cửa sổ duy nhất.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FFF7ED;">🏠</div>
+        <h3>Trang chủ động</h3>
+        <p>Hiển thị sản phẩm mới nhất, sản phẩm sắp hết hàng và thông tin giao hàng từ dữ liệu thật.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#EFF6FF;">🔍</div>
+        <h3>Tìm &amp; lọc sản phẩm</h3>
+        <p>Tìm theo tên (<kbd>Ctrl+K</kbd>), lọc theo danh mục, sắp xếp theo giá hoặc độ mới, phân trang.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#F0FDF4;">🛒</div>
+        <h3>Giỏ hàng thông minh</h3>
+        <p>Giỏ hàng trượt ra trong cửa sổ, dùng được trước khi đăng nhập. Khi đăng nhập, giỏ khách tự gộp vào.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FFF1F2;">📦</div>
+        <h3>Đặt hàng &amp; theo dõi</h3>
+        <p>Thanh toán COD, xem lịch sử đơn, tự hủy đơn khi còn trong trạng thái "Chờ xử lý".</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FAF5FF;">⚙️</div>
+        <h3>Khu quản trị</h3>
+        <p>Tổng quan doanh thu, quản lý danh mục, sản phẩm, tồn kho và điều phối đơn hàng theo đúng luồng.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FFFBEB;">🎨</div>
+        <h3>Phong cách soft-modern</h3>
+        <p>Nền xám nhạt, thẻ trắng bo góc lớn, màu nhấn cam, phông Plus Jakarta Sans đủ dấu tiếng Việt.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#F0FDFA;">⌨️</div>
+        <h3>Thao tác bàn phím</h3>
+        <p>Điều hướng hoàn toàn bằng Tab, Enter, Esc. Cửa sổ không bao giờ "Not responding".</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FFF7ED;">🔒</div>
+        <h3>An toàn &amp; chắc chắn</h3>
+        <p>Không bán vượt kho, quyền quản trị kiểm ở tầng service, ảnh được kiểm nội dung file.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCREENSHOTS -->
+<section id="screenshots">
+  <div class="section-inner">
+    <div class="section-label">Ảnh màn hình</div>
+    <h2 class="section-title">Trải nghiệm thực tế</h2>
+    <p class="section-desc">Giao diện nhất quán từ trang chủ, giỏ hàng đến khu quản trị.</p>
+
+    <div class="screenshots-grid">
+      <figure class="screenshot-card">
+        <img src="images/catalog.png" alt="Danh sách sản phẩm" loading="lazy" />
+        <figcaption>📋 Danh sách sản phẩm: tìm, lọc, sắp xếp</figcaption>
+      </figure>
+      <figure class="screenshot-card">
+        <img src="images/product.png" alt="Chi tiết sản phẩm" loading="lazy" />
+        <figcaption>🔎 Chi tiết sản phẩm</figcaption>
+      </figure>
+      <figure class="screenshot-card">
+        <img src="images/cart.png" alt="Giỏ hàng" loading="lazy" />
+        <figcaption>🛒 Giỏ hàng trượt ra trong cửa sổ</figcaption>
+      </figure>
+      <figure class="screenshot-card">
+        <img src="images/checkout.png" alt="Thanh toán" loading="lazy" />
+        <figcaption>💳 Thanh toán khi nhận hàng (COD)</figcaption>
+      </figure>
+      <figure class="screenshot-card">
+        <img src="images/order.png" alt="Chi tiết đơn hàng" loading="lazy" />
+        <figcaption>📦 Chi tiết đơn hàng</figcaption>
+      </figure>
+      <figure class="screenshot-card">
+        <img src="images/admin-dashboard.png" alt="Tổng quan quản trị" loading="lazy" />
+        <figcaption>📊 Tổng quan của quản trị viên</figcaption>
+      </figure>
+      <figure class="screenshot-card">
+        <img src="images/admin-products.png" alt="Quản lý sản phẩm" loading="lazy" />
+        <figcaption>🗂️ Quản lý sản phẩm</figcaption>
+      </figure>
+      <figure class="screenshot-card">
+        <img src="images/credits.png" alt="Nguồn ảnh" loading="lazy" />
+        <figcaption>ℹ️ Hộp thoại Nguồn ảnh</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- QUICKSTART -->
+<section class="features-bg" id="quickstart">
+  <div class="section-inner">
+    <div class="section-label">Cài đặt</div>
+    <h2 class="section-title">Chạy trong 3 bước</h2>
+    <p class="section-desc">Không cần cài Java, database hay Docker.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Tải bản Windows</h3>
+          <p>Tải <code>MiniShop-0.9.0-windows.zip</code> ở trang <a href="https://github.com/Luffyreals/mini-shop/releases/latest" target="_blank" rel="noopener">Releases</a> (~80 MB, Windows 10/11 64-bit).</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Giải nén vào thư mục không dấu</h3>
+          <p>Ví dụ <code>C:\MiniShop</code>. Đường dẫn có chữ ngoài bảng mã ANSI (ví dụ "ư") làm app thoát ngay.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Nhấp đúp MiniShop.exe</h3>
+          <p>Windows SmartScreen có thể cảnh báo: bấm "Thông tin thêm" → "Vẫn chạy". Lần đầu app tự tạo dữ liệu mẫu.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:48px; font-size:1rem; font-weight:700;">Tài khoản demo</h3>
+    <table class="cred-table">
+      <thead>
+        <tr><th>Vai trò</th><th>Email</th><th>Mật khẩu</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Quản trị</td><td><code>admin@minishop.local</code></td><td><code>Admin@123</code></td></tr>
+        <tr><td>Khách hàng</td><td><code>user@minishop.local</code></td><td><code>User@123</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:48px; font-size:1rem; font-weight:700;">Chạy từ mã nguồn (cần JDK 25)</h3>
+    <pre><code>git clone https://github.com/Luffyreals/mini-shop.git
+cd mini-shop
+./mvnw javafx:run          # macOS / Linux
+.\mvnw.cmd javafx:run      # Windows PowerShell</code></pre>
+  </div>
+</section>
+
+<!-- STACK -->
+<section class="stack-bg" id="stack">
+  <div class="section-inner">
+    <div class="section-label">Công nghệ</div>
+    <h2 class="section-title">Bên trong Mini Shop</h2>
+    <p class="section-desc">Stack thuần Java, không cần server bên ngoài. Gần 3000 test, CI fail nếu có test bị bỏ qua.</p>
+
+    <table class="stack-table">
+      <thead>
+        <tr><th>Lớp</th><th>Công nghệ</th><th>Ghi chú</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Ngôn ngữ</td>
+          <td><span class="tag">Java 25</span></td>
+          <td>JDK 25 (Temurin)</td>
+        </tr>
+        <tr>
+          <td>Giao diện</td>
+          <td><span class="tag">JavaFX 25</span></td>
+          <td>CSS của JavaFX, phông Plus Jakarta Sans</td>
+        </tr>
+        <tr>
+          <td>Nghiệp vụ</td>
+          <td><span class="tag">Spring Boot 4.1</span></td>
+          <td>Data JPA, Validation, BCrypt — không có web server</td>
+        </tr>
+        <tr>
+          <td>Dữ liệu</td>
+          <td><span class="tag">H2</span> <span class="tag">Flyway</span></td>
+          <td>H2 lưu ra file (chế độ tương thích PostgreSQL)</td>
+        </tr>
+        <tr>
+          <td>Kiểm thử</td>
+          <td><span class="tag">JUnit</span> <span class="tag">Mockito</span> <span class="tag">TestFX</span> <span class="tag">ArchUnit</span></td>
+          <td>~3000 test; ArchUnit kiểm chiều phụ thuộc giữa module</td>
+        </tr>
+        <tr>
+          <td>Đóng gói</td>
+          <td><span class="tag">jpackage</span></td>
+          <td>MiniShop.exe + Java runtime riêng, chạy không cần cài Java</td>
+        </tr>
+        <tr>
+          <td>CI</td>
+          <td><span class="tag">GitHub Actions</span></td>
+          <td>Build, test, đóng gói Windows, upload artifact</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="section-inner">
+    <div class="section-label">Bắt đầu ngay</div>
+    <h2 class="section-title">Sẵn sàng thử chưa?</h2>
+    <p class="section-desc">
+      Tải bản Windows hoặc clone về chạy từ mã nguồn.
+      Mã nguồn mở, giấy phép MIT.
+    </p>
+    <div class="cta-actions">
+      <a class="btn btn-white" href="https://github.com/Luffyreals/mini-shop/releases/latest" target="_blank" rel="noopener">
+        ⬇ Tải về Windows
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/Luffyreals/mini-shop" target="_blank" rel="noopener">
+        ★ GitHub Repo
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>
+    Mã nguồn &amp; biểu tượng: <a href="https://github.com/Luffyreals/mini-shop/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a> ·
+    Ảnh sản phẩm theo giấy phép mở ·
+    Phông Plus Jakarta Sans theo SIL OFL ·
+    Xem chi tiết trong hộp thoại <strong>Nguồn ảnh</strong> của app
+  </p>
+  <p style="margin-top:8px;">
+    <a href="https://github.com/Luffyreals/mini-shop" target="_blank" rel="noopener">github.com/Luffyreals/mini-shop</a>
+  </p>
+</footer>
+
+</body>
+</html>
